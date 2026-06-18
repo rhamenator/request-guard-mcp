@@ -19,7 +19,7 @@ pub async fn run(state: &AppState, req: ClassifyRequest) -> ClassifyResponse {
     let rule_engine = RuleEngine::new();
     let scorer = Scorer::new();
 
-    let mut signals: SignalSet = rule_engine.evaluate(&req);
+    let signals: SignalSet = rule_engine.evaluate(&req);
 
     // Check cache for fingerprint
     let fingerprint = request_fingerprint(

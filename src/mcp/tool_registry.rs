@@ -109,10 +109,10 @@ impl McpTool for ClassifyTool {
     }
     async fn call(&self, state: Arc<AppState>, params: Option<Value>) -> Result<Value, AppError> {
         let req: crate::models::request::ClassifyRequest = params
-            .map(|v| serde_json::from_value(v))
+            .map(serde_json::from_value)
             .transpose()
             .map_err(|e: serde_json::Error| AppError::InvalidRequest(e.to_string()))?
-            .unwrap_or_else(|| crate::models::request::ClassifyRequest {
+            .unwrap_or(crate::models::request::ClassifyRequest {
                 ip: None,
                 user_agent: None,
                 path: None,
@@ -205,7 +205,7 @@ impl McpTool for FeatureFlagsTool {
     }
     async fn call(&self, state: Arc<AppState>, params: Option<Value>) -> Result<Value, AppError> {
         let req: crate::models::request::FeatureFlagsRequest = params
-            .map(|v| serde_json::from_value(v))
+            .map(serde_json::from_value)
             .transpose()
             .map_err(|e: serde_json::Error| AppError::InvalidRequest(e.to_string()))?
             .unwrap_or(crate::models::request::FeatureFlagsRequest { flag: None });
@@ -226,7 +226,7 @@ impl McpTool for WarmupTool {
     }
     async fn call(&self, state: Arc<AppState>, params: Option<Value>) -> Result<Value, AppError> {
         let req: crate::models::request::WarmupRequest = params
-            .map(|v| serde_json::from_value(v))
+            .map(serde_json::from_value)
             .transpose()
             .map_err(|e: serde_json::Error| AppError::InvalidRequest(e.to_string()))?
             .unwrap_or(crate::models::request::WarmupRequest { target: None });
@@ -415,7 +415,7 @@ impl McpTool for ScoreBreakdownTool {
     }
     async fn call(&self, state: Arc<AppState>, params: Option<Value>) -> Result<Value, AppError> {
         let req: crate::models::request::ScoreBreakdownRequest = params
-            .map(|v| serde_json::from_value(v))
+            .map(serde_json::from_value)
             .transpose()
             .map_err(|e: serde_json::Error| AppError::InvalidRequest(e.to_string()))?
             .unwrap_or(crate::models::request::ScoreBreakdownRequest {
@@ -460,7 +460,7 @@ impl McpTool for DriftReportTool {
     }
     async fn call(&self, state: Arc<AppState>, params: Option<Value>) -> Result<Value, AppError> {
         let req: crate::models::request::DriftReportRequest = params
-            .map(|v| serde_json::from_value(v))
+            .map(serde_json::from_value)
             .transpose()
             .map_err(|e: serde_json::Error| AppError::InvalidRequest(e.to_string()))?
             .unwrap_or(crate::models::request::DriftReportRequest {
@@ -484,7 +484,7 @@ impl McpTool for CalibrationReportTool {
     }
     async fn call(&self, state: Arc<AppState>, params: Option<Value>) -> Result<Value, AppError> {
         let req: crate::models::request::CalibrationReportRequest = params
-            .map(|v| serde_json::from_value(v))
+            .map(serde_json::from_value)
             .transpose()
             .map_err(|e: serde_json::Error| AppError::InvalidRequest(e.to_string()))?
             .unwrap_or(crate::models::request::CalibrationReportRequest { window_hours: None });
@@ -505,7 +505,7 @@ impl McpTool for QueueStatusTool {
     }
     async fn call(&self, state: Arc<AppState>, params: Option<Value>) -> Result<Value, AppError> {
         let req: crate::models::request::QueueStatusRequest = params
-            .map(|v| serde_json::from_value(v))
+            .map(serde_json::from_value)
             .transpose()
             .map_err(|e: serde_json::Error| AppError::InvalidRequest(e.to_string()))?
             .unwrap_or(crate::models::request::QueueStatusRequest { queue: None });
@@ -526,7 +526,7 @@ impl McpTool for ConfigSnapshotTool {
     }
     async fn call(&self, state: Arc<AppState>, params: Option<Value>) -> Result<Value, AppError> {
         let req: crate::models::request::ConfigSnapshotRequest = params
-            .map(|v| serde_json::from_value(v))
+            .map(serde_json::from_value)
             .transpose()
             .map_err(|e: serde_json::Error| AppError::InvalidRequest(e.to_string()))?
             .unwrap_or(crate::models::request::ConfigSnapshotRequest {
@@ -549,7 +549,7 @@ impl McpTool for SelfTestTool {
     }
     async fn call(&self, state: Arc<AppState>, params: Option<Value>) -> Result<Value, AppError> {
         let req: crate::models::request::SelfTestRequest = params
-            .map(|v| serde_json::from_value(v))
+            .map(serde_json::from_value)
             .transpose()
             .map_err(|e: serde_json::Error| AppError::InvalidRequest(e.to_string()))?
             .unwrap_or(crate::models::request::SelfTestRequest { suite: None });

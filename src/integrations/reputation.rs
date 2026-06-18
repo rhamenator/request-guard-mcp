@@ -7,6 +7,7 @@ pub struct ReputationScore {
     pub categories: Vec<String>,
 }
 
+#[derive(Default)]
 pub struct ReputationClient {
     api_key: Option<String>,
 }
@@ -27,11 +28,5 @@ impl ReputationClient {
         }
         // Real implementation would call an external API.
         ReputationScore::default()
-    }
-}
-
-impl Default for ReputationClient {
-    fn default() -> Self {
-        ReputationClient { api_key: None }
     }
 }

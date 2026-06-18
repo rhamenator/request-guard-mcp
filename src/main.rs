@@ -1,16 +1,4 @@
-mod auth;
-mod config;
-mod engines;
-mod error;
-mod integrations;
-mod limits;
-mod mcp;
-mod models;
-mod state;
-mod telemetry;
-mod tools;
-mod util;
-
+use ai_scraping_defense_mcp::{config, mcp, state, telemetry};
 use anyhow::Result;
 
 #[tokio::main]

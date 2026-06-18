@@ -5,7 +5,7 @@ use std::collections::HashMap;
 
 static START_TIME: once_cell::sync::Lazy<u64> = once_cell::sync::Lazy::new(now_unix);
 
-pub async fn run(state: &AppState) -> HealthResponse {
+pub async fn run(_state: &AppState) -> HealthResponse {
     // Trigger initialization of start time on first call.
     let _ = *START_TIME;
 

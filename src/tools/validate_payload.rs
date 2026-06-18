@@ -53,13 +53,11 @@ fn validate_for_tool(tool: &str, payload: &serde_json::Value) -> Vec<ValidationE
                 }
             }
         }
-        "enrich_ip" => {
-            if payload.get("ip").is_none() {
-                errors.push(ValidationError {
-                    path: "/ip".to_string(),
-                    message: "'ip' is required".to_string(),
-                });
-            }
+        "enrich_ip" if payload.get("ip").is_none() => {
+            errors.push(ValidationError {
+                path: "/ip".to_string(),
+                message: "'ip' is required".to_string(),
+            });
         }
         _ => {
             // Unknown tool - no specific validation

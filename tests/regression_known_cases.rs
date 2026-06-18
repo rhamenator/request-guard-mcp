@@ -53,19 +53,17 @@ async fn known_cases_match_expected_verdicts() {
             ua: Some("Scrapy/2.11"),
             path: Some("/"),
             method: Some("GET"),
-            expected_verdict: models::enums::Verdict::Flag,
+            expected_verdict: models::enums::Verdict::Block,
         },
     ];
 
     for case in &cases {
         let req = make_req(case);
         let resp = tools::classify::run(&state, req).await;
-        assert!(
-            !matches!(resp.verdict, models::enums::Verdict::Allow),
-            "case '{}': expected non-allow, got {:?} (score={})",
-            case.name,
-            resp.verdict,
-            resp.score
+        assert_eq!(
+            resp.verdict, case.expected_verdict,
+            "case '{}': expected {:?}, got {:?} (score={})",
+            case.name, case.expected_verdict, resp.verdict, resp.score
         );
     }
 }

@@ -20,7 +20,7 @@ pub async fn run(
     }
 
     let mut results = Vec::with_capacity(got);
-    let mut error_count = 0usize;
+    let error_count = 0usize;
 
     for (i, item) in req.items.into_iter().enumerate() {
         let result = crate::tools::classify::run(state, item).await;

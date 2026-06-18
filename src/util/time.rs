@@ -27,7 +27,7 @@ pub fn format_utc(secs: u64) -> String {
     let dt: DateTime<Utc> = Utc
         .timestamp_opt(secs as i64, 0)
         .single()
-        .unwrap_or_else(|| Utc::now());
+        .unwrap_or_else(Utc::now);
     dt.to_rfc3339()
 }
 

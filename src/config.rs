@@ -78,7 +78,7 @@ pub struct PostgresConfig {
     pub max_connections: u32,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize)]
 pub struct GeoipConfig {
     #[serde(default)]
     pub mmdb_path: Option<String>,
@@ -242,12 +242,6 @@ impl Default for PostgresConfig {
             url: None,
             max_connections: defaults::pg_max_connections(),
         }
-    }
-}
-
-impl Default for GeoipConfig {
-    fn default() -> Self {
-        Self { mmdb_path: None }
     }
 }
 

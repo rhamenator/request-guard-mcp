@@ -50,7 +50,7 @@ opentelemetry_sdk = { version = "0.22", features = ["rt-tokio"] }
 opentelemetry-otlp = { version = "0.15", features = ["tonic"] }
 
 # Metrics
-prometheus = { version = "0.13", features = ["process"] }
+prometheus = { version = "0.13", default-features = false, features = ["process"] }
 axum-prometheus = "0.6"
 
 # Error handling
@@ -58,7 +58,7 @@ thiserror = "1.0"
 anyhow = "1.0"
 
 # Validation
-validator = { version = "0.18", features = ["derive"] }
+validator = { version = "0.20", features = ["derive"] }
 jsonschema = "0.17"
 
 # UUID / IDs
@@ -83,7 +83,7 @@ moka = { version = "0.12", features = ["future"] }
 
 # IP parsing
 ipnetwork = "0.20"
-maxminddb = "0.23"
+maxminddb = "0.28"
 
 # Regex
 regex = "1.10"
@@ -97,7 +97,7 @@ deadpool-redis = { version = "0.15", optional = true }
 redis = { version = "0.25", features = ["tokio-comp", "connection-manager"] }
 
 # Optional: PostgreSQL
-sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json"], optional = true }
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json"], optional = true }
 
 # Async traits
 async-trait = "0.1"

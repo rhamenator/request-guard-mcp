@@ -4,6 +4,7 @@ use std::net::IpAddr;
 use std::sync::Arc;
 use tracing::{info, warn};
 
+#[derive(Default)]
 pub struct GeoipClient {
     reader: Option<Arc<Reader<Vec<u8>>>>,
 }
@@ -39,19 +40,19 @@ impl GeoipClient {
             return GeoipResult::default();
         };
 
-        let city: Option<geoip2::City> = reader.lookup(*ip).ok();
+        let city: Option<geoip2::City> = reader
+            .lookup(*ip)
+            .ok()
+            .and_then(|result| result.decode().ok().flatten());
         let country = city
             .as_ref()
-            .and_then(|c| c.country.as_ref())
-            .and_then(|c| c.iso_code)
+            .and_then(|c| c.country.iso_code)
             .map(str::to_string);
 
         let city_name = city
             .as_ref()
-            .and_then(|c| c.city.as_ref())
-            .and_then(|c| c.names.as_ref())
-            .and_then(|n| n.get("en"))
-            .map(|s| (*s).to_string());
+            .and_then(|c| c.city.names.english)
+            .map(str::to_string);
 
         GeoipResult {
             country,
@@ -63,11 +64,5 @@ impl GeoipClient {
 
     pub fn is_available(&self) -> bool {
         self.reader.is_some()
-    }
-}
-
-impl Default for GeoipClient {
-    fn default() -> Self {
-        GeoipClient { reader: None }
     }
 }
