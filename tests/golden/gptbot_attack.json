@@ -1,0 +1,13 @@
+{
+  "description": "Known AI bot - should be blocked",
+  "input": {
+    "ip": "66.249.90.1",
+    "user_agent": "GPTBot/1.0",
+    "path": "/articles/2024/data-export.html",
+    "method": "GET"
+  },
+  "expected": {
+    "verdict_not": "allow",
+    "min_score": 0.55
+  }
+}

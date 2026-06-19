@@ -1,0 +1,13 @@
+[advisories]
+ignore = [
+    # rsa: Marvin Attack timing side-channel, no fixed upgrade available upstream.
+    # rsa is pulled in only as an optional dependency of sqlx's MySQL backend
+    # (sqlx always lists sqlx-mysql as a resolvable optional dep regardless of
+    # which backend feature is selected). We build with default-features = false
+    # and only enable the "postgres" feature, so sqlx-mysql/rsa are never
+    # compiled into the binary.
+    "RUSTSEC-2023-0071",
+    # proc-macro-error2: unmaintained, build-time-only proc-macro dependency of
+    # validator_derive. No functional impact; no maintained replacement yet.
+    "RUSTSEC-2026-0173",
+]

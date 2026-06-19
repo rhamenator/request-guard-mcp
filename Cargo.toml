@@ -1,0 +1,134 @@
+[package]
+name = "ai-scraping-defense-mcp"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+description = "Production-ready Rust MCP server for AI scraping defense"
+authors = ["rhamenator"]
+license = "MIT"
+repository = "https://github.com/rhamenator/ai-scraping-defense-mcp"
+keywords = ["mcp", "ai-defense", "scraping", "websocket", "security"]
+categories = ["network-programming", "web-programming::websocket"]
+
+[[bin]]
+name = "ai-scraping-defense-mcp"
+path = "src/main.rs"
+
+[lib]
+name = "ai_scraping_defense_mcp"
+path = "src/lib.rs"
+
+[features]
+default = ["redis-integration", "postgres-integration"]
+redis-integration = ["dep:deadpool-redis"]
+postgres-integration = ["dep:sqlx"]
+
+[dependencies]
+# Async runtime
+tokio = { version = "1.36", features = ["full"] }
+tokio-stream = "0.1"
+
+# WebSocket
+axum = { version = "0.7", features = ["ws", "macros"] }
+tower = { version = "0.4", features = ["util", "timeout", "limit"] }
+tower-http = { version = "0.5", features = ["trace", "cors", "limit"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Configuration
+config = { version = "0.14", features = ["toml"] }
+dotenvy = "0.15"
+
+# Tracing / observability
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "fmt"] }
+tracing-opentelemetry = "0.23"
+opentelemetry = "0.22"
+opentelemetry_sdk = { version = "0.22", features = ["rt-tokio"] }
+opentelemetry-otlp = { version = "0.15", features = ["tonic"] }
+
+# Metrics
+prometheus = { version = "0.13", default-features = false, features = ["process"] }
+axum-prometheus = "0.6"
+
+# Error handling
+thiserror = "1.0"
+anyhow = "1.0"
+
+# Validation
+validator = { version = "0.20", features = ["derive"] }
+jsonschema = "0.17"
+
+# UUID / IDs
+uuid = { version = "1.7", features = ["v4", "serde"] }
+
+# Time
+chrono = { version = "0.4", features = ["serde"] }
+time = { version = "0.3", features = ["serde"] }
+
+# Cryptography / hashing
+sha2 = "0.10"
+hmac = "0.12"
+hex = "0.4"
+base64 = "0.22"
+
+# HTTP client (for enrichment)
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+
+
+# Caching
+moka = { version = "0.12", features = ["future"] }
+
+# IP parsing
+ipnetwork = "0.20"
+maxminddb = "0.28"
+
+# Regex
+regex = "1.10"
+once_cell = "1.19"
+
+# User agent parsing
+woothee = "0.13"
+
+# Optional: Redis
+deadpool-redis = { version = "0.15", optional = true }
+redis = { version = "0.25", features = ["tokio-comp", "connection-manager"] }
+
+# Optional: PostgreSQL
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json"], optional = true }
+
+# Async traits
+async-trait = "0.1"
+
+# Collections
+indexmap = { version = "2.2", features = ["serde"] }
+dashmap = "5.5"
+
+# Random
+rand = "0.8"
+
+# Process info
+sysinfo = "0.30"
+
+[dev-dependencies]
+tokio-test = "0.4"
+axum-test = "14.2"
+pretty_assertions = "1.4"
+serde_json = "1.0"
+tempfile = "3.10"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+strip = "symbols"
+panic = "abort"
+
+[profile.dev]
+opt-level = 0
+debug = true
+
+[profile.test]
+opt-level = 1

@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "BatchClassifyRequest",
+  "type": "object",
+  "required": ["items"],
+  "properties": {
+    "items": {
+      "type": "array",
+      "items": { "$ref": "classify.json" },
+      "minItems": 1,
+      "maxItems": 200
+    },
+    "options": {
+      "type": "object",
+      "properties": {
+        "fail_fast": { "type": "boolean", "default": false },
+        "include_details": { "type": "boolean", "default": false }
+      }
+    }
+  }
+}

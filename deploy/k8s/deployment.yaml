@@ -1,0 +1,90 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-scraping-defense-mcp
+  namespace: ai-defense
+  labels:
+    app: ai-scraping-defense-mcp
+    version: "0.1.0"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ai-scraping-defense-mcp
+  template:
+    metadata:
+      labels:
+        app: ai-scraping-defense-mcp
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8085"
+        prometheus.io/path: "/metrics"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+      containers:
+        - name: mcp
+          image: ghcr.io/rhamenator/ai-scraping-defense-mcp:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8085
+              name: http
+              protocol: TCP
+          env:
+            - name: MCP__HOST
+              value: "0.0.0.0"
+            - name: MCP__PORT
+              value: "8085"
+            - name: LOG_LEVEL
+              valueFrom:
+                configMapKeyRef:
+                  name: mcp-config
+                  key: log_level
+            - name: AUTH_TOKENS
+              valueFrom:
+                secretKeyRef:
+                  name: mcp-secrets
+                  key: auth_tokens
+            - name: MCP__REDIS__URL
+              valueFrom:
+                configMapKeyRef:
+                  name: mcp-config
+                  key: redis_url
+                  optional: true
+            - name: MCP__POSTGRES__URL
+              valueFrom:
+                secretKeyRef:
+                  name: mcp-secrets
+                  key: postgres_url
+                  optional: true
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "1000m"
+              memory: "512Mi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8085
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8085
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 2
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+      terminationGracePeriodSeconds: 30

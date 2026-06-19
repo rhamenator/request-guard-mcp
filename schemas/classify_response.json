@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ClassifyResponse",
+  "type": "object",
+  "required": ["request_id", "verdict", "score", "confidence", "threat_category", "signals", "latency_ms", "model_version"],
+  "properties": {
+    "request_id": { "type": "string" },
+    "verdict": { "type": "string", "enum": ["allow","challenge","flag","block","unknown"] },
+    "score": { "type": "number", "minimum": 0, "maximum": 1 },
+    "confidence": { "type": "string", "enum": ["high","medium","low","very_low"] },
+    "threat_category": { "type": "string" },
+    "signals": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "value": { "type": "number" },
+          "weight": { "type": "number" },
+          "description": { "type": "string" }
+        }
+      }
+    },
+    "latency_ms": { "type": "integer" },
+    "model_version": { "type": "string" }
+  }
+}
