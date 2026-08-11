@@ -15,6 +15,10 @@ pub async fn run(_state: &AppState, req: ValidatePayloadRequest) -> ValidatePayl
 
 fn validate_for_tool(tool: &str, payload: &serde_json::Value) -> Vec<ValidationError> {
     let mut errors = Vec::new();
+    let has_batch_items = payload
+        .get("items")
+        .and_then(|value| value.as_array())
+        .is_some_and(|items| !items.is_empty());
 
     match tool {
         "classify" => {
@@ -30,18 +34,11 @@ fn validate_for_tool(tool: &str, payload: &serde_json::Value) -> Vec<ValidationE
                 });
             }
         }
-        "batch_classify" => {
-            if payload
-                .get("items")
-                .and_then(|v| v.as_array())
-                .map(|a| a.is_empty())
-                .unwrap_or(true)
-            {
-                errors.push(ValidationError {
-                    path: "/items".to_string(),
-                    message: "'items' must be a non-empty array".to_string(),
-                });
-            }
+        "batch_classify" if !has_batch_items => {
+            errors.push(ValidationError {
+                path: "/items".to_string(),
+                message: "'items' must be a non-empty array".to_string(),
+            });
         }
         "feedback" => {
             for field in &["request_id", "correct_verdict"] {
