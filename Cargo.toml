@@ -44,11 +44,6 @@ dotenvy = "0.15"
 # Tracing / observability
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "fmt"] }
-tracing-opentelemetry = "0.23"
-opentelemetry = "0.22"
-opentelemetry_sdk = { version = "0.22", features = ["rt-tokio"] }
-opentelemetry-otlp = { version = "0.15", features = ["tonic"] }
-
 # Metrics
 prometheus = { version = "0.13", default-features = false, features = ["process"] }
 axum-prometheus = "0.6"
