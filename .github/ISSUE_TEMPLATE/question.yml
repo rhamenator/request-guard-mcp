@@ -1,0 +1,43 @@
+name: Question or support request
+description: Ask for help using or operating Request Guard MCP
+title: "[Question]: "
+labels: []
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Support is provided on a best-effort basis. Please read SUPPORT.md and do not post credentials, tokens, private request content, or vulnerability details.
+  - type: textarea
+    id: goal
+    attributes:
+      label: What are you trying to accomplish?
+    validations:
+      required: true
+  - type: textarea
+    id: attempted
+    attributes:
+      label: What have you tried?
+      description: Include relevant sanitized configuration and the documentation you consulted.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Include the version, operating system, deployment method, MCP client, and enabled integrations.
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I read the README, relevant docs, and SUPPORT.md.
+          required: true
+        - label: I searched existing issues for an answer.
+          required: true
+        - label: I removed secrets and sensitive data.
+          required: true
+        - label: This is not a security vulnerability. Security vulnerabilities must be reported privately.
+          required: true

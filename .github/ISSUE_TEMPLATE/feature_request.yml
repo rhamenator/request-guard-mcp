@@ -1,0 +1,43 @@
+name: Feature request
+description: Propose an improvement to Request Guard MCP
+title: "[Feature]: "
+labels: []
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the problem and desired outcome before proposing an implementation. For security-sensitive requests, avoid publishing exploit details.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: What limitation or user need should this address?
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: What should users be able to do, and how would success be measured?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Describe current workarounds or other designs you considered.
+  - type: textarea
+    id: impact
+    attributes:
+      label: Compatibility and operational impact
+      description: Note any effects on the MCP protocol or tool schemas, APIs, configuration, authentication, data stores, performance, deployments, or existing clients.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues and pull requests for similar proposals.
+          required: true
+        - label: I have not included secrets or sensitive data.
+          required: true
