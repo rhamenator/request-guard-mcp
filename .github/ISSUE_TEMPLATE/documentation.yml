@@ -1,0 +1,35 @@
+name: Documentation improvement
+description: Report missing, unclear, or incorrect documentation
+title: "[Docs]: "
+labels: []
+assignees: []
+body:
+  - type: input
+    id: location
+    attributes:
+      label: Documentation location
+      description: Link to the page or name the file and section.
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What is unclear or incorrect?
+    validations:
+      required: true
+  - type: textarea
+    id: improvement
+    attributes:
+      label: Suggested improvement
+      description: Explain what information, example, or correction would help.
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I checked the current README and docs directory.
+          required: true
+        - label: I removed secrets and sensitive data from this report.
+          required: true
