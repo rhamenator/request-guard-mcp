@@ -1,4 +1,7 @@
-/// Reputation data for an IP or ASN (stub - would connect to external APIs).
+use crate::integrations::redis::RedisClient;
+use anyhow::Result;
+use std::sync::Arc;
+
 #[derive(Debug, Clone, Default)]
 pub struct ReputationScore {
     pub score: f64,
@@ -7,26 +10,46 @@ pub struct ReputationScore {
     pub categories: Vec<String>,
 }
 
-#[derive(Default)]
 pub struct ReputationClient {
-    api_key: Option<String>,
+    redis: Arc<RedisClient>,
 }
 
 impl ReputationClient {
-    pub fn new(api_key: Option<String>) -> Self {
-        ReputationClient { api_key }
+    pub fn new(redis: Arc<RedisClient>) -> Self {
+        Self { redis }
     }
 
     pub fn is_configured(&self) -> bool {
-        self.api_key.is_some()
+        self.redis.is_available()
     }
 
-    /// Look up reputation for an IP. Returns default if not configured.
-    pub async fn lookup_ip(&self, _ip: &str) -> ReputationScore {
+    pub async fn lookup_ip(&self, ip: &str) -> Result<ReputationScore> {
+        self.lookup("ip", ip).await
+    }
+
+    pub async fn lookup_asn(&self, asn: u32) -> Result<ReputationScore> {
+        self.lookup("asn", &asn.to_string()).await
+    }
+
+    async fn lookup(&self, indicator_type: &str, indicator: &str) -> Result<ReputationScore> {
         if !self.is_configured() {
-            return ReputationScore::default();
+            return Ok(ReputationScore::default());
         }
-        // Real implementation would call an external API.
-        ReputationScore::default()
+        let Some(record) = self.redis.threat_lookup(indicator_type, indicator).await? else {
+            return Ok(ReputationScore::default());
+        };
+        let score = match record.severity.to_ascii_lowercase().as_str() {
+            "critical" => 1.0,
+            "high" => 0.9,
+            "medium" => 0.6,
+            "low" => 0.3,
+            _ => 0.5,
+        };
+        Ok(ReputationScore {
+            score,
+            listed: true,
+            source: Some(record.source),
+            categories: vec![record.threat_type],
+        })
     }
 }

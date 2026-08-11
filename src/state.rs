@@ -1,5 +1,9 @@
 use crate::config::Config;
 use crate::integrations::cache::CacheStore;
+use crate::integrations::{
+    geoip::GeoipClient, postgres::PostgresClient, redis::RedisClient, reputation::ReputationClient,
+};
+use anyhow::Result;
 use dashmap::DashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -11,6 +15,10 @@ pub struct AppState {
     pub config: Arc<Config>,
     pub semaphore: Arc<Semaphore>,
     pub cache: Arc<CacheStore>,
+    pub redis: Arc<RedisClient>,
+    pub postgres: Arc<PostgresClient>,
+    pub geoip: Arc<GeoipClient>,
+    pub reputation: Arc<ReputationClient>,
     pub metrics: Arc<AppMetrics>,
     pub feature_flags: Arc<DashMap<String, bool>>,
     pub request_counter: Arc<AtomicU64>,
@@ -100,10 +108,35 @@ impl BuildInfo {
 
 impl AppState {
     pub fn new(config: Config) -> Self {
+        Self::with_integrations(
+            config,
+            RedisClient::disabled(),
+            PostgresClient::disabled(),
+            GeoipClient::disabled(),
+        )
+    }
+
+    pub async fn initialize(config: Config) -> Result<Self> {
+        let redis = RedisClient::connect(&config.redis).await?;
+        let postgres = PostgresClient::connect(&config.postgres).await?;
+        let geoip = GeoipClient::load(&config.geoip)?;
+        Ok(Self::with_integrations(config, redis, postgres, geoip))
+    }
+
+    fn with_integrations(
+        config: Config,
+        redis: RedisClient,
+        postgres: PostgresClient,
+        geoip: GeoipClient,
+    ) -> Self {
         let concurrency = config.limits.global_concurrency;
         let config = Arc::new(config);
         let semaphore = Arc::new(Semaphore::new(concurrency));
         let cache = Arc::new(CacheStore::new());
+        let redis = Arc::new(redis);
+        let postgres = Arc::new(postgres);
+        let geoip = Arc::new(geoip);
+        let reputation = Arc::new(ReputationClient::new(Arc::clone(&redis)));
         let metrics = Arc::new(AppMetrics::new());
         let feature_flags = Arc::new(DashMap::new());
         let request_counter = Arc::new(AtomicU64::new(0));
@@ -112,14 +145,26 @@ impl AppState {
         // Initialize default feature flags
         feature_flags.insert("batch_classify".to_string(), config.features.enable_batch);
         feature_flags.insert("enrichment".to_string(), config.features.enable_enrichment);
-        feature_flags.insert("feedback".to_string(), false);
-        feature_flags.insert("drift_report".to_string(), false);
-        feature_flags.insert("canary_eval".to_string(), false);
+        feature_flags.insert(
+            "feedback".to_string(),
+            config.features.enable_feedback && postgres.is_available(),
+        );
+        feature_flags.insert("replay_decision".to_string(), postgres.is_available());
+        feature_flags.insert("drift_report".to_string(), postgres.is_available());
+        feature_flags.insert("calibration_report".to_string(), postgres.is_available());
+        feature_flags.insert("canary_eval".to_string(), redis.is_available());
+        feature_flags.insert("threat_lookup".to_string(), redis.is_available());
+        feature_flags.insert("queue_status".to_string(), redis.is_available());
+        feature_flags.insert("geoip".to_string(), geoip.is_available());
 
         Self {
             config,
             semaphore,
             cache,
+            redis,
+            postgres,
+            geoip,
+            reputation,
             metrics,
             feature_flags,
             request_counter,

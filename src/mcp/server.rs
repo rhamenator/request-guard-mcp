@@ -1,5 +1,5 @@
 use crate::mcp::tool_registry::ToolRegistry;
-use crate::mcp::transport_ws::handle_ws_connection;
+use crate::mcp::transport_ws::{handle_ws_connection, process_message};
 use crate::state::AppState;
 use crate::telemetry::gather_metrics;
 use axum::{
@@ -22,7 +22,7 @@ pub struct ServerState {
 pub fn build_router(state: ServerState, max_body: usize) -> Router {
     let metrics_path = state.app.config.telemetry.metrics_path.clone();
     Router::new()
-        .route("/mcp", get(ws_handler))
+        .route("/mcp", get(ws_handler).post(http_mcp_handler))
         .route("/health", get(http_health_handler))
         .route(&metrics_path, get(metrics_handler))
         .route("/ready", get(readiness_handler))
@@ -35,15 +35,51 @@ async fn ws_handler(
     headers: HeaderMap,
     State(state): State<ServerState>,
 ) -> Response {
-    if state.app.config.auth.enabled {
-        if let Err(error) = crate::auth::verify_token(&headers, &state.app.config.auth.tokens) {
-            let status = StatusCode::from_u16(error.status_code())
-                .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
-            return (status, error.code()).into_response();
-        }
+    if let Err(error) = authorize(&headers, &state.app) {
+        return error_response(&error);
     }
 
     ws.on_upgrade(move |socket| handle_ws_connection(socket, state.app, state.registry))
+}
+
+async fn http_mcp_handler(
+    headers: HeaderMap,
+    State(state): State<ServerState>,
+    body: axum::body::Bytes,
+) -> Response {
+    if let Err(error) = authorize(&headers, &state.app) {
+        return error_response(&error);
+    }
+    let Ok(text) = std::str::from_utf8(&body) else {
+        return (
+            StatusCode::BAD_REQUEST,
+            [(axum::http::header::CONTENT_TYPE, "application/json")],
+            r#"{"jsonrpc":"2.0","id":null,"error":{"code":-32700,"message":"Parse error: MCP messages must be UTF-8"}}"#,
+        )
+            .into_response();
+    };
+    match process_message(text, &state.app, &state.registry).await {
+        Some(response) => (
+            StatusCode::OK,
+            [(axum::http::header::CONTENT_TYPE, "application/json")],
+            response,
+        )
+            .into_response(),
+        None => StatusCode::NO_CONTENT.into_response(),
+    }
+}
+
+fn authorize(headers: &HeaderMap, state: &AppState) -> Result<(), crate::error::AppError> {
+    if state.config.auth.enabled {
+        crate::auth::verify_token(headers, &state.config.auth.tokens)?;
+    }
+    Ok(())
+}
+
+fn error_response(error: &crate::error::AppError) -> Response {
+    let status =
+        StatusCode::from_u16(error.status_code()).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
+    (status, error.code()).into_response()
 }
 
 async fn http_health_handler(State(state): State<ServerState>) -> impl IntoResponse {
@@ -63,9 +99,15 @@ async fn metrics_handler() -> impl IntoResponse {
 }
 
 async fn readiness_handler(State(state): State<ServerState>) -> impl IntoResponse {
-    // Simple readiness: semaphore available + no critical failures
-    let available = state.app.semaphore.available_permits() > 0;
-    if available {
+    let capacity_available = state.app.semaphore.available_permits() > 0;
+    let redis_ready = state.app.config.redis.url.is_none() || state.app.redis.ping().await;
+    let postgres_ready = state.app.config.postgres.url.is_none() || state.app.postgres.ping().await;
+    let geoip_configured = state.app.config.geoip.mmdb_path.is_some()
+        || state.app.config.geoip.city_mmdb_path.is_some()
+        || state.app.config.geoip.asn_mmdb_path.is_some()
+        || state.app.config.geoip.anonymous_ip_mmdb_path.is_some();
+    let geoip_ready = !geoip_configured || state.app.geoip.is_available();
+    if capacity_available && redis_ready && postgres_ready && geoip_ready {
         (StatusCode::OK, "ready")
     } else {
         (StatusCode::SERVICE_UNAVAILABLE, "not ready")

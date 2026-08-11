@@ -7,7 +7,11 @@ async fn main() -> Result<()> {
     let config = config::Config::load()?;
 
     // Initialize tracing
-    telemetry::init_tracing(&config.log_level);
+    let tracer_provider = telemetry::init_tracing(
+        &config.log_level,
+        &config.telemetry.service_name,
+        config.telemetry.otlp_endpoint.as_deref(),
+    )?;
 
     tracing::info!(
         version = env!("CARGO_PKG_VERSION"),
@@ -17,8 +21,14 @@ async fn main() -> Result<()> {
     );
 
     // Build application state
-    let app_state = state::AppState::new(config);
+    let app_state = state::AppState::initialize(config).await?;
 
     // Run the MCP server (blocks until shutdown)
-    mcp::server::run_server(app_state).await
+    let result = mcp::server::run_server(app_state).await;
+    if let Some(provider) = tracer_provider {
+        provider
+            .shutdown()
+            .map_err(|error| anyhow::anyhow!("failed to flush OTLP traces: {error}"))?;
+    }
+    result
 }

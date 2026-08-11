@@ -59,7 +59,7 @@ async fn known_cases_match_expected_verdicts() {
 
     for case in &cases {
         let req = make_req(case);
-        let resp = tools::classify::run(&state, req).await;
+        let resp = tools::classify::run(&state, req).await.unwrap();
         assert_eq!(
             resp.verdict, case.expected_verdict,
             "case '{}': expected {:?}, got {:?} (score={})",
@@ -93,7 +93,7 @@ async fn clean_browser_always_allowed() {
         timestamp: None,
         extra: None,
     };
-    let resp = tools::classify::run(&state, req).await;
+    let resp = tools::classify::run(&state, req).await.unwrap();
     assert_eq!(
         resp.verdict,
         models::enums::Verdict::Allow,

@@ -17,7 +17,7 @@ services:
       - MCP__PORT=8085
       - LOG_LEVEL=info
       - AUTH_TOKENS=${AUTH_TOKENS:?Set AUTH_TOKENS to a strong non-placeholder token}
-      - MCP__REDIS__URL=redis://redis:6379
+      - MCP__REDIS__URL=redis://:${REDIS_PASSWORD:?Set REDIS_PASSWORD}@redis:6379
       - MCP__POSTGRES__URL=postgresql://mcp:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/mcp
     depends_on:
       redis:
@@ -35,11 +35,16 @@ services:
     image: redis:7-alpine
     container_name: mcp-redis
     restart: unless-stopped
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:?Set REDIS_PASSWORD}", "--appendonly", "yes"]
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep PONG"]
       interval: 10s
       timeout: 3s
       retries: 5
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
 
   postgres:
     image: postgres:16-alpine
@@ -78,4 +83,5 @@ services:
       - prometheus
 
 volumes:
+  redis_data:
   postgres_data:

@@ -58,6 +58,7 @@ docker-compose-down:
 k8s-apply:
 	kubectl apply -f deploy/k8s/namespace.yaml
 	kubectl apply -f deploy/k8s/configmap.yaml
+	kubectl apply -f deploy/k8s/backends.yaml
 	kubectl apply -f deploy/k8s/deployment.yaml
 	kubectl apply -f deploy/k8s/service.yaml
 	kubectl apply -f deploy/k8s/hpa.yaml

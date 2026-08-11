@@ -13,7 +13,11 @@ pub async fn run(state: &AppState) -> ModelInfoResponse {
         ),
         tool("health", "Server health check", true),
         tool("model_info", "Return model and server metadata", true),
-        tool("feedback", "Submit feedback on a classification", false),
+        tool(
+            "feedback",
+            "Submit feedback on a classification",
+            flag(state, "feedback"),
+        ),
         tool("score_breakdown", "Break down a classification score", true),
         tool(
             "validate_payload",
@@ -22,25 +26,55 @@ pub async fn run(state: &AppState) -> ModelInfoResponse {
         ),
         tool("feature_flags", "List or get feature flags", true),
         tool("warmup", "Warm up caches and engines", true),
-        tool("replay_decision", "Replay a previous decision", false),
+        tool(
+            "replay_decision",
+            "Replay a previous decision",
+            flag(state, "replay_decision"),
+        ),
         tool("redact_preview", "Preview payload redaction", true),
-        tool("enrich_ip", "Enrich an IP address with geo/ASN data", false),
-        tool("enrich_asn", "Enrich an ASN with org data", false),
+        tool(
+            "enrich_ip",
+            "Enrich an IP address with geo/ASN data",
+            state.config.features.enable_enrichment
+                && (state.geoip.has_ip_database() || state.reputation.is_configured()),
+        ),
+        tool(
+            "enrich_asn",
+            "Enrich an ASN with org data",
+            state.config.features.enable_enrichment
+                && (state.geoip.has_asn_database() || state.reputation.is_configured()),
+        ),
         tool(
             "enrich_ua",
             "Enrich a user-agent string",
             state.config.features.enable_enrichment,
         ),
-        tool("threat_lookup", "Look up a threat indicator", false),
-        tool("canary_eval", "Evaluate a canary token", false),
+        tool(
+            "threat_lookup",
+            "Look up a threat indicator",
+            flag(state, "threat_lookup"),
+        ),
+        tool(
+            "canary_eval",
+            "Evaluate a canary token",
+            flag(state, "canary_eval"),
+        ),
         tool("abuse_pattern_match", "Match abuse patterns in text", true),
-        tool("drift_report", "Report on score/signal drift", false),
+        tool(
+            "drift_report",
+            "Report on score/signal drift",
+            flag(state, "drift_report"),
+        ),
         tool(
             "calibration_report",
             "Precision/recall calibration report",
-            false,
+            flag(state, "calibration_report"),
         ),
-        tool("queue_status", "Status of processing queues", false),
+        tool(
+            "queue_status",
+            "Status of processing queues",
+            flag(state, "queue_status"),
+        ),
         tool("config_snapshot", "Snapshot of current configuration", true),
         tool("self_test", "Run internal self-test suite", true),
     ];
@@ -57,6 +91,10 @@ pub async fn run(state: &AppState) -> ModelInfoResponse {
             rust_version: bi.rust_version.clone(),
         },
     }
+}
+
+fn flag(state: &AppState, name: &str) -> bool {
+    state.feature_flags.get(name).is_some_and(|value| *value)
 }
 
 fn tool(name: &str, desc: &str, enabled: bool) -> ToolInfo {

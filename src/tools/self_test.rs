@@ -26,10 +26,10 @@ pub async fn run(state: &AppState, req: SelfTestRequest) -> SelfTestResponse {
             timestamp: None,
             extra: None,
         };
-        let resp = crate::tools::classify::run(state, dummy).await;
+        let resp = crate::tools::classify::run_ephemeral(state, dummy).await;
         let passed = matches!(
-            resp.verdict,
-            crate::models::enums::Verdict::Block | crate::models::enums::Verdict::Flag
+            resp.as_ref().map(|value| &value.verdict),
+            Ok(crate::models::enums::Verdict::Block | crate::models::enums::Verdict::Flag)
         );
         results.push(SelfTestResult {
             name: "classify_gptbot".to_string(),
@@ -37,7 +37,7 @@ pub async fn run(state: &AppState, req: SelfTestRequest) -> SelfTestResponse {
             message: if passed {
                 None
             } else {
-                Some(format!("expected block/flag, got {:?}", resp.verdict))
+                Some(format!("expected block/flag, got {resp:?}"))
             },
             latency_ms: elapsed_ms(start),
         });
@@ -62,15 +62,17 @@ pub async fn run(state: &AppState, req: SelfTestRequest) -> SelfTestResponse {
             timestamp: None,
             extra: None,
         };
-        let resp = crate::tools::classify::run(state, dummy).await;
-        let passed = resp.verdict == crate::models::enums::Verdict::Allow;
+        let resp = crate::tools::classify::run_ephemeral(state, dummy).await;
+        let passed = resp
+            .as_ref()
+            .is_ok_and(|value| value.verdict == crate::models::enums::Verdict::Allow);
         results.push(SelfTestResult {
             name: "classify_clean_browser".to_string(),
             passed,
             message: if passed {
                 None
             } else {
-                Some(format!("expected allow, got {:?}", resp.verdict))
+                Some(format!("expected allow, got {resp:?}"))
             },
             latency_ms: elapsed_ms(start),
         });

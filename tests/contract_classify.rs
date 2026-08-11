@@ -52,7 +52,7 @@ fn browser_request() -> models::request::ClassifyRequest {
 #[tokio::test]
 async fn gptbot_is_blocked_or_flagged() {
     let state = make_state();
-    let resp = tools::classify::run(&state, bot_request()).await;
+    let resp = tools::classify::run(&state, bot_request()).await.unwrap();
     assert!(
         matches!(
             resp.verdict,
@@ -69,7 +69,9 @@ async fn gptbot_is_blocked_or_flagged() {
 #[tokio::test]
 async fn browser_request_is_allowed() {
     let state = make_state();
-    let resp = tools::classify::run(&state, browser_request()).await;
+    let resp = tools::classify::run(&state, browser_request())
+        .await
+        .unwrap();
     assert_eq!(
         resp.verdict,
         models::enums::Verdict::Allow,
@@ -82,7 +84,7 @@ async fn browser_request_is_allowed() {
 #[tokio::test]
 async fn response_has_required_fields() {
     let state = make_state();
-    let resp = tools::classify::run(&state, bot_request()).await;
+    let resp = tools::classify::run(&state, bot_request()).await.unwrap();
     assert!(!resp.request_id.is_empty());
     assert!(!resp.model_version.is_empty());
     // Score must be in [0, 1]
@@ -98,7 +100,7 @@ async fn classify_preserves_request_id() {
     let state = make_state();
     let mut req = browser_request();
     req.request_id = Some("my-custom-id".to_string());
-    let resp = tools::classify::run(&state, req).await;
+    let resp = tools::classify::run(&state, req).await.unwrap();
     assert_eq!(resp.request_id, "my-custom-id");
 }
 
@@ -118,7 +120,7 @@ async fn scrapy_ua_is_flagged_or_blocked() {
         timestamp: None,
         extra: None,
     };
-    let resp = tools::classify::run(&state, req).await;
+    let resp = tools::classify::run(&state, req).await.unwrap();
     assert!(
         !matches!(resp.verdict, models::enums::Verdict::Allow),
         "expected non-allow for Scrapy, got {:?}",
@@ -142,7 +144,7 @@ async fn sensitive_path_raises_score() {
         timestamp: None,
         extra: None,
     };
-    let resp = tools::classify::run(&state, req).await;
+    let resp = tools::classify::run(&state, req).await.unwrap();
     assert!(resp.score > 0.0, "expected non-zero score for .env path");
 }
 
@@ -154,12 +156,12 @@ async fn cache_key_includes_method_and_headers() {
     first.user_agent = Some("Mozilla/5.0".to_string());
     first.path = Some("/same".to_string());
     first.method = Some("GET".to_string());
-    let first_response = tools::classify::run(&state, first.clone()).await;
+    let first_response = tools::classify::run(&state, first.clone()).await.unwrap();
 
     first.method = Some("BREW".to_string());
     first.headers = None;
     first.request_id = Some("different-request".to_string());
-    let second_response = tools::classify::run(&state, first).await;
+    let second_response = tools::classify::run(&state, first).await.unwrap();
 
     assert!(second_response.score > first_response.score);
     assert!(second_response

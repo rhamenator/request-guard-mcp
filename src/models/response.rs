@@ -251,6 +251,7 @@ pub struct DriftReportResponse {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DriftMetrics {
+    pub samples: u64,
     pub score_mean: f64,
     pub score_stddev: f64,
     pub verdict_distribution: HashMap<String, u64>,
@@ -261,6 +262,7 @@ pub struct DriftMetrics {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CalibrationReportResponse {
     pub window_hours: u32,
+    pub samples: u64,
     pub precision: f64,
     pub recall: f64,
     pub f1: f64,

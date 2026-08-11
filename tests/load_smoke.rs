@@ -37,7 +37,7 @@ async fn concurrent_classify_500_requests() {
                 timestamp: None,
                 extra: None,
             };
-            tools::classify::run(&s, req).await
+            tools::classify::run(&s, req).await.unwrap()
         });
     }
 

@@ -1,0 +1,20 @@
+spec:
+  template:
+    spec:
+      containers:
+        - name: mcp
+          env:
+            - name: MCP__GEOIP__CITY_MMDB_PATH
+              value: /data/geoip/GeoIP2-City.mmdb
+            - name: MCP__GEOIP__ASN_MMDB_PATH
+              value: /data/geoip/GeoLite2-ASN.mmdb
+            - name: MCP__GEOIP__ANONYMOUS_IP_MMDB_PATH
+              value: /data/geoip/GeoIP2-Anonymous-IP.mmdb
+          volumeMounts:
+            - name: geoip
+              mountPath: /data/geoip
+              readOnly: true
+      volumes:
+        - name: geoip
+          persistentVolumeClaim:
+            claimName: geoip-mmdb

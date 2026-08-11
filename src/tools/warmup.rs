@@ -32,8 +32,14 @@ pub async fn run(state: &AppState, req: WarmupRequest) -> WarmupResponse {
                     timestamp: None,
                     extra: None,
                 };
-                crate::tools::classify::run(state, dummy).await;
-                warmed.push(t.to_string());
+                if crate::tools::classify::run_ephemeral(state, dummy)
+                    .await
+                    .is_ok()
+                {
+                    warmed.push(t.to_string());
+                } else {
+                    skipped.push(t.to_string());
+                }
             }
             "cache" => {
                 state

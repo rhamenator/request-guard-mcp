@@ -49,10 +49,20 @@ spec:
                   key: auth_tokens
             - name: MCP__REDIS__URL
               valueFrom:
-                configMapKeyRef:
-                  name: mcp-config
+                secretKeyRef:
+                  name: mcp-secrets
                   key: redis_url
                   optional: true
+            - name: MCP__REDIS__KEY_PREFIX
+              valueFrom:
+                configMapKeyRef:
+                  name: mcp-config
+                  key: redis_key_prefix
+            - name: MCP__REDIS__CACHE_TTL_SECS
+              valueFrom:
+                configMapKeyRef:
+                  name: mcp-config
+                  key: redis_cache_ttl_secs
             - name: MCP__POSTGRES__URL
               valueFrom:
                 secretKeyRef:

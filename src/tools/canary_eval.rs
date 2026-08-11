@@ -1,21 +1,27 @@
+use crate::error::AppError;
 use crate::models::{request::CanaryEvalRequest, response::CanaryEvalResponse};
 use crate::state::AppState;
-use crate::util::hashing::sha256_hex;
 
-pub async fn run(_state: &AppState, req: CanaryEvalRequest) -> CanaryEvalResponse {
-    // A canary token is a traceable URL/value that should never be fetched by legitimate users.
-    // Trigger if the token matches one of our registered canaries (stub: check hash prefix).
-    let hash = sha256_hex(req.token.as_bytes());
-    let triggered = hash.starts_with("00"); // Demo: 1-in-256 trigger rate
-
-    CanaryEvalResponse {
-        token: req.token,
-        triggered,
-        canary_id: if triggered {
-            Some("canary-001".to_string())
-        } else {
-            None
-        },
-        metadata: None,
+pub async fn run(state: &AppState, req: CanaryEvalRequest) -> Result<CanaryEvalResponse, AppError> {
+    if !state.redis.is_available() {
+        return Err(AppError::IntegrationUnavailable(
+            "canary evaluation requires Redis".to_string(),
+        ));
     }
+    if req.token.trim().is_empty() {
+        return Err(AppError::InvalidRequest(
+            "token cannot be empty".to_string(),
+        ));
+    }
+    let record = state
+        .redis
+        .canary_lookup(&req.token, req.context.as_ref())
+        .await
+        .map_err(|error| AppError::Upstream(error.to_string()))?;
+    Ok(CanaryEvalResponse {
+        token: req.token,
+        triggered: record.is_some(),
+        canary_id: record.as_ref().map(|value| value.canary_id.clone()),
+        metadata: record.and_then(|value| value.metadata),
+    })
 }

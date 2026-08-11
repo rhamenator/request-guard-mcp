@@ -1,6 +1,6 @@
 # Tool Contracts
 
-All tools are called via JSON-RPC 2.0 over WebSocket. The method name is the tool name (optionally prefixed with `tools/`).
+All tools are called via JSON-RPC 2.0 over WebSocket or HTTP POST at `/mcp`. The method name is the tool name (optionally prefixed with `tools/`).
 
 ## Core Tools
 
@@ -95,10 +95,14 @@ List or get feature flags. **Request**: `{ "flag": "batch_classify" }` (omit for
 ### `drift_report`
 Statistical drift report over a time window.
 **Request**: `{ "window_hours": 24 }`
+**Response metrics** include real persisted `samples`, current-half score mean,
+window standard deviation, verdict distribution, and per-signal frequency change.
 
 ### `calibration_report`
 Precision/recall calibration report.
 **Request**: `{ "window_hours": 24 }`
+**Response** includes labelled `samples`, precision, recall, F1, false-positive
+and false-negative rates computed from the latest feedback per decision.
 
 ### `queue_status`
 Status of processing queues.

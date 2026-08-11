@@ -57,8 +57,8 @@ Fallback is triggered when:
 | Version | Transport | Supported |
 |---------|-----------|-----------|
 | MCP 1.0 | WebSocket (JSON-RPC 2.0) | ✅ |
-| MCP 1.0 | HTTP (polling) | ❌ (planned) |
-| MCP 1.0 | gRPC | ❌ (planned) |
+| MCP 1.0 | HTTP POST (JSON-RPC 2.0) | ✅ |
+| MCP 1.0 | gRPC | ❌ (out of scope; no project-specific gRPC contract is defined) |
 
 ## Tool Availability by Feature Flag
 
@@ -67,15 +67,18 @@ Fallback is triggered when:
 | `classify` | always | enabled |
 | `explain` | always | enabled |
 | `batch_classify` | `enable_batch` | enabled |
-| `feedback` | Persistence adapter required | disabled |
-| `enrich_ip` | GeoIP/reputation adapter required | disabled |
-| `enrich_asn` | ASN reputation adapter required | disabled |
+| `feedback` | PostgreSQL + `enable_feedback` | enabled when configured |
+| `enrich_ip` | MaxMind or Redis reputation + `enable_enrichment` | enabled when configured |
+| `enrich_asn` | MaxMind ASN or Redis reputation + `enable_enrichment` | enabled when configured |
 | `enrich_ua` | `enable_enrichment` | enabled |
-| `replay_decision`, `threat_lookup`, `canary_eval`, `drift_report`, `calibration_report`, `queue_status` | Backend adapter required | disabled |
+| `replay_decision`, `drift_report`, `calibration_report` | PostgreSQL | enabled when configured |
+| `threat_lookup`, `canary_eval`, `queue_status` | Redis | enabled when configured |
 | All other tools | always | enabled |
 
-Disabled tool contracts remain registered for compatibility and return
-`INTEGRATION_UNAVAILABLE`; they never return synthetic success data.
+Backend-dependent contracts remain registered for compatibility. They return
+`INTEGRATION_UNAVAILABLE` when their required backend is intentionally absent,
+and `UPSTREAM_ERROR` when a configured backend fails at runtime; they never
+return synthetic success data.
 
 ## Tested Client Versions
 

@@ -11,7 +11,7 @@ use serde_json::{json, Value};
 use std::sync::Arc;
 
 #[tokio::test]
-async fn placeholder_tools_fail_explicitly() {
+async fn backend_tools_fail_explicitly_without_integrations() {
     let state = Arc::new(AppState::new(Config::default()));
     let registry = build_registry();
     let request = McpRequest {
@@ -28,7 +28,7 @@ async fn placeholder_tools_fail_explicitly() {
 }
 
 #[tokio::test]
-async fn model_info_marks_placeholder_tools_disabled() {
+async fn model_info_marks_unconfigured_backend_tools_disabled() {
     let state = Arc::new(AppState::new(Config::default()));
     let value = ModelInfoTool.call(state, None).await.unwrap();
     let tools = value["tools"].as_array().unwrap();

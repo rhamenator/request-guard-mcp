@@ -3,19 +3,21 @@
 [![CI](https://github.com/rhamenator/request-guard-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/rhamenator/request-guard-mcp/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A production-ready **Rust MCP (Model Context Protocol) server** for request risk classification, enrichment, and abuse-signal analysis. It can be used by any MCP-capable client over WebSocket JSON-RPC; the `ai-scraping-defense` projects are supported clients, not required dependencies.
+A production-ready **Rust MCP (Model Context Protocol) server** for request risk classification, enrichment, and abuse-signal analysis. It can be used by any MCP-capable client over WebSocket or HTTP JSON-RPC; the `ai-scraping-defense` projects are supported clients, not required dependencies.
 
 ## Features
 
-- **23 MCP tool contracts**: implemented tools are marked enabled in `model_info`; backend-dependent placeholders return an explicit `INTEGRATION_UNAVAILABLE` error instead of fabricated data
-- **WebSocket transport** with JSON-RPC 2.0 protocol
+- **23 implemented MCP tool contracts** with truthful, backend-aware availability in `model_info`
+- **WebSocket and HTTP POST transports** with JSON-RPC 2.0 protocol
 - **Token-based authentication** (Bearer scheme) at connection establishment
 - **Global concurrency control** via semaphore with backpressure
 - **Per-tool timeouts** to prevent resource exhaustion
 - **Prometheus metrics** at `/metrics` with p50/p95/p99 histograms
-- **In-process LRU cache** (Moka) for classify results
+- **Two-level classification cache** (in-process Moka + shared Redis)
 - **Structured JSON logging** via `tracing`
-- **Integration configuration scaffolding** for Redis, PostgreSQL, and GeoIP; these adapters are not yet wired into persistence/enrichment tool execution
+- **Redis-backed** threat reputation, canary registry, queue telemetry, and distributed cache
+- **PostgreSQL-backed** decision replay, feedback, drift, and calibration reports with automatic schema setup
+- **MaxMind City/ASN/Anonymous-IP enrichment**, optionally combined with Redis reputation scores
 - **Docker + Kubernetes** ready with HPA, NetworkPolicy, health probes
 
 ## Quickstart
@@ -34,6 +36,11 @@ Server starts on `http://0.0.0.0:8085`. Test it:
 ```bash
 # Health check
 curl http://localhost:8085/health
+
+# HTTP JSON-RPC classify
+curl -H "Authorization: Bearer $YOUR_TOKEN" -H "Content-Type: application/json" \
+  --data '{"jsonrpc":"2.0","id":1,"method":"classify","params":{"user_agent":"GPTBot/1.0","path":"/"}}' \
+  http://localhost:8085/mcp
 
 # WebSocket classify (requires wscat: npm install -g wscat)
 wscat -H "Authorization: $(echo -n 'Bearer ')$YOUR_TOKEN" -c ws://localhost:8085/mcp
@@ -70,12 +77,16 @@ make docker-compose-up
 ## Kubernetes
 
 ```bash
-kubectl create secret generic mcp-secrets \
-  --namespace request-guard \
-  --from-literal=auth_tokens=your_strong_token
+# Create the namespace first, then copy secret.example.yaml, replace every
+# placeholder with base64-encoded strong credentials, and apply the copy.
+kubectl apply -f deploy/k8s/namespace.yaml
+kubectl apply -f deploy/k8s/secret.yaml
 
 make k8s-apply
 ```
+
+The application, Redis, and PostgreSQL intentionally refuse to start with the
+example credentials. Do not commit `deploy/k8s/secret.yaml`.
 
 ## Development
 

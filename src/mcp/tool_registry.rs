@@ -6,6 +6,15 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+fn required_params<T: serde::de::DeserializeOwned>(params: Option<Value>) -> Result<T, AppError> {
+    params
+        .ok_or_else(|| AppError::InvalidRequest("params required".to_string()))
+        .and_then(|value| {
+            serde_json::from_value(value)
+                .map_err(|error| AppError::InvalidRequest(error.to_string()))
+        })
+}
+
 /// Every registered tool implements this trait.
 #[async_trait]
 pub trait McpTool: Send + Sync {
@@ -125,7 +134,7 @@ impl McpTool for ClassifyTool {
                 timestamp: None,
                 extra: None,
             });
-        let result = crate::tools::classify::run(&state, req).await;
+        let result = crate::tools::classify::run(&state, req).await?;
         serde_json::to_value(result).map_err(AppError::from)
     }
 }
@@ -187,10 +196,15 @@ impl McpTool for FeedbackTool {
     fn description(&self) -> &str {
         "Submit feedback on a classification"
     }
-    async fn call(&self, _state: Arc<AppState>, _params: Option<Value>) -> Result<Value, AppError> {
-        Err(AppError::IntegrationUnavailable(
-            "feedback persistence is not implemented".to_string(),
-        ))
+    async fn call(&self, state: Arc<AppState>, params: Option<Value>) -> Result<Value, AppError> {
+        if !state.config.features.enable_feedback {
+            return Err(AppError::IntegrationUnavailable(
+                "feedback is disabled by configuration".to_string(),
+            ));
+        }
+        let req = required_params(params)?;
+        let result = crate::tools::feedback::run(&state, req).await?;
+        serde_json::to_value(result).map_err(AppError::from)
     }
 }
 
@@ -246,10 +260,10 @@ impl McpTool for ReplayDecisionTool {
     fn description(&self) -> &str {
         "Replay a previous decision"
     }
-    async fn call(&self, _state: Arc<AppState>, _params: Option<Value>) -> Result<Value, AppError> {
-        Err(AppError::IntegrationUnavailable(
-            "decision persistence is not implemented".to_string(),
-        ))
+    async fn call(&self, state: Arc<AppState>, params: Option<Value>) -> Result<Value, AppError> {
+        let req = required_params(params)?;
+        let result = crate::tools::replay_decision::run(&state, req).await?;
+        serde_json::to_value(result).map_err(AppError::from)
     }
 }
 
@@ -284,10 +298,15 @@ impl McpTool for EnrichIpTool {
     fn description(&self) -> &str {
         "Enrich an IP address"
     }
-    async fn call(&self, _state: Arc<AppState>, _params: Option<Value>) -> Result<Value, AppError> {
-        Err(AppError::IntegrationUnavailable(
-            "IP reputation and GeoIP enrichment are not wired into the server".to_string(),
-        ))
+    async fn call(&self, state: Arc<AppState>, params: Option<Value>) -> Result<Value, AppError> {
+        if !state.config.features.enable_enrichment {
+            return Err(AppError::IntegrationUnavailable(
+                "IP enrichment is disabled by configuration".to_string(),
+            ));
+        }
+        let req = required_params(params)?;
+        let result = crate::tools::enrich_ip::run(&state, req).await?;
+        serde_json::to_value(result).map_err(AppError::from)
     }
 }
 
@@ -301,10 +320,15 @@ impl McpTool for EnrichAsnTool {
     fn description(&self) -> &str {
         "Enrich an ASN"
     }
-    async fn call(&self, _state: Arc<AppState>, _params: Option<Value>) -> Result<Value, AppError> {
-        Err(AppError::IntegrationUnavailable(
-            "ASN reputation enrichment is not implemented".to_string(),
-        ))
+    async fn call(&self, state: Arc<AppState>, params: Option<Value>) -> Result<Value, AppError> {
+        if !state.config.features.enable_enrichment {
+            return Err(AppError::IntegrationUnavailable(
+                "ASN enrichment is disabled by configuration".to_string(),
+            ));
+        }
+        let req = required_params(params)?;
+        let result = crate::tools::enrich_asn::run(&state, req).await?;
+        serde_json::to_value(result).map_err(AppError::from)
     }
 }
 
@@ -344,10 +368,10 @@ impl McpTool for ThreatLookupTool {
     fn description(&self) -> &str {
         "Look up a threat indicator"
     }
-    async fn call(&self, _state: Arc<AppState>, _params: Option<Value>) -> Result<Value, AppError> {
-        Err(AppError::IntegrationUnavailable(
-            "threat intelligence lookup is not configured".to_string(),
-        ))
+    async fn call(&self, state: Arc<AppState>, params: Option<Value>) -> Result<Value, AppError> {
+        let req = required_params(params)?;
+        let result = crate::tools::threat_lookup::run(&state, req).await?;
+        serde_json::to_value(result).map_err(AppError::from)
     }
 }
 
@@ -361,10 +385,10 @@ impl McpTool for CanaryEvalTool {
     fn description(&self) -> &str {
         "Evaluate a canary token"
     }
-    async fn call(&self, _state: Arc<AppState>, _params: Option<Value>) -> Result<Value, AppError> {
-        Err(AppError::IntegrationUnavailable(
-            "canary registration storage is not implemented".to_string(),
-        ))
+    async fn call(&self, state: Arc<AppState>, params: Option<Value>) -> Result<Value, AppError> {
+        let req = required_params(params)?;
+        let result = crate::tools::canary_eval::run(&state, req).await?;
+        serde_json::to_value(result).map_err(AppError::from)
     }
 }
 
@@ -444,10 +468,17 @@ impl McpTool for DriftReportTool {
     fn description(&self) -> &str {
         "Report on score/signal drift"
     }
-    async fn call(&self, _state: Arc<AppState>, _params: Option<Value>) -> Result<Value, AppError> {
-        Err(AppError::IntegrationUnavailable(
-            "historical decision metrics are not implemented".to_string(),
-        ))
+    async fn call(&self, state: Arc<AppState>, params: Option<Value>) -> Result<Value, AppError> {
+        let req = params
+            .map(serde_json::from_value)
+            .transpose()
+            .map_err(|error: serde_json::Error| AppError::InvalidRequest(error.to_string()))?
+            .unwrap_or(crate::models::request::DriftReportRequest {
+                since: None,
+                window_hours: None,
+            });
+        let result = crate::tools::drift_report::run(&state, req).await?;
+        serde_json::to_value(result).map_err(AppError::from)
     }
 }
 
@@ -461,10 +492,14 @@ impl McpTool for CalibrationReportTool {
     fn description(&self) -> &str {
         "Precision/recall calibration report"
     }
-    async fn call(&self, _state: Arc<AppState>, _params: Option<Value>) -> Result<Value, AppError> {
-        Err(AppError::IntegrationUnavailable(
-            "labelled feedback metrics are not implemented".to_string(),
-        ))
+    async fn call(&self, state: Arc<AppState>, params: Option<Value>) -> Result<Value, AppError> {
+        let req = params
+            .map(serde_json::from_value)
+            .transpose()
+            .map_err(|error: serde_json::Error| AppError::InvalidRequest(error.to_string()))?
+            .unwrap_or(crate::models::request::CalibrationReportRequest { window_hours: None });
+        let result = crate::tools::calibration_report::run(&state, req).await?;
+        serde_json::to_value(result).map_err(AppError::from)
     }
 }
 
@@ -478,10 +513,14 @@ impl McpTool for QueueStatusTool {
     fn description(&self) -> &str {
         "Status of processing queues"
     }
-    async fn call(&self, _state: Arc<AppState>, _params: Option<Value>) -> Result<Value, AppError> {
-        Err(AppError::IntegrationUnavailable(
-            "external queue integration is not implemented".to_string(),
-        ))
+    async fn call(&self, state: Arc<AppState>, params: Option<Value>) -> Result<Value, AppError> {
+        let req = params
+            .map(serde_json::from_value)
+            .transpose()
+            .map_err(|error: serde_json::Error| AppError::InvalidRequest(error.to_string()))?
+            .unwrap_or(crate::models::request::QueueStatusRequest { queue: None });
+        let result = crate::tools::queue_status::run(&state, req).await?;
+        serde_json::to_value(result).map_err(AppError::from)
     }
 }
 

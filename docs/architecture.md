@@ -2,7 +2,7 @@
 
 ## Overview
 
-`request-guard-mcp` is a production-ready **Model Context Protocol (MCP) server** implemented in Rust. It provides a unified, high-performance request classification and enrichment API for any client that can speak WebSocket JSON-RPC. The `ai-scraping-defense` Python, IIS, and Rust projects are compatible clients, but they are not required dependencies.
+`request-guard-mcp` is a production-ready **Model Context Protocol (MCP) server** implemented in Rust. It provides a unified, high-performance request classification and enrichment API for any client that can speak WebSocket or HTTP JSON-RPC. The `ai-scraping-defense` Python, IIS, and Rust projects are compatible clients, but they are not required dependencies.
 
 ```
 ┌──────────────────────────┐   WebSocket/MCP   ┌────────────────────────────────┐
@@ -17,27 +17,25 @@
                                                │  │  Engines                │   │
                                                │  │  ├── RuleEngine         │   │
                                                │  │  ├── Scorer             │   │
-                                               │  │  ├── AnomalyEngine      │   │
-                                               │  │  └── PolicyEngine       │   │
                                                │  └─────────────────────────┘   │
                                                │                                │
                                                │  Integrations (optional)       │
-                                               │  ├── Redis (cache)             │
-                                               │  ├── PostgreSQL (audit/FB)     │
-                                               │  └── GeoIP (MMDB)              │
+                                               │  ├── Redis (cache/reputation)  │
+                                               │  ├── PostgreSQL (decisions/FB) │
+                                               │  └── MaxMind GeoIP (MMDB)      │
                                                └────────────────────────────────┘
 ```
 
 ## Request Lifecycle
 
-1. Client opens a WebSocket connection to `ws://<host>:8085/mcp`.
-2. Server authenticates the connection using the `Authorization` header (token scheme).
+1. Client opens a WebSocket connection or sends an HTTP POST to `/mcp`.
+2. Server authenticates the request using the `Authorization` header (Bearer scheme).
 3. Client sends a JSON-RPC 2.0 message: `{ "jsonrpc": "2.0", "id": 1, "method": "classify", "params": {...} }`.
 4. Server acquires a semaphore permit (global concurrency control).
 5. Tool is dispatched through the registry with a per-tool timeout.
-6. Engines evaluate the request: rules → scorer → anomaly → policy.
-7. Response is serialized and returned over the WebSocket.
-8. Metrics and audit logs are emitted.
+6. The rule engine extracts signals and the scorer produces the verdict.
+7. Backend-dependent tools query Redis, PostgreSQL, or MaxMind as required.
+8. The response is serialized over the selected transport and metrics/traces are emitted.
 
 ## Components
 
@@ -59,7 +57,7 @@
 | `engines/anomaly` | `src/engines/anomaly.rs` | Statistical anomaly detection |
 | `engines/policy` | `src/engines/policy.rs` | Configurable decision thresholds |
 | `tools/*` | `src/tools/` | All 23 MCP tool implementations |
-| `integrations/*` | `src/integrations/` | Redis, PostgreSQL, GeoIP adapters |
+| `integrations/*` | `src/integrations/` | Redis, PostgreSQL, MaxMind, reputation adapters |
 | `util/*` | `src/util/` | Time, JSON, network, hashing helpers |
 
 ## Concurrency Model
@@ -79,4 +77,4 @@
   - `mcp_active_connections`
   - `mcp_tool_errors_total{tool, error_code}`
 - **Health**: `GET /health` (liveness), `GET /ready` (readiness)
-- **OTLP**: Optional OpenTelemetry export via `MCP__TELEMETRY__OTLP_ENDPOINT`
+- **OTLP**: Optional batched OpenTelemetry trace export via `MCP__TELEMETRY__OTLP_ENDPOINT`

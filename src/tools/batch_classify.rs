@@ -20,15 +20,31 @@ pub async fn run(
     }
 
     let mut results = Vec::with_capacity(got);
-    let error_count = 0usize;
+    let mut error_count = 0usize;
+    let fail_fast = req
+        .options
+        .as_ref()
+        .is_some_and(|options| options.fail_fast);
 
     for (i, item) in req.items.into_iter().enumerate() {
-        let result = crate::tools::classify::run(state, item).await;
-        results.push(BatchItemResult {
-            index: i,
-            result: Some(result),
-            error: None,
-        });
+        match crate::tools::classify::run(state, item).await {
+            Ok(result) => results.push(BatchItemResult {
+                index: i,
+                result: Some(result),
+                error: None,
+            }),
+            Err(error) => {
+                error_count += 1;
+                if fail_fast {
+                    return Err(error);
+                }
+                results.push(BatchItemResult {
+                    index: i,
+                    result: None,
+                    error: Some(error.code().to_string()),
+                });
+            }
+        }
     }
 
     let processed = results.len() - error_count;

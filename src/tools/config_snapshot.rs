@@ -15,6 +15,7 @@ pub async fn run(state: &AppState, req: ConfigSnapshotRequest) -> ConfigSnapshot
             "max_batch_size": cfg.limits.max_batch_size,
             "global_concurrency": cfg.limits.global_concurrency,
             "per_tool_timeout_secs": cfg.limits.per_tool_timeout_secs,
+            "classify_timeout_secs": cfg.limits.classify_timeout_secs,
         },
         "features": {
             "enable_batch": cfg.features.enable_batch,
@@ -33,9 +34,19 @@ pub async fn run(state: &AppState, req: ConfigSnapshotRequest) -> ConfigSnapshot
         "redis": {
             "configured": cfg.redis.url.is_some(),
             "pool_size": cfg.redis.pool_size,
+            "key_prefix": cfg.redis.key_prefix,
+            "cache_ttl_secs": cfg.redis.cache_ttl_secs,
         },
         "postgres": {
             "configured": cfg.postgres.url.is_some(),
+            "max_connections": cfg.postgres.max_connections,
+            "connect_timeout_secs": cfg.postgres.connect_timeout_secs,
+        },
+        "geoip": {
+            "configured": cfg.geoip.mmdb_path.is_some() || cfg.geoip.city_mmdb_path.is_some() || cfg.geoip.asn_mmdb_path.is_some() || cfg.geoip.anonymous_ip_mmdb_path.is_some(),
+            "city_configured": cfg.geoip.mmdb_path.is_some() || cfg.geoip.city_mmdb_path.is_some(),
+            "asn_configured": cfg.geoip.asn_mmdb_path.is_some(),
+            "anonymous_ip_configured": cfg.geoip.anonymous_ip_mmdb_path.is_some(),
         },
     });
 

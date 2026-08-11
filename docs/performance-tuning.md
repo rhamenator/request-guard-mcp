@@ -58,7 +58,7 @@ Monitor these Prometheus metrics for performance insights:
 
 ## Redis Caching
 
-When Redis is configured, the in-process Moka cache acts as L1 and Redis as L2 (not yet wired by default). To maximize hit rate:
+When Redis is configured, the in-process Moka cache acts as L1 and Redis as a shared L2. To maximize hit rate:
 
 - Ensure classify requests for the same `(ip, user_agent, path)` tuple are sent to the same server instance, or use Redis as a shared cache.
 - TTL on cache entries is 300 seconds by default.

@@ -1,0 +1,8 @@
+.git
+.github
+.env
+target
+target-*
+tmp
+dist
+*.pdb

@@ -7,7 +7,7 @@ use serde_json::Value;
 use std::sync::Arc;
 use std::time::Instant;
 use tokio::time::timeout;
-use tracing::{error, info, warn};
+use tracing::{error, info, warn, Instrument};
 
 /// Handle a single WebSocket connection lifecycle.
 pub async fn handle_ws_connection(
@@ -68,7 +68,7 @@ pub async fn handle_ws_connection(
     state.metrics.active_connections.dec();
 }
 
-async fn process_message(
+pub(crate) async fn process_message(
     text: &str,
     state: &Arc<AppState>,
     registry: &Arc<ToolRegistry>,
@@ -120,7 +120,40 @@ async fn process_message(
     let registry_arc = Arc::clone(registry);
     let state_arc = Arc::clone(state);
 
-    let dispatch_result = timeout(tool_timeout, registry_arc.dispatch(state_arc, &req)).await;
+    let operation_id = if state.redis.is_available() {
+        match state
+            .redis
+            .record_tool_started(&tool_name, tool_timeout.as_secs().max(1))
+            .await
+        {
+            Ok(id) => Some(id),
+            Err(error) => {
+                warn!(tool = %tool_name, %error, "failed to record Redis operation start");
+                None
+            }
+        }
+    } else {
+        None
+    };
+
+    let dispatch_span = tracing::info_span!("mcp.tool", tool = %tool_name);
+    let dispatch_result = timeout(
+        tool_timeout,
+        registry_arc
+            .dispatch(state_arc, &req)
+            .instrument(dispatch_span),
+    )
+    .await;
+
+    if let Some(operation_id) = operation_id {
+        if let Err(error) = state
+            .redis
+            .record_tool_finished(&tool_name, &operation_id)
+            .await
+        {
+            warn!(tool = %tool_name, %error, "failed to record Redis operation completion");
+        }
+    }
 
     let latency = start.elapsed().as_millis() as u64;
 

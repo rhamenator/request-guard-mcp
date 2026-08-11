@@ -5,7 +5,8 @@ metadata:
   namespace: request-guard
 data:
   log_level: "info"
-  redis_url: "redis://redis:6379"
+  redis_key_prefix: "request_guard"
+  redis_cache_ttl_secs: "300"
   max_request_bytes: "1048576"
   max_batch_size: "50"
   global_concurrency: "256"

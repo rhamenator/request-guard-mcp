@@ -68,6 +68,10 @@ pub struct RedisConfig {
     pub url: Option<String>,
     #[serde(default = "defaults::redis_pool_size")]
     pub pool_size: usize,
+    #[serde(default = "defaults::redis_key_prefix")]
+    pub key_prefix: String,
+    #[serde(default = "defaults::redis_cache_ttl_secs")]
+    pub cache_ttl_secs: u64,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -76,12 +80,21 @@ pub struct PostgresConfig {
     pub url: Option<String>,
     #[serde(default = "defaults::pg_max_connections")]
     pub max_connections: u32,
+    #[serde(default = "defaults::integration_connect_timeout_secs")]
+    pub connect_timeout_secs: u64,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct GeoipConfig {
+    /// Backwards-compatible City database path.
     #[serde(default)]
     pub mmdb_path: Option<String>,
+    #[serde(default)]
+    pub city_mmdb_path: Option<String>,
+    #[serde(default)]
+    pub asn_mmdb_path: Option<String>,
+    #[serde(default)]
+    pub anonymous_ip_mmdb_path: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -189,6 +202,55 @@ impl Config {
         ) {
             anyhow::bail!("telemetry.metrics_path conflicts with a reserved route");
         }
+        if let Some(endpoint) = self.telemetry.otlp_endpoint.as_deref() {
+            if endpoint.trim().is_empty()
+                || !(endpoint.starts_with("http://") || endpoint.starts_with("https://"))
+            {
+                anyhow::bail!("telemetry.otlp_endpoint must be a non-empty HTTP(S) URL");
+            }
+        }
+        if self.redis.pool_size == 0 || self.redis.cache_ttl_secs == 0 {
+            anyhow::bail!("Redis pool size and cache TTL must be positive");
+        }
+        if self.redis.key_prefix.is_empty()
+            || !self.redis.key_prefix.chars().all(|character| {
+                character.is_ascii_alphanumeric() || matches!(character, '_' | '-')
+            })
+        {
+            anyhow::bail!("redis.key_prefix must contain only ASCII letters, digits, '_' or '-'");
+        }
+        if self
+            .redis
+            .url
+            .as_deref()
+            .is_some_and(|value| value.trim().is_empty())
+        {
+            anyhow::bail!("redis.url cannot be empty when configured");
+        }
+        if self.postgres.max_connections == 0 || self.postgres.connect_timeout_secs == 0 {
+            anyhow::bail!("PostgreSQL connection count and timeout must be positive");
+        }
+        if self
+            .postgres
+            .url
+            .as_deref()
+            .is_some_and(|value| value.trim().is_empty())
+        {
+            anyhow::bail!("postgres.url cannot be empty when configured");
+        }
+        for (name, path) in [
+            ("geoip.mmdb_path", self.geoip.mmdb_path.as_deref()),
+            ("geoip.city_mmdb_path", self.geoip.city_mmdb_path.as_deref()),
+            ("geoip.asn_mmdb_path", self.geoip.asn_mmdb_path.as_deref()),
+            (
+                "geoip.anonymous_ip_mmdb_path",
+                self.geoip.anonymous_ip_mmdb_path.as_deref(),
+            ),
+        ] {
+            if path.is_some_and(|value| value.trim().is_empty()) {
+                anyhow::bail!("{name} cannot be empty when configured");
+            }
+        }
         Ok(())
     }
 }
@@ -230,8 +292,17 @@ mod defaults {
     pub fn redis_pool_size() -> usize {
         16
     }
+    pub fn redis_key_prefix() -> String {
+        "request_guard".to_string()
+    }
+    pub fn redis_cache_ttl_secs() -> u64 {
+        300
+    }
     pub fn pg_max_connections() -> u32 {
         10
+    }
+    pub fn integration_connect_timeout_secs() -> u64 {
+        5
     }
     pub fn enable_batch() -> bool {
         true
@@ -240,7 +311,7 @@ mod defaults {
         true
     }
     pub fn enable_feedback() -> bool {
-        false
+        true
     }
 }
 
@@ -280,6 +351,8 @@ impl Default for RedisConfig {
         Self {
             url: None,
             pool_size: defaults::redis_pool_size(),
+            key_prefix: defaults::redis_key_prefix(),
+            cache_ttl_secs: defaults::redis_cache_ttl_secs(),
         }
     }
 }
@@ -289,6 +362,7 @@ impl Default for PostgresConfig {
         Self {
             url: None,
             max_connections: defaults::pg_max_connections(),
+            connect_timeout_secs: defaults::integration_connect_timeout_secs(),
         }
     }
 }
