@@ -26,8 +26,8 @@ spec:
         fsGroup: 10001
       containers:
         - name: mcp
-          image: ghcr.io/rhamenator/request-guard-mcp:latest
-          imagePullPolicy: Always
+          image: ghcr.io/rhamenator/request-guard-mcp:0.1.0
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8085
               name: http
@@ -59,6 +59,31 @@ spec:
                   name: mcp-secrets
                   key: postgres_url
                   optional: true
+            - name: MCP__LIMITS__MAX_REQUEST_BYTES
+              valueFrom:
+                configMapKeyRef:
+                  name: mcp-config
+                  key: max_request_bytes
+            - name: MCP__LIMITS__MAX_BATCH_SIZE
+              valueFrom:
+                configMapKeyRef:
+                  name: mcp-config
+                  key: max_batch_size
+            - name: MCP__LIMITS__GLOBAL_CONCURRENCY
+              valueFrom:
+                configMapKeyRef:
+                  name: mcp-config
+                  key: global_concurrency
+            - name: MCP__LIMITS__PER_TOOL_TIMEOUT_SECS
+              valueFrom:
+                configMapKeyRef:
+                  name: mcp-config
+                  key: per_tool_timeout_secs
+            - name: MCP__LIMITS__CLASSIFY_TIMEOUT_SECS
+              valueFrom:
+                configMapKeyRef:
+                  name: mcp-config
+                  key: classify_timeout_secs
           resources:
             requests:
               cpu: "100m"

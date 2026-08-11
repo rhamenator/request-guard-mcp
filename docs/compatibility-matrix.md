@@ -67,11 +67,15 @@ Fallback is triggered when:
 | `classify` | always | enabled |
 | `explain` | always | enabled |
 | `batch_classify` | `enable_batch` | enabled |
-| `feedback` | `enable_feedback` | enabled |
-| `enrich_ip` | `enable_enrichment` | enabled |
-| `enrich_asn` | `enable_enrichment` | enabled |
+| `feedback` | Persistence adapter required | disabled |
+| `enrich_ip` | GeoIP/reputation adapter required | disabled |
+| `enrich_asn` | ASN reputation adapter required | disabled |
 | `enrich_ua` | `enable_enrichment` | enabled |
+| `replay_decision`, `threat_lookup`, `canary_eval`, `drift_report`, `calibration_report`, `queue_status` | Backend adapter required | disabled |
 | All other tools | always | enabled |
+
+Disabled tool contracts remain registered for compatibility and return
+`INTEGRATION_UNAVAILABLE`; they never return synthetic success data.
 
 ## Tested Client Versions
 

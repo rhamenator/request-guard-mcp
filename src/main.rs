@@ -4,10 +4,7 @@ use request_guard_mcp::{config, mcp, state, telemetry};
 #[tokio::main]
 async fn main() -> Result<()> {
     // Load config (reads .env and env vars)
-    let config = config::Config::load().unwrap_or_else(|e| {
-        eprintln!("config error: {e}; using defaults");
-        config::Config::default()
-    });
+    let config = config::Config::load()?;
 
     // Initialize tracing
     telemetry::init_tracing(&config.log_level);

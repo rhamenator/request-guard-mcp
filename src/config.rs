@@ -24,7 +24,7 @@ pub struct Config {
     pub geoip: GeoipConfig,
     #[serde(default)]
     pub features: FeatureConfig,
-    #[serde(default)]
+    #[serde(default = "defaults::log_level")]
     pub log_level: String,
 }
 
@@ -97,12 +97,18 @@ pub struct FeatureConfig {
 impl Config {
     /// Load configuration from environment variables and optional config file.
     pub fn load() -> Result<Self> {
-        let _ = dotenvy::dotenv();
+        if let Err(error) = dotenvy::dotenv() {
+            match &error {
+                dotenvy::Error::Io(io_error) if io_error.kind() == std::io::ErrorKind::NotFound => {
+                }
+                _ => return Err(error).context("failed to load .env"),
+            }
+        }
         let mut builder = config::Config::builder();
 
         // Optional config file
         if let Ok(path) = std::env::var("CONFIG_FILE") {
-            builder = builder.add_source(config::File::with_name(&path).required(false));
+            builder = builder.add_source(config::File::with_name(&path).required(true));
         }
 
         // Environment variables with prefix MCP_
@@ -114,7 +120,12 @@ impl Config {
 
         // Also read plain env vars for common settings
         if let Ok(val) = std::env::var("AUTH_TOKENS") {
-            let tokens: Vec<String> = val.split(',').map(|s| s.trim().to_string()).collect();
+            let tokens: Vec<String> = val
+                .split(',')
+                .map(str::trim)
+                .filter(|token| !token.is_empty())
+                .map(str::to_string)
+                .collect();
             if !tokens.is_empty() {
                 builder = builder.set_override("auth.tokens", tokens)?;
             }
@@ -130,13 +141,14 @@ impl Config {
             .try_deserialize()
             .context("failed to deserialize config")?;
 
+        cfg.validate()?;
         Ok(cfg)
     }
 
-    pub fn bind_addr(&self) -> SocketAddr {
+    pub fn bind_addr(&self) -> Result<SocketAddr> {
         format!("{}:{}", self.host, self.port)
             .parse()
-            .unwrap_or_else(|_| "0.0.0.0:8085".parse().unwrap())
+            .with_context(|| format!("invalid bind address {}:{}", self.host, self.port))
     }
 
     pub fn per_tool_timeout(&self) -> Duration {
@@ -145,6 +157,39 @@ impl Config {
 
     pub fn classify_timeout(&self) -> Duration {
         Duration::from_secs(self.limits.classify_timeout_secs)
+    }
+
+    fn validate(&self) -> Result<()> {
+        if self.auth.enabled {
+            if self.auth.tokens.is_empty() {
+                anyhow::bail!("authentication is enabled but AUTH_TOKENS is empty");
+            }
+            if self.auth.tokens.iter().any(|token| {
+                token.is_empty()
+                    || token == "replace_me"
+                    || token == "replace_me_with_a_strong_token"
+            }) {
+                anyhow::bail!("AUTH_TOKENS contains an empty or placeholder token");
+            }
+        }
+        if self.limits.max_request_bytes == 0
+            || self.limits.max_batch_size == 0
+            || self.limits.global_concurrency == 0
+            || self.limits.per_tool_timeout_secs == 0
+            || self.limits.classify_timeout_secs == 0
+        {
+            anyhow::bail!("all request, batch, concurrency, and timeout limits must be positive");
+        }
+        if !self.telemetry.metrics_path.starts_with('/') {
+            anyhow::bail!("telemetry.metrics_path must start with '/'");
+        }
+        if matches!(
+            self.telemetry.metrics_path.as_str(),
+            "/mcp" | "/health" | "/ready"
+        ) {
+            anyhow::bail!("telemetry.metrics_path conflicts with a reserved route");
+        }
+        Ok(())
     }
 }
 
@@ -179,6 +224,9 @@ mod defaults {
     pub fn service_name() -> String {
         "request-guard-mcp".to_string()
     }
+    pub fn log_level() -> String {
+        "info".to_string()
+    }
     pub fn redis_pool_size() -> usize {
         16
     }
@@ -192,7 +240,7 @@ mod defaults {
         true
     }
     pub fn enable_feedback() -> bool {
-        true
+        false
     }
 }
 
@@ -269,5 +317,58 @@ impl Default for Config {
             features: FeatureConfig::default(),
             log_level: "info".to_string(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn invalid_bind_address_is_reported() {
+        let config = Config {
+            host: "not a valid address".to_string(),
+            ..Config::default()
+        };
+        assert!(config.bind_addr().is_err());
+    }
+
+    #[test]
+    fn enabled_auth_requires_a_real_token() {
+        assert!(Config::default().validate().is_err());
+
+        let placeholder = Config {
+            auth: AuthConfig {
+                tokens: vec!["replace_me_with_a_strong_token".to_string()],
+                ..AuthConfig::default()
+            },
+            ..Config::default()
+        };
+        assert!(placeholder.validate().is_err());
+
+        let valid = Config {
+            auth: AuthConfig {
+                tokens: vec!["a-real-test-token".to_string()],
+                ..AuthConfig::default()
+            },
+            ..Config::default()
+        };
+        assert!(valid.validate().is_ok());
+    }
+
+    #[test]
+    fn zero_limits_are_rejected() {
+        let config = Config {
+            auth: AuthConfig {
+                enabled: false,
+                ..AuthConfig::default()
+            },
+            limits: LimitsConfig {
+                global_concurrency: 0,
+                ..LimitsConfig::default()
+            },
+            ..Config::default()
+        };
+        assert!(config.validate().is_err());
     }
 }

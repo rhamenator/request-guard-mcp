@@ -7,13 +7,31 @@ pub fn sha256_hex(data: &[u8]) -> String {
     hex::encode(hasher.finalize())
 }
 
-/// Compute a fast fingerprint string from a classify request's key fields.
-pub fn request_fingerprint(ip: Option<&str>, ua: Option<&str>, path: Option<&str>) -> String {
+/// Compute a stable fingerprint from every field used by the rule engine.
+pub fn request_fingerprint(
+    ip: Option<&str>,
+    ua: Option<&str>,
+    path: Option<&str>,
+    method: Option<&str>,
+    headers: Option<&std::collections::HashMap<String, String>>,
+) -> String {
+    let mut header_names = headers
+        .map(|values| {
+            values
+                .keys()
+                .map(|key| key.to_lowercase())
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    header_names.sort_unstable();
+    header_names.dedup();
     let input = format!(
-        "{}|{}|{}",
+        "{}|{}|{}|{}|{}",
         ip.unwrap_or(""),
         ua.unwrap_or(""),
-        path.unwrap_or("")
+        path.unwrap_or(""),
+        method.unwrap_or("").to_uppercase(),
+        header_names.join(",")
     );
     sha256_hex(input.as_bytes())
 }

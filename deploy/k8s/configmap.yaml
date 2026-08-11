@@ -6,6 +6,8 @@ metadata:
 data:
   log_level: "info"
   redis_url: "redis://redis:6379"
+  max_request_bytes: "1048576"
   max_batch_size: "50"
   global_concurrency: "256"
   per_tool_timeout_secs: "30"
+  classify_timeout_secs: "5"

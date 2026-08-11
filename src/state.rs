@@ -112,9 +112,9 @@ impl AppState {
         // Initialize default feature flags
         feature_flags.insert("batch_classify".to_string(), config.features.enable_batch);
         feature_flags.insert("enrichment".to_string(), config.features.enable_enrichment);
-        feature_flags.insert("feedback".to_string(), config.features.enable_feedback);
-        feature_flags.insert("drift_report".to_string(), true);
-        feature_flags.insert("canary_eval".to_string(), true);
+        feature_flags.insert("feedback".to_string(), false);
+        feature_flags.insert("drift_report".to_string(), false);
+        feature_flags.insert("canary_eval".to_string(), false);
 
         Self {
             config,

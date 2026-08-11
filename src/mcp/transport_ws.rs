@@ -14,46 +14,42 @@ pub async fn handle_ws_connection(
     mut socket: WebSocket,
     state: Arc<AppState>,
     registry: Arc<ToolRegistry>,
-    auth_header: Option<String>,
 ) {
-    // Authenticate once at connection establishment.
-    if state.config.auth.enabled {
-        let token = auth_header
-            .as_deref()
-            .and_then(crate::auth::extract_token)
-            .unwrap_or("");
-        if !state.config.auth.tokens.iter().any(|t| t == token) {
-            warn!("WebSocket connection rejected: invalid auth");
-            let msg = serde_json::json!({
-                "jsonrpc": "2.0",
-                "error": { "code": -401, "message": "UNAUTHENTICATED" }
-            });
-            let _ = socket.send(Message::Text(msg.to_string())).await;
-            return;
-        }
-    }
-
     state.metrics.active_connections.inc();
     info!("WebSocket connection established");
 
     loop {
         match socket.recv().await {
             Some(Ok(Message::Text(text))) => {
-                let response = process_message(&text, &state, &registry).await;
-                if let Err(e) = socket.send(Message::Text(response)).await {
-                    warn!(error = %e, "failed to send WS response");
-                    break;
-                }
-            }
-            Some(Ok(Message::Binary(bytes))) => {
-                if let Ok(text) = std::str::from_utf8(&bytes) {
-                    let response = process_message(text, &state, &registry).await;
+                if let Some(response) = process_message(&text, &state, &registry).await {
                     if let Err(e) = socket.send(Message::Text(response)).await {
                         warn!(error = %e, "failed to send WS response");
                         break;
                     }
                 }
             }
+            Some(Ok(Message::Binary(bytes))) => match std::str::from_utf8(&bytes) {
+                Ok(text) => {
+                    if let Some(response) = process_message(text, &state, &registry).await {
+                        if let Err(e) = socket.send(Message::Text(response)).await {
+                            warn!(error = %e, "failed to send WS response");
+                            break;
+                        }
+                    }
+                }
+                Err(error) => {
+                    warn!(%error, "received non-UTF-8 binary MCP message");
+                    let response = serialize_message(&McpMessage::error(
+                        Value::Null,
+                        -32700,
+                        "Parse error: MCP messages must be UTF-8",
+                    ));
+                    if let Err(e) = socket.send(Message::Text(response)).await {
+                        warn!(error = %e, "failed to send WS parse error");
+                        break;
+                    }
+                }
+            },
             Some(Ok(Message::Ping(data))) => {
                 let _ = socket.send(Message::Pong(data)).await;
             }
@@ -76,13 +72,13 @@ async fn process_message(
     text: &str,
     state: &Arc<AppState>,
     registry: &Arc<ToolRegistry>,
-) -> String {
+) -> Option<String> {
     let start = Instant::now();
 
     // Size check
     if text.len() > state.config.limits.max_request_bytes {
         let err = McpMessage::error(Value::Null, -413, AppError::RequestTooLarge.code());
-        return serde_json::to_string(&err).unwrap_or_default();
+        return Some(serialize_message(&err));
     }
 
     // Parse JSON-RPC message
@@ -91,13 +87,13 @@ async fn process_message(
         Err(e) => {
             warn!(error = %e, "failed to parse MCP message");
             let err = McpMessage::error(Value::Null, -32700, "Parse error");
-            return serde_json::to_string(&err).unwrap_or_default();
+            return Some(serialize_message(&err));
         }
     };
 
     let McpPayload::Request(req) = msg.payload else {
         // Notifications and responses from the client are ignored
-        return String::new();
+        return None;
     };
 
     let id = req.id.clone();
@@ -112,11 +108,15 @@ async fn process_message(
         Ok(p) => p,
         Err(_) => {
             let err = McpMessage::error(id, -429, AppError::RateLimitExceeded.code());
-            return serde_json::to_string(&err).unwrap_or_default();
+            return Some(serialize_message(&err));
         }
     };
 
-    let tool_timeout = state.config.per_tool_timeout();
+    let tool_timeout = if tool_name == "classify" {
+        state.config.classify_timeout()
+    } else {
+        state.config.per_tool_timeout()
+    };
     let registry_arc = Arc::clone(registry);
     let state_arc = Arc::clone(state);
 
@@ -164,5 +164,29 @@ async fn process_message(
         .with_label_values(&[&tool_name])
         .observe(latency as f64 / 1000.0);
 
-    serde_json::to_string(&response).unwrap_or_default()
+    Some(serialize_message(&response))
+}
+
+fn serialize_message(message: &McpMessage) -> String {
+    serde_json::to_string(message).unwrap_or_else(|error| {
+        error!(%error, "failed to serialize MCP response");
+        r#"{"jsonrpc":"2.0","id":null,"error":{"code":-500,"message":"INTERNAL_ERROR","data":null}}"#.to_string()
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::Config;
+
+    #[tokio::test]
+    async fn notifications_do_not_generate_empty_response_frames() {
+        let state = Arc::new(AppState::new(Config::default()));
+        let registry = Arc::new(crate::mcp::tool_registry::build_registry());
+        let notification = r#"{"jsonrpc":"2.0","method":"warmup","params":{}}"#;
+
+        assert!(process_message(notification, &state, &registry)
+            .await
+            .is_none());
+    }
 }

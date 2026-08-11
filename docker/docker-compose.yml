@@ -16,9 +16,9 @@ services:
       - MCP__HOST=0.0.0.0
       - MCP__PORT=8085
       - LOG_LEVEL=info
-      - AUTH_TOKENS=replace_me_with_a_strong_token
+      - AUTH_TOKENS=${AUTH_TOKENS:?Set AUTH_TOKENS to a strong non-placeholder token}
       - MCP__REDIS__URL=redis://redis:6379
-      - MCP__POSTGRES__URL=postgresql://mcp:${POSTGRES_PASSWORD:-mcp}@postgres:5432/mcp
+      - MCP__POSTGRES__URL=postgresql://mcp:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/mcp
     depends_on:
       redis:
         condition: service_healthy
@@ -47,7 +47,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: mcp
-      POSTGRES_PASSWORD: mcp
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
       POSTGRES_DB: mcp
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U mcp"]
@@ -73,7 +73,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:?Set GRAFANA_ADMIN_PASSWORD}
     depends_on:
       - prometheus
 

@@ -20,10 +20,11 @@ pub struct ServerState {
 }
 
 pub fn build_router(state: ServerState, max_body: usize) -> Router {
+    let metrics_path = state.app.config.telemetry.metrics_path.clone();
     Router::new()
         .route("/mcp", get(ws_handler))
         .route("/health", get(http_health_handler))
-        .route("/metrics", get(metrics_handler))
+        .route(&metrics_path, get(metrics_handler))
         .route("/ready", get(readiness_handler))
         .layer(RequestBodyLimitLayer::new(max_body))
         .with_state(state)
@@ -34,12 +35,15 @@ async fn ws_handler(
     headers: HeaderMap,
     State(state): State<ServerState>,
 ) -> Response {
-    let auth = headers
-        .get("authorization")
-        .and_then(|v| v.to_str().ok())
-        .map(str::to_string);
+    if state.app.config.auth.enabled {
+        if let Err(error) = crate::auth::verify_token(&headers, &state.app.config.auth.tokens) {
+            let status = StatusCode::from_u16(error.status_code())
+                .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
+            return (status, error.code()).into_response();
+        }
+    }
 
-    ws.on_upgrade(move |socket| handle_ws_connection(socket, state.app, state.registry, auth))
+    ws.on_upgrade(move |socket| handle_ws_connection(socket, state.app, state.registry))
 }
 
 async fn http_health_handler(State(state): State<ServerState>) -> impl IntoResponse {
@@ -70,7 +74,7 @@ async fn readiness_handler(State(state): State<ServerState>) -> impl IntoRespons
 
 pub async fn run_server(app_state: AppState) -> anyhow::Result<()> {
     let registry = Arc::new(crate::mcp::tool_registry::build_registry());
-    let bind_addr = app_state.config.bind_addr();
+    let bind_addr = app_state.config.bind_addr()?;
     let max_body = app_state.config.limits.max_request_bytes;
 
     info!(addr = %bind_addr, "starting MCP server");

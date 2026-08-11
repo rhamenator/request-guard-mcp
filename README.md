@@ -7,7 +7,7 @@ A production-ready **Rust MCP (Model Context Protocol) server** for request risk
 
 ## Features
 
-- **23 MCP tools**: classify, explain, batch_classify, health, model_info, feedback, enrich_ip/asn/ua, threat_lookup, canary_eval, abuse_pattern_match, drift_report, calibration_report, and more
+- **23 MCP tool contracts**: implemented tools are marked enabled in `model_info`; backend-dependent placeholders return an explicit `INTEGRATION_UNAVAILABLE` error instead of fabricated data
 - **WebSocket transport** with JSON-RPC 2.0 protocol
 - **Token-based authentication** (Bearer scheme) at connection establishment
 - **Global concurrency control** via semaphore with backpressure
@@ -15,7 +15,7 @@ A production-ready **Rust MCP (Model Context Protocol) server** for request risk
 - **Prometheus metrics** at `/metrics` with p50/p95/p99 histograms
 - **In-process LRU cache** (Moka) for classify results
 - **Structured JSON logging** via `tracing`
-- **Optional integrations**: Redis, PostgreSQL, GeoIP (MaxMind MMDB)
+- **Integration configuration scaffolding** for Redis, PostgreSQL, and GeoIP; these adapters are not yet wired into persistence/enrichment tool execution
 - **Docker + Kubernetes** ready with HPA, NetworkPolicy, health probes
 
 ## Quickstart

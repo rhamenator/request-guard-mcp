@@ -145,3 +145,25 @@ async fn sensitive_path_raises_score() {
     let resp = tools::classify::run(&state, req).await;
     assert!(resp.score > 0.0, "expected non-zero score for .env path");
 }
+
+#[tokio::test]
+async fn cache_key_includes_method_and_headers() {
+    let state = make_state();
+    let mut first = browser_request();
+    first.ip = Some("198.51.100.20".to_string());
+    first.user_agent = Some("Mozilla/5.0".to_string());
+    first.path = Some("/same".to_string());
+    first.method = Some("GET".to_string());
+    let first_response = tools::classify::run(&state, first.clone()).await;
+
+    first.method = Some("BREW".to_string());
+    first.headers = None;
+    first.request_id = Some("different-request".to_string());
+    let second_response = tools::classify::run(&state, first).await;
+
+    assert!(second_response.score > first_response.score);
+    assert!(second_response
+        .signals
+        .iter()
+        .any(|signal| signal.name == "method_unusual"));
+}

@@ -26,6 +26,8 @@ pub async fn run(state: &AppState, req: ClassifyRequest) -> ClassifyResponse {
         req.ip.as_deref(),
         req.user_agent.as_deref(),
         req.path.as_deref(),
+        req.method.as_deref(),
+        req.headers.as_ref(),
     );
     if let Some(cached) = state.cache.get(&fingerprint).await {
         if let Ok(mut resp) = serde_json::from_value::<ClassifyResponse>(cached) {
@@ -63,13 +65,6 @@ pub async fn run(state: &AppState, req: ClassifyRequest) -> ClassifyResponse {
     if let Ok(val) = serde_json::to_value(&resp) {
         state.cache.set(&fingerprint, val).await;
     }
-
-    // Record metrics
-    state
-        .metrics
-        .requests_total
-        .with_label_values(&["classify", "ok"])
-        .inc();
 
     resp
 }
