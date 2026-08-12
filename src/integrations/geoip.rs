@@ -131,11 +131,12 @@ impl GeoipClient {
 
 fn open_optional(path: Option<&String>, database_name: &str) -> Result<Option<MmdbReader>> {
     path.map(|path| {
+        let mut error_context = String::from("failed to load configured ");
+        error_context.push_str(database_name);
+        error_context.push_str(" MMDB at ");
+        error_context.push_str(path);
         Reader::open_readfile(path)
-            .context(format!(
-                "failed to load configured {} MMDB at {}",
-                database_name, path
-            ))
+            .context(error_context)
             .map(Arc::new)
     })
     .transpose()
