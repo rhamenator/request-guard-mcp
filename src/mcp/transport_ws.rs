@@ -14,6 +14,7 @@ pub async fn handle_ws_connection(
     mut socket: WebSocket,
     state: Arc<AppState>,
     registry: Arc<ToolRegistry>,
+    caller_scope: String,
 ) {
     state.metrics.active_connections.inc();
     info!("WebSocket connection established");
@@ -21,7 +22,9 @@ pub async fn handle_ws_connection(
     loop {
         match socket.recv().await {
             Some(Ok(Message::Text(text))) => {
-                if let Some(response) = process_message(&text, &state, &registry).await {
+                if let Some(response) =
+                    process_message(&text, &state, &registry, &caller_scope).await
+                {
                     if let Err(e) = socket.send(Message::Text(response)).await {
                         warn!(error = %e, "failed to send WS response");
                         break;
@@ -30,7 +33,9 @@ pub async fn handle_ws_connection(
             }
             Some(Ok(Message::Binary(bytes))) => match std::str::from_utf8(&bytes) {
                 Ok(text) => {
-                    if let Some(response) = process_message(text, &state, &registry).await {
+                    if let Some(response) =
+                        process_message(text, &state, &registry, &caller_scope).await
+                    {
                         if let Err(e) = socket.send(Message::Text(response)).await {
                             warn!(error = %e, "failed to send WS response");
                             break;
@@ -72,6 +77,7 @@ pub(crate) async fn process_message(
     text: &str,
     state: &Arc<AppState>,
     registry: &Arc<ToolRegistry>,
+    caller_scope: &str,
 ) -> Option<String> {
     let start = Instant::now();
 
@@ -140,7 +146,7 @@ pub(crate) async fn process_message(
     let dispatch_result = timeout(
         tool_timeout,
         registry_arc
-            .dispatch(state_arc, &req)
+            .dispatch(state_arc, &req, caller_scope)
             .instrument(dispatch_span),
     )
     .await;
@@ -218,8 +224,10 @@ mod tests {
         let registry = Arc::new(crate::mcp::tool_registry::build_registry());
         let notification = r#"{"jsonrpc":"2.0","method":"warmup","params":{}}"#;
 
-        assert!(process_message(notification, &state, &registry)
-            .await
-            .is_none());
+        assert!(
+            process_message(notification, &state, &registry, "test-caller")
+                .await
+                .is_none()
+        );
     }
 }

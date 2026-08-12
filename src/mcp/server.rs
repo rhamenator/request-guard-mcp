@@ -35,11 +35,14 @@ async fn ws_handler(
     headers: HeaderMap,
     State(state): State<ServerState>,
 ) -> Response {
-    if let Err(error) = authorize(&headers, &state.app) {
-        return error_response(&error);
-    }
+    let caller_scope = match authorize(&headers, &state.app) {
+        Ok(scope) => scope,
+        Err(error) => return error_response(&error),
+    };
 
-    ws.on_upgrade(move |socket| handle_ws_connection(socket, state.app, state.registry))
+    ws.on_upgrade(move |socket| {
+        handle_ws_connection(socket, state.app, state.registry, caller_scope)
+    })
 }
 
 async fn http_mcp_handler(
@@ -47,9 +50,10 @@ async fn http_mcp_handler(
     State(state): State<ServerState>,
     body: axum::body::Bytes,
 ) -> Response {
-    if let Err(error) = authorize(&headers, &state.app) {
-        return error_response(&error);
-    }
+    let caller_scope = match authorize(&headers, &state.app) {
+        Ok(scope) => scope,
+        Err(error) => return error_response(&error),
+    };
     let Ok(text) = std::str::from_utf8(&body) else {
         return (
             StatusCode::BAD_REQUEST,
@@ -58,7 +62,7 @@ async fn http_mcp_handler(
         )
             .into_response();
     };
-    match process_message(text, &state.app, &state.registry).await {
+    match process_message(text, &state.app, &state.registry, &caller_scope).await {
         Some(response) => (
             StatusCode::OK,
             [(axum::http::header::CONTENT_TYPE, "application/json")],
@@ -69,11 +73,11 @@ async fn http_mcp_handler(
     }
 }
 
-fn authorize(headers: &HeaderMap, state: &AppState) -> Result<(), crate::error::AppError> {
+fn authorize(headers: &HeaderMap, state: &AppState) -> Result<String, crate::error::AppError> {
     if state.config.auth.enabled {
-        crate::auth::verify_token(headers, &state.config.auth.tokens)?;
+        return crate::auth::authenticated_cache_scope(headers, &state.config.auth.tokens);
     }
-    Ok(())
+    Ok("public".to_string())
 }
 
 fn error_response(error: &crate::error::AppError) -> Response {

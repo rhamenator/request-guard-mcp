@@ -11,6 +11,14 @@ pub async fn run(
     state: &AppState,
     req: BatchClassifyRequest,
 ) -> Result<BatchClassifyResponse, AppError> {
+    run_scoped(state, req, "internal").await
+}
+
+pub async fn run_scoped(
+    state: &AppState,
+    req: BatchClassifyRequest,
+    caller_scope: &str,
+) -> Result<BatchClassifyResponse, AppError> {
     let start = Instant::now();
     let max = state.config.limits.max_batch_size;
     let got = req.items.len();
@@ -27,7 +35,7 @@ pub async fn run(
         .is_some_and(|options| options.fail_fast);
 
     for (i, item) in req.items.into_iter().enumerate() {
-        match crate::tools::classify::run(state, item).await {
+        match crate::tools::classify::run_scoped(state, item, caller_scope).await {
             Ok(result) => results.push(BatchItemResult {
                 index: i,
                 result: Some(result),

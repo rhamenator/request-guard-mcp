@@ -14,7 +14,8 @@ pub struct ClassifyRequest {
     pub accept: Option<String>,
     pub request_id: Option<String>,
     pub timestamp: Option<String>,
-    /// TLS fingerprint values already collected and trust-validated by the caller.
+    /// Caller-asserted TLS metadata. It is validated for storage but is not a
+    /// server-verified identity signal and is excluded from cache identity.
     pub tls_ja3: Option<String>,
     pub tls_ja4: Option<String>,
     pub tls_fingerprint_source: Option<String>,

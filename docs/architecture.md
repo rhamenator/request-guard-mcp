@@ -60,6 +60,10 @@
 | `integrations/*` | `src/integrations/` | Redis, PostgreSQL, MaxMind, reputation adapters |
 | `util/*` | `src/util/` | Time, JSON, network, hashing helpers |
 
+The runtime intentionally exposes only MCP JSON-RPC over WebSocket and HTTP
+POST. gRPC is not a pending application transport; the gRPC dependency visible
+in the build belongs exclusively to OTLP trace export.
+
 ## Concurrency Model
 
 - **Async runtime**: Tokio with `rt-multi-thread`

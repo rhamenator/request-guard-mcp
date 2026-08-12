@@ -15,9 +15,20 @@ Classify a single HTTP request as bot/human.
   "path": "/api/data",
   "method": "GET",
   "headers": { "accept": "application/json" },
+  "tls_ja3": "72a589da586844d7f0818ce684948eea",
+  "tls_ja4": "t13d1516h2_8daaf6152771_e5627efa2ab1",
+  "tls_fingerprint_source": "envoy",
   "request_id": "uuid-optional"
 }
 ```
+
+`tls_ja3`, `tls_ja4`, and `tls_fingerprint_source` are optional provenance
+metadata asserted by the authenticated MCP caller. The server validates their
+format but cannot recreate the original client handshake, so it does not treat
+them as server-verified identity and excludes them from classification cache
+keys. Shared cache entries are instead scoped by a one-way hash of the
+authenticated MCP credential. Callers should populate these fields only after
+validating the immediate proxy/CDN peer that observed the TLS handshake.
 
 **Response**
 ```json

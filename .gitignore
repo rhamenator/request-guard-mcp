@@ -5,6 +5,7 @@ target
 /target-*/
 /tmp/
 dist/
+__pycache__/
 
 # Local configuration and generated Kubernetes secrets
 .env

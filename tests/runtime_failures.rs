@@ -23,7 +23,7 @@ async fn backend_tools_fail_explicitly_without_integrations() {
         })),
     };
 
-    let result = registry.dispatch(state, &request).await;
+    let result = registry.dispatch(state, &request, "test-caller").await;
     assert!(matches!(result, Err(AppError::IntegrationUnavailable(_))));
 }
 

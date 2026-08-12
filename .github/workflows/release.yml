@@ -1,6 +1,7 @@
 name: Release
 
 on:
+  workflow_dispatch:
   push:
     tags:
       - "v*.*.*"
@@ -10,50 +11,85 @@ env:
 
 jobs:
   build-release:
-    name: Build Release Binaries
+    name: Build ${{ matrix.platform }} binary
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
+            platform: linux-x64
+            suffix: ""
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            platform: windows-x64
+            suffix: .exe
+          - os: macos-15-intel
+            target: x86_64-apple-darwin
+            platform: macos-x64
+            suffix: ""
+          - os: macos-15
+            target: aarch64-apple-darwin
+            platform: macos-arm64
             suffix: ""
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
       - uses: Swatinem/rust-cache@v2
       - name: Build
-        run: cargo build --release --target ${{ matrix.target }}
+        run: cargo build --release --locked --target ${{ matrix.target }}
       - name: Package
+        shell: bash
         run: |
-          mkdir -p dist
-          cp target/${{ matrix.target }}/release/request-guard-mcp${{ matrix.suffix }} \
-             dist/request-guard-mcp-${{ github.ref_name }}-${{ matrix.target }}${{ matrix.suffix }}
-      - uses: actions/upload-artifact@v4
+          python scripts/package_release.py \
+            --version "${GITHUB_REF_NAME}" \
+            --target "${{ matrix.target }}" \
+            --platform "${{ matrix.platform }}" \
+            --suffix "${{ matrix.suffix }}"
+      - name: Smoke test packaged server
+        shell: bash
+        run: |
+          python scripts/smoke_release.py \
+            --artifacts artifacts \
+            --binary "request-guard-mcp${{ matrix.suffix }}" \
+            --port 18766
+      - uses: actions/upload-artifact@v7
         with:
-          name: binary-${{ matrix.target }}
-          path: dist/
+          name: request-guard-mcp-${{ matrix.platform }}
+          path: |
+            artifacts/*.zip
+            artifacts/*.tar.gz
+            artifacts/*.sha256
+          if-no-files-found: error
 
   create-release:
     name: Create GitHub Release
+    if: github.ref_type == 'tag'
     needs: build-release
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
-          path: dist/
+          path: artifacts/
+          pattern: request-guard-mcp-*
           merge-multiple: true
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/*
+          files: |
+            artifacts/*.zip
+            artifacts/*.tar.gz
+            artifacts/*.sha256
           generate_release_notes: true
           draft: false
           prerelease: ${{ contains(github.ref_name, '-') }}

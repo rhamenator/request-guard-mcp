@@ -11,20 +11,29 @@ use std::time::Instant;
 use uuid::Uuid;
 
 pub async fn run(state: &AppState, req: ClassifyRequest) -> Result<ClassifyResponse, AppError> {
-    run_internal(state, req, true).await
+    run_internal(state, req, true, "internal").await
+}
+
+pub async fn run_scoped(
+    state: &AppState,
+    req: ClassifyRequest,
+    caller_scope: &str,
+) -> Result<ClassifyResponse, AppError> {
+    run_internal(state, req, true, caller_scope).await
 }
 
 pub(crate) async fn run_ephemeral(
     state: &AppState,
     req: ClassifyRequest,
 ) -> Result<ClassifyResponse, AppError> {
-    run_internal(state, req, false).await
+    run_internal(state, req, false, "internal").await
 }
 
 async fn run_internal(
     state: &AppState,
     req: ClassifyRequest,
     persist: bool,
+    caller_scope: &str,
 ) -> Result<ClassifyResponse, AppError> {
     let start = Instant::now();
     validate_tls_fingerprints(&req)?;
@@ -40,13 +49,12 @@ async fn run_internal(
 
     // Check cache for fingerprint
     let fingerprint = request_fingerprint(
+        caller_scope,
         req.ip.as_deref(),
         req.user_agent.as_deref(),
         req.path.as_deref(),
         req.method.as_deref(),
         req.headers.as_ref(),
-        req.tls_ja3.as_deref(),
-        req.tls_ja4.as_deref(),
     );
     let distributed_cached = if state.redis.is_available() {
         match state.redis.cache_get(&fingerprint).await {

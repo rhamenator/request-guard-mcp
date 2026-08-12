@@ -21,6 +21,15 @@ pub trait McpTool: Send + Sync {
     fn name(&self) -> &str;
     fn description(&self) -> &str;
     async fn call(&self, state: Arc<AppState>, params: Option<Value>) -> Result<Value, AppError>;
+
+    async fn call_scoped(
+        &self,
+        state: Arc<AppState>,
+        params: Option<Value>,
+        _caller_scope: &str,
+    ) -> Result<Value, AppError> {
+        self.call(state, params).await
+    }
 }
 
 /// Central registry mapping tool names to implementations.
@@ -53,6 +62,7 @@ impl ToolRegistry {
         &self,
         state: Arc<AppState>,
         req: &McpRequest,
+        caller_scope: &str,
     ) -> Result<Value, AppError> {
         // Strip the "tools/" prefix if present
         let tool_name = req.method.strip_prefix("tools/").unwrap_or(&req.method);
@@ -62,7 +72,8 @@ impl ToolRegistry {
             .get(tool_name)
             .ok_or_else(|| AppError::ToolNotFound(tool_name.to_string()))?;
 
-        tool.call(state, req.params.clone()).await
+        tool.call_scoped(state, req.params.clone(), caller_scope)
+            .await
     }
 }
 
@@ -117,6 +128,14 @@ impl McpTool for ClassifyTool {
         "Classify a request as bot/human"
     }
     async fn call(&self, state: Arc<AppState>, params: Option<Value>) -> Result<Value, AppError> {
+        self.call_scoped(state, params, "internal").await
+    }
+    async fn call_scoped(
+        &self,
+        state: Arc<AppState>,
+        params: Option<Value>,
+        caller_scope: &str,
+    ) -> Result<Value, AppError> {
         let req: crate::models::request::ClassifyRequest = params
             .map(serde_json::from_value)
             .transpose()
@@ -137,7 +156,7 @@ impl McpTool for ClassifyTool {
                 tls_fingerprint_source: None,
                 extra: None,
             });
-        let result = crate::tools::classify::run(&state, req).await?;
+        let result = crate::tools::classify::run_scoped(&state, req, caller_scope).await?;
         serde_json::to_value(result).map_err(AppError::from)
     }
 }
@@ -174,6 +193,14 @@ impl McpTool for BatchClassifyTool {
         "Classify multiple requests"
     }
     async fn call(&self, state: Arc<AppState>, params: Option<Value>) -> Result<Value, AppError> {
+        self.call_scoped(state, params, "internal").await
+    }
+    async fn call_scoped(
+        &self,
+        state: Arc<AppState>,
+        params: Option<Value>,
+        caller_scope: &str,
+    ) -> Result<Value, AppError> {
         if !state.config.features.enable_batch {
             return Err(AppError::IntegrationUnavailable(
                 "batch_classify is disabled by configuration".to_string(),
@@ -184,7 +211,7 @@ impl McpTool for BatchClassifyTool {
             .and_then(|v| {
                 serde_json::from_value(v).map_err(|e| AppError::InvalidRequest(e.to_string()))
             })?;
-        let result = crate::tools::batch_classify::run(&state, req).await?;
+        let result = crate::tools::batch_classify::run_scoped(&state, req, caller_scope).await?;
         serde_json::to_value(result).map_err(AppError::from)
     }
 }

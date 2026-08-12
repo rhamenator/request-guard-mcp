@@ -1,4 +1,5 @@
 use crate::error::AppError;
+use crate::util::hashing::sha256_hex;
 use axum::http::HeaderMap;
 use std::collections::HashSet;
 use tracing::warn;
@@ -6,6 +7,17 @@ use tracing::warn;
 /// Validates the `Authorization` header (****** against the
 /// configured set of allowed tokens.
 pub fn verify_token(headers: &HeaderMap, allowed: &[String]) -> Result<(), AppError> {
+    authenticated_cache_scope(headers, allowed).map(|_| ())
+}
+
+/// Authenticate a caller and derive a non-secret, server-controlled cache scope.
+///
+/// The scope prevents two separately provisioned MCP callers from sharing
+/// classification cache entries without ever placing a bearer token in a key.
+pub fn authenticated_cache_scope(
+    headers: &HeaderMap,
+    allowed: &[String],
+) -> Result<String, AppError> {
     // Build a set for O(1) lookup
     let allowed_set: HashSet<&str> = allowed.iter().map(String::as_str).collect();
 
@@ -29,7 +41,7 @@ pub fn verify_token(headers: &HeaderMap, allowed: &[String]) -> Result<(), AppEr
     };
 
     if allowed_set.contains(token) {
-        Ok(())
+        Ok(format!("caller:{}", sha256_hex(token.as_bytes())))
     } else {
         warn!("invalid bearer token presented");
         Err(AppError::Forbidden)
@@ -98,5 +110,23 @@ mod tests {
             verify_token(&headers, &tokens),
             Err(AppError::Forbidden)
         ));
+    }
+
+    #[test]
+    fn cache_scope_is_stable_separated_and_does_not_expose_token() {
+        let first = "test-token-abc";
+        let second = "test-token-def";
+        let allowed = vec![first.to_string(), second.to_string()];
+
+        let first_scope = authenticated_cache_scope(&make_headers(&auth_hdr(first)), &allowed)
+            .expect("first token should authenticate");
+        let repeated_scope = authenticated_cache_scope(&make_headers(&auth_hdr(first)), &allowed)
+            .expect("first token should authenticate repeatedly");
+        let second_scope = authenticated_cache_scope(&make_headers(&auth_hdr(second)), &allowed)
+            .expect("second token should authenticate");
+
+        assert_eq!(first_scope, repeated_scope);
+        assert_ne!(first_scope, second_scope);
+        assert!(!first_scope.contains(first));
     }
 }

@@ -20,6 +20,13 @@ A production-ready **Rust MCP (Model Context Protocol) server** for request risk
 - **MaxMind City/ASN/Anonymous-IP enrichment**, optionally combined with Redis reputation scores
 - **Docker + Kubernetes** ready with HPA, NetworkPolicy, health probes
 
+### Transport scope
+
+WebSocket and HTTP POST JSON-RPC are the final supported MCP transports for
+this server. A gRPC listener is intentionally out of scope because the project
+does not define a separate protobuf service contract; the `grpc-tonic` feature
+in `opentelemetry-otlp` is used only to export telemetry to an OTLP collector.
+
 ## Quickstart
 
 ```bash
@@ -62,6 +69,14 @@ MCP_SERVER_PRIMARY_TIMEOUT=10
 For clients already configured with the previous `ai-scraping-defense-mcp` hostname, Docker Compose and Kubernetes manifests include an optional legacy DNS alias/service that points to the same server.
 
 See [docs/compatibility-matrix.md](docs/compatibility-matrix.md) for full details.
+
+## Ready-to-run releases
+
+Each GitHub release includes a checksum-protected native bundle for Linux x64,
+Windows x64, macOS Intel, and macOS Apple Silicon. Download the archive for your
+platform, extract it, copy `.env.example` to `.env`, set `AUTH_TOKENS`, and run
+`request-guard-mcp` (or `request-guard-mcp.exe` on Windows). A signed container
+image is also published to `ghcr.io/rhamenator/request-guard-mcp`.
 
 ## Docker
 

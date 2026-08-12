@@ -8,6 +8,8 @@ All WebSocket connections are authenticated at connection establishment using to
 - Tokens are configured via the `AUTH_TOKENS` environment variable (comma-separated).
 - An unauthenticated connection receives a JSON-RPC error and the connection is closed.
 - Authentication is enforced before any tool dispatch occurs.
+- Classification caches are partitioned by a server-derived hash of the
+  authenticated credential; raw bearer tokens are never used in cache keys.
 
 ## Transport Security
 
@@ -22,6 +24,9 @@ All WebSocket connections are authenticated at connection establishment using to
 - Invalid JSON is rejected with a `Parse error` (-32700) response.
 - Batch requests are bounded by `max_batch_size` (default 50).
 - Per-tool timeouts prevent slow-loris and resource exhaustion attacks.
+- Caller-supplied JA3/JA4 values are format-validated metadata, not proof of a
+  TLS handshake. They are excluded from cache identity; callers must establish
+  provenance at their own trusted proxy/CDN boundary.
 
 ## No Panics on Request Path
 
