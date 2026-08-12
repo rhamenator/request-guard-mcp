@@ -93,7 +93,7 @@ woothee = "0.13"
 
 # Optional: Redis
 deadpool-redis = { version = "0.15", optional = true }
-redis = { version = "0.25", features = ["tokio-comp", "connection-manager"] }
+redis = { version = "1.5", features = ["tokio-comp", "connection-manager"] }
 
 # Optional: PostgreSQL
 sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json"], optional = true }
