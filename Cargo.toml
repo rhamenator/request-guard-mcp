@@ -103,7 +103,7 @@ async-trait = "0.1"
 
 # Collections
 indexmap = { version = "2.2", features = ["serde"] }
-dashmap = "5.5"
+dashmap = "6.2"
 
 # Random
 rand = "0.8"
