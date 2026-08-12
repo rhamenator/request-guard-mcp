@@ -39,6 +39,7 @@ def main() -> None:
     shutil.copy2("README.md", stage / "README.md")
     shutil.copy2("LICENSE", stage / "LICENSE")
     shutil.copy2(".env.example", stage / ".env.example")
+    shutil.copy2("Cargo.lock", stage / "Cargo.lock")
 
     if args.platform.startswith("windows-"):
         archive = artifacts / f"{prefix}.zip"
