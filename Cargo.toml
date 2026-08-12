@@ -106,7 +106,7 @@ indexmap = { version = "2.2", features = ["serde"] }
 dashmap = "5.5"
 
 # Random
-rand = "0.8"
+rand = "0.10"
 
 # Process info
 sysinfo = "0.30"

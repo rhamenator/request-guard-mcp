@@ -2673,7 +2673,7 @@ dependencies = [
  "opentelemetry_sdk",
  "pretty_assertions",
  "prometheus",
- "rand 0.8.7",
+ "rand 0.10.2",
  "redis",
  "regex",
  "reqwest 0.12.28",
