@@ -30,6 +30,9 @@ pub async fn run(state: &AppState, req: WarmupRequest) -> WarmupResponse {
                     accept: None,
                     request_id: Some("warmup".to_string()),
                     timestamp: None,
+                    tls_ja3: None,
+                    tls_ja4: None,
+                    tls_fingerprint_source: None,
                     extra: None,
                 };
                 if crate::tools::classify::run_ephemeral(state, dummy)

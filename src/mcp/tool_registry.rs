@@ -132,6 +132,9 @@ impl McpTool for ClassifyTool {
                 accept: None,
                 request_id: None,
                 timestamp: None,
+                tls_ja3: None,
+                tls_ja4: None,
+                tls_fingerprint_source: None,
                 extra: None,
             });
         let result = crate::tools::classify::run(&state, req).await?;

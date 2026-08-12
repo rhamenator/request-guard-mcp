@@ -14,6 +14,10 @@ pub struct ClassifyRequest {
     pub accept: Option<String>,
     pub request_id: Option<String>,
     pub timestamp: Option<String>,
+    /// TLS fingerprint values already collected and trust-validated by the caller.
+    pub tls_ja3: Option<String>,
+    pub tls_ja4: Option<String>,
+    pub tls_fingerprint_source: Option<String>,
     pub extra: Option<serde_json::Value>,
 }
 

@@ -17,6 +17,9 @@ fn bot_request() -> models::request::ClassifyRequest {
         accept: None,
         request_id: Some("test-bot-001".to_string()),
         timestamp: None,
+        tls_ja3: None,
+        tls_ja4: None,
+        tls_fingerprint_source: None,
         extra: None,
     }
 }
@@ -45,6 +48,9 @@ fn browser_request() -> models::request::ClassifyRequest {
         accept: None,
         request_id: Some("test-browser-001".to_string()),
         timestamp: None,
+        tls_ja3: None,
+        tls_ja4: None,
+        tls_fingerprint_source: None,
         extra: None,
     }
 }
@@ -118,6 +124,9 @@ async fn scrapy_ua_is_flagged_or_blocked() {
         accept: None,
         request_id: None,
         timestamp: None,
+        tls_ja3: None,
+        tls_ja4: None,
+        tls_fingerprint_source: None,
         extra: None,
     };
     let resp = tools::classify::run(&state, req).await.unwrap();
@@ -142,6 +151,9 @@ async fn sensitive_path_raises_score() {
         accept: None,
         request_id: None,
         timestamp: None,
+        tls_ja3: None,
+        tls_ja4: None,
+        tls_fingerprint_source: None,
         extra: None,
     };
     let resp = tools::classify::run(&state, req).await.unwrap();
@@ -168,4 +180,18 @@ async fn cache_key_includes_method_and_headers() {
         .signals
         .iter()
         .any(|signal| signal.name == "method_unusual"));
+}
+
+#[tokio::test]
+async fn classify_accepts_valid_tls_fingerprints_and_rejects_malformed_values() {
+    let state = make_state();
+    let mut request = browser_request();
+    request.tls_ja3 = Some("72A589DA586844D7F0818CE684948EEA".to_string());
+    request.tls_ja4 = Some("T13D1516H2_8DAAF6152771_E5627EFA2AB1".to_string());
+    request.tls_fingerprint_source = Some("cloudflare".to_string());
+    assert!(tools::classify::run(&state, request.clone()).await.is_ok());
+
+    request.tls_ja4 = Some("not-a-ja4".to_string());
+    let error = tools::classify::run(&state, request).await.unwrap_err();
+    assert_eq!(error.code(), "VALIDATION_FAILED");
 }

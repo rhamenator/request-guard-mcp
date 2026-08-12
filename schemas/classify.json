@@ -13,6 +13,9 @@
     "accept": { "type": "string" },
     "request_id": { "type": "string", "description": "Optional idempotency / correlation ID" },
     "timestamp": { "type": "string", "format": "date-time" },
+    "tls_ja3": { "type": "string", "pattern": "^[0-9A-Fa-f]{32}$", "description": "JA3 digest collected by trusted TLS infrastructure" },
+    "tls_ja4": { "type": "string", "pattern": "^[A-Za-z0-9]{10}_[0-9A-Fa-f]{12}_[0-9A-Fa-f]{12}$", "description": "Canonical JA4 value collected by trusted TLS infrastructure" },
+    "tls_fingerprint_source": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,32}$", "description": "Trusted collector or CDN that supplied the fingerprint" },
     "extra": { "type": "object", "description": "Arbitrary extra signals" }
   }
 }

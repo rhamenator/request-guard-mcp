@@ -25,6 +25,9 @@ fn make_req(c: &Case) -> models::request::ClassifyRequest {
         accept: None,
         request_id: Some(c.name.to_string()),
         timestamp: None,
+        tls_ja3: None,
+        tls_ja4: None,
+        tls_fingerprint_source: None,
         extra: None,
     }
 }
@@ -91,6 +94,9 @@ async fn clean_browser_always_allowed() {
         accept: None,
         request_id: Some("regression-clean-browser".to_string()),
         timestamp: None,
+        tls_ja3: None,
+        tls_ja4: None,
+        tls_fingerprint_source: None,
         extra: None,
     };
     let resp = tools::classify::run(&state, req).await.unwrap();

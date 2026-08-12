@@ -27,6 +27,7 @@ async fn run_internal(
     persist: bool,
 ) -> Result<ClassifyResponse, AppError> {
     let start = Instant::now();
+    validate_tls_fingerprints(&req)?;
     let request_id = req
         .request_id
         .clone()
@@ -44,6 +45,8 @@ async fn run_internal(
         req.path.as_deref(),
         req.method.as_deref(),
         req.headers.as_ref(),
+        req.tls_ja3.as_deref(),
+        req.tls_ja4.as_deref(),
     );
     let distributed_cached = if state.redis.is_available() {
         match state.redis.cache_get(&fingerprint).await {
@@ -105,6 +108,50 @@ async fn run_internal(
         persist_decision(state, &req, &resp).await?;
     }
     Ok(resp)
+}
+
+fn validate_tls_fingerprints(request: &ClassifyRequest) -> Result<(), AppError> {
+    if let Some(ja3) = request.tls_ja3.as_deref() {
+        let candidate = ja3.trim();
+        if candidate.len() != 32 || !candidate.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+            return Err(AppError::Validation(
+                "tls_ja3 must be a 32-character hexadecimal JA3 digest".into(),
+            ));
+        }
+    }
+    if let Some(ja4) = request.tls_ja4.as_deref() {
+        let candidate = ja4.trim().to_ascii_lowercase();
+        let sections = candidate.split('_').collect::<Vec<_>>();
+        let valid = sections.len() == 3
+            && sections[0].len() == 10
+            && sections[0]
+                .bytes()
+                .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit())
+            && sections[1].len() == 12
+            && sections[2].len() == 12
+            && sections[1]
+                .bytes()
+                .chain(sections[2].bytes())
+                .all(|byte| byte.is_ascii_hexdigit());
+        if !valid {
+            return Err(AppError::Validation(
+                "tls_ja4 must use the canonical JA4 a_b_c format".into(),
+            ));
+        }
+    }
+    if let Some(source) = request.tls_fingerprint_source.as_deref() {
+        if source.is_empty()
+            || source.len() > 32
+            || !source
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-'))
+        {
+            return Err(AppError::Validation(
+                "tls_fingerprint_source must be a short infrastructure identifier".into(),
+            ));
+        }
+    }
+    Ok(())
 }
 
 async fn persist_decision(

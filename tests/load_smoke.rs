@@ -35,6 +35,9 @@ async fn concurrent_classify_500_requests() {
                 accept: None,
                 request_id: Some(format!("load-{i}")),
                 timestamp: None,
+                tls_ja3: None,
+                tls_ja4: None,
+                tls_fingerprint_source: None,
                 extra: None,
             };
             tools::classify::run(&s, req).await.unwrap()

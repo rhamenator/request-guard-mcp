@@ -24,6 +24,9 @@ pub async fn run(state: &AppState, req: SelfTestRequest) -> SelfTestResponse {
             accept: None,
             request_id: Some("self_test_1".to_string()),
             timestamp: None,
+            tls_ja3: None,
+            tls_ja4: None,
+            tls_fingerprint_source: None,
             extra: None,
         };
         let resp = crate::tools::classify::run_ephemeral(state, dummy).await;
@@ -60,6 +63,9 @@ pub async fn run(state: &AppState, req: SelfTestRequest) -> SelfTestResponse {
             accept: None,
             request_id: Some("self_test_2".to_string()),
             timestamp: None,
+            tls_ja3: None,
+            tls_ja4: None,
+            tls_fingerprint_source: None,
             extra: None,
         };
         let resp = crate::tools::classify::run_ephemeral(state, dummy).await;

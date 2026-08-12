@@ -21,6 +21,9 @@ fn classify_request(request_id: String, user_agent: &str) -> ClassifyRequest {
         accept: Some("text/html".to_string()),
         request_id: Some(request_id),
         timestamp: None,
+        tls_ja3: None,
+        tls_ja4: None,
+        tls_fingerprint_source: None,
         extra: None,
     }
 }

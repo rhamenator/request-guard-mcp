@@ -14,24 +14,27 @@ pub fn request_fingerprint(
     path: Option<&str>,
     method: Option<&str>,
     headers: Option<&std::collections::HashMap<String, String>>,
+    tls_ja3: Option<&str>,
+    tls_ja4: Option<&str>,
 ) -> String {
-    let mut header_names = headers
+    let mut canonical_headers = headers
         .map(|values| {
             values
-                .keys()
-                .map(|key| key.to_lowercase())
+                .iter()
+                .map(|(key, value)| format!("{}:{}", key.to_lowercase(), value.trim()))
                 .collect::<Vec<_>>()
         })
         .unwrap_or_default();
-    header_names.sort_unstable();
-    header_names.dedup();
+    canonical_headers.sort_unstable();
     let input = format!(
-        "{}|{}|{}|{}|{}",
+        "{}|{}|{}|{}|{}|{}|{}",
         ip.unwrap_or(""),
         ua.unwrap_or(""),
         path.unwrap_or(""),
         method.unwrap_or("").to_uppercase(),
-        header_names.join(",")
+        canonical_headers.join(","),
+        tls_ja3.unwrap_or("").to_ascii_lowercase(),
+        tls_ja4.unwrap_or("").to_ascii_lowercase(),
     );
     sha256_hex(input.as_bytes())
 }
