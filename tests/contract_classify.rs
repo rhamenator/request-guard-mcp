@@ -20,6 +20,8 @@ fn bot_request() -> models::request::ClassifyRequest {
         tls_ja3: None,
         tls_ja4: None,
         tls_fingerprint_source: None,
+        tls_fingerprint_attestation: None,
+        tls_fingerprint_verified: false,
         extra: None,
     }
 }
@@ -51,6 +53,8 @@ fn browser_request() -> models::request::ClassifyRequest {
         tls_ja3: None,
         tls_ja4: None,
         tls_fingerprint_source: None,
+        tls_fingerprint_attestation: None,
+        tls_fingerprint_verified: false,
         extra: None,
     }
 }
@@ -127,6 +131,8 @@ async fn scrapy_ua_is_flagged_or_blocked() {
         tls_ja3: None,
         tls_ja4: None,
         tls_fingerprint_source: None,
+        tls_fingerprint_attestation: None,
+        tls_fingerprint_verified: false,
         extra: None,
     };
     let resp = tools::classify::run(&state, req).await.unwrap();
@@ -154,6 +160,8 @@ async fn sensitive_path_raises_score() {
         tls_ja3: None,
         tls_ja4: None,
         tls_fingerprint_source: None,
+        tls_fingerprint_attestation: None,
+        tls_fingerprint_verified: false,
         extra: None,
     };
     let resp = tools::classify::run(&state, req).await.unwrap();
@@ -194,4 +202,76 @@ async fn classify_accepts_valid_tls_fingerprints_and_rejects_malformed_values() 
     request.tls_ja4 = Some("not-a-ja4".to_string());
     let error = tools::classify::run(&state, request).await.unwrap_err();
     assert_eq!(error.code(), "VALIDATION_FAILED");
+}
+
+#[tokio::test]
+async fn only_fresh_attested_tls_fingerprints_affect_rules() {
+    let key = "0123456789abcdef0123456789abcdef";
+    let ja3 = "72a589da586844d7f0818ce684948eea";
+    let ja4 = "t13d1516h2_8daaf6152771_e5627efa2ab1";
+    let mut config = config::Config::default();
+    config.tls_fingerprints.attestation_key = Some(key.to_string());
+    config.tls_fingerprints.known_bad_ja3 = vec![ja3.to_string()];
+    let state = state::AppState::new(config);
+    let mut request = browser_request();
+    request.ip = Some("198.51.100.7".into());
+    request.path = Some("/products".into());
+    request.tls_ja3 = Some(ja3.into());
+    request.tls_ja4 = Some(ja4.into());
+    request.tls_fingerprint_source = Some("envoy".into());
+
+    let unverified = tools::classify::run(&state, request.clone()).await.unwrap();
+    assert!(unverified
+        .signals
+        .iter()
+        .all(|signal| signal.name != "tls_fingerprint_known_bad"));
+
+    let issued_at = chrono::Utc::now().timestamp();
+    request.request_id = Some("attested".into());
+    request.tls_fingerprint_attestation = Some(
+        util::tls_attestation::create_attestation(
+            key.as_bytes(),
+            issued_at,
+            request.ip.as_deref().unwrap(),
+            request.method.as_deref().unwrap(),
+            request.path.as_deref().unwrap(),
+            request.tls_ja3.as_deref(),
+            request.tls_ja4.as_deref(),
+            request.tls_fingerprint_source.as_deref().unwrap(),
+        )
+        .unwrap(),
+    );
+    let verified = tools::classify::run(&state, request).await.unwrap();
+    assert!(verified
+        .signals
+        .iter()
+        .any(|signal| signal.name == "tls_fingerprint_known_bad"));
+    assert!(verified.score > unverified.score);
+}
+
+#[test]
+fn callers_cannot_deserialize_server_verified_provenance() {
+    let request: models::request::ClassifyRequest = serde_json::from_value(serde_json::json!({
+        "ip": "198.51.100.7",
+        "tls_ja3": "72a589da586844d7f0818ce684948eea",
+        "tls_fingerprint_source": "client-claim",
+        "tls_fingerprint_verified": true
+    }))
+    .unwrap();
+    assert!(!request.tls_fingerprint_verified);
+}
+
+#[test]
+fn persisted_request_shape_keeps_verified_tls_but_not_the_attestation() {
+    let mut request = browser_request();
+    request.tls_ja3 = Some("72a589da586844d7f0818ce684948eea".into());
+    request.tls_fingerprint_source = Some("envoy".into());
+    request.tls_fingerprint_attestation = Some("v1:1:not-persisted".into());
+    request.tls_fingerprint_verified = true;
+
+    let payload = serde_json::to_value(request).unwrap();
+    assert_eq!(payload["tls_fingerprint_verified"], true);
+    assert_eq!(payload["tls_ja3"], "72a589da586844d7f0818ce684948eea");
+    assert_eq!(payload["tls_fingerprint_source"], "envoy");
+    assert!(payload.get("tls_fingerprint_attestation").is_none());
 }

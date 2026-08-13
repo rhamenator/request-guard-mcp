@@ -31,31 +31,34 @@ pub(crate) async fn run_ephemeral(
 
 async fn run_internal(
     state: &AppState,
-    req: ClassifyRequest,
+    mut req: ClassifyRequest,
     persist: bool,
     caller_scope: &str,
 ) -> Result<ClassifyResponse, AppError> {
     let start = Instant::now();
     validate_tls_fingerprints(&req)?;
+    req.tls_ja3 = crate::util::tls_attestation::normalize_ja3(req.tls_ja3.as_deref());
+    req.tls_ja4 = crate::util::tls_attestation::normalize_ja4(req.tls_ja4.as_deref());
+    req.tls_fingerprint_source =
+        crate::util::tls_attestation::normalize_source(req.tls_fingerprint_source.as_deref());
+    req.tls_fingerprint_verified = crate::util::tls_attestation::verify_request(
+        &req,
+        &state.config.tls_fingerprints,
+        chrono::Utc::now().timestamp(),
+    );
+    req.tls_fingerprint_attestation = None;
     let request_id = req
         .request_id
         .clone()
         .unwrap_or_else(|| Uuid::new_v4().to_string());
 
-    let rule_engine = RuleEngine::new();
+    let rule_engine = RuleEngine::with_tls_config(&state.config.tls_fingerprints);
     let scorer = Scorer::new();
 
     let signals: SignalSet = rule_engine.evaluate(&req);
 
     // Check cache for fingerprint
-    let fingerprint = request_fingerprint(
-        caller_scope,
-        req.ip.as_deref(),
-        req.user_agent.as_deref(),
-        req.path.as_deref(),
-        req.method.as_deref(),
-        req.headers.as_ref(),
-    );
+    let fingerprint = request_fingerprint(caller_scope, &req);
     let distributed_cached = if state.redis.is_available() {
         match state.redis.cache_get(&fingerprint).await {
             Ok(value) => value,

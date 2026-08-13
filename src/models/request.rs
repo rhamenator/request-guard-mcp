@@ -14,11 +14,15 @@ pub struct ClassifyRequest {
     pub accept: Option<String>,
     pub request_id: Option<String>,
     pub timestamp: Option<String>,
-    /// Caller-asserted TLS metadata. It is validated for storage but is not a
-    /// server-verified identity signal and is excluded from cache identity.
+    /// TLS metadata is never trusted without a valid short-lived attestation.
     pub tls_ja3: Option<String>,
     pub tls_ja4: Option<String>,
     pub tls_fingerprint_source: Option<String>,
+    #[serde(default, skip_serializing)]
+    pub tls_fingerprint_attestation: Option<String>,
+    /// Server-derived provenance. JSON callers cannot set this field.
+    #[serde(default, skip_deserializing)]
+    pub tls_fingerprint_verified: bool,
     pub extra: Option<serde_json::Value>,
 }
 

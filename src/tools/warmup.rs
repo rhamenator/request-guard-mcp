@@ -33,6 +33,8 @@ pub async fn run(state: &AppState, req: WarmupRequest) -> WarmupResponse {
                     tls_ja3: None,
                     tls_ja4: None,
                     tls_fingerprint_source: None,
+                    tls_fingerprint_attestation: None,
+                    tls_fingerprint_verified: false,
                     extra: None,
                 };
                 if crate::tools::classify::run_ephemeral(state, dummy)

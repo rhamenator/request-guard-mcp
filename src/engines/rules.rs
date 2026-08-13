@@ -4,6 +4,7 @@ use crate::models::{
 };
 use once_cell::sync::Lazy;
 use regex::Regex;
+use std::collections::HashSet;
 
 static AI_BOT_UA: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
@@ -32,11 +33,36 @@ static SENSITIVE_PATH: Lazy<Regex> = Lazy::new(|| {
 });
 
 /// Rule-based signal extraction engine.
-pub struct RuleEngine;
+pub struct RuleEngine {
+    known_bad_ja3: HashSet<String>,
+    known_bad_ja4: HashSet<String>,
+}
 
 impl RuleEngine {
     pub fn new() -> Self {
-        RuleEngine
+        RuleEngine {
+            known_bad_ja3: HashSet::new(),
+            known_bad_ja4: HashSet::new(),
+        }
+    }
+
+    pub fn with_tls_config(config: &crate::config::TlsFingerprintConfig) -> Self {
+        RuleEngine {
+            known_bad_ja3: config
+                .known_bad_ja3
+                .iter()
+                .filter_map(|value| {
+                    crate::util::tls_attestation::normalize_ja3(Some(value.as_str()))
+                })
+                .collect(),
+            known_bad_ja4: config
+                .known_bad_ja4
+                .iter()
+                .filter_map(|value| {
+                    crate::util::tls_attestation::normalize_ja4(Some(value.as_str()))
+                })
+                .collect(),
+        }
     }
 
     /// Run all rules against a classify request and return a signal set.
@@ -58,6 +84,8 @@ impl RuleEngine {
         if let Some(method) = &req.method {
             self.eval_method(method, &mut signals);
         }
+
+        self.eval_tls_fingerprint(req, &mut signals);
 
         signals
     }
@@ -169,6 +197,53 @@ impl RuleEngine {
             }
         }
     }
+
+    fn eval_tls_fingerprint(&self, req: &ClassifyRequest, signals: &mut SignalSet) {
+        if !req.tls_fingerprint_verified {
+            return;
+        }
+        let known_bad = req
+            .tls_ja3
+            .as_ref()
+            .is_some_and(|value| self.known_bad_ja3.contains(value))
+            || req
+                .tls_ja4
+                .as_ref()
+                .is_some_and(|value| self.known_bad_ja4.contains(value));
+        if known_bad {
+            signals.push(Signal::new(
+                "tls_fingerprint_known_bad",
+                1.0,
+                0.85,
+                SignalSource::RuleEngine,
+                "Verified TLS fingerprint matches the configured threat set",
+            ));
+        }
+
+        let ua = req
+            .user_agent
+            .as_deref()
+            .unwrap_or_default()
+            .to_ascii_lowercase();
+        let claims_modern_browser = ua.contains("mozilla/5.0")
+            && ["chrome/", "crios/", "firefox/", "fxios/", "safari/", "edg/"]
+                .iter()
+                .any(|marker| ua.contains(marker));
+        let browser_profile_mismatch = claims_modern_browser
+            && req
+                .tls_ja4
+                .as_deref()
+                .is_some_and(|ja4| !matches!(ja4.get(..3), Some("t12" | "t13" | "q12" | "q13")));
+        if browser_profile_mismatch {
+            signals.push(Signal::new(
+                "ua_tls_profile_mismatch",
+                1.0,
+                0.45,
+                SignalSource::RuleEngine,
+                "Browser user-agent conflicts with the verified JA4 transport profile",
+            ));
+        }
+    }
 }
 
 impl Default for RuleEngine {
@@ -196,6 +271,8 @@ mod tests {
             tls_ja3: None,
             tls_ja4: None,
             tls_fingerprint_source: None,
+            tls_fingerprint_attestation: None,
+            tls_fingerprint_verified: false,
             extra: None,
         }
     }
@@ -218,5 +295,30 @@ mod tests {
         let signals = engine.evaluate(&req);
         let score = signals.aggregate_score();
         assert!(score < 0.5, "clean request score too high: {score}");
+    }
+
+    #[test]
+    fn tls_rules_require_verified_provenance() {
+        let config = crate::config::TlsFingerprintConfig {
+            known_bad_ja3: vec!["72a589da586844d7f0818ce684948eea".into()],
+            ..crate::config::TlsFingerprintConfig::default()
+        };
+        let engine = RuleEngine::with_tls_config(&config);
+        let mut req = make_req(Some("Mozilla/5.0 Chrome/140.0.0.0 Safari/537.36"), None);
+        req.tls_ja3 = Some("72a589da586844d7f0818ce684948eea".into());
+        req.tls_ja4 = Some("z99d1516h2_8daaf6152771_e5627efa2ab1".into());
+        assert!(engine.evaluate(&req).as_slice().iter().all(|signal| {
+            signal.name != "tls_fingerprint_known_bad" && signal.name != "ua_tls_profile_mismatch"
+        }));
+        req.tls_fingerprint_verified = true;
+        let signals = engine.evaluate(&req);
+        assert!(signals
+            .as_slice()
+            .iter()
+            .any(|signal| signal.name == "tls_fingerprint_known_bad"));
+        assert!(signals
+            .as_slice()
+            .iter()
+            .any(|signal| signal.name == "ua_tls_profile_mismatch"));
     }
 }

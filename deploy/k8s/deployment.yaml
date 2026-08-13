@@ -47,6 +47,32 @@ spec:
                 secretKeyRef:
                   name: mcp-secrets
                   key: auth_tokens
+            - name: TLS_FINGERPRINT_ATTESTATION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: mcp-secrets
+                  key: tls_fingerprint_attestation_key
+            - name: TLS_FINGERPRINT_ATTESTATION_PREVIOUS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: mcp-secrets
+                  key: tls_fingerprint_attestation_previous_key
+                  optional: true
+            - name: TLS_FINGERPRINT_ATTESTATION_MAX_AGE_SECONDS
+              valueFrom:
+                configMapKeyRef:
+                  name: mcp-config
+                  key: tls_fingerprint_attestation_max_age_seconds
+            - name: TLS_KNOWN_BAD_JA3
+              valueFrom:
+                configMapKeyRef:
+                  name: mcp-config
+                  key: tls_known_bad_ja3
+            - name: TLS_KNOWN_BAD_JA4
+              valueFrom:
+                configMapKeyRef:
+                  name: mcp-config
+                  key: tls_known_bad_ja4
             - name: MCP__REDIS__URL
               valueFrom:
                 secretKeyRef:

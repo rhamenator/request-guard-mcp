@@ -17,6 +17,7 @@ A production-ready **Rust MCP (Model Context Protocol) server** for request risk
 - **Structured JSON logging** via `tracing`
 - **Redis-backed** threat reputation, canary registry, queue telemetry, and distributed cache
 - **PostgreSQL-backed** decision replay, feedback, drift, and calibration reports with automatic schema setup
+- **HMAC-attested JA3/JA4 rules** with known-bad sets, UA/TLS mismatch detection, and verified cache partitioning
 - **MaxMind City/ASN/Anonymous-IP enrichment**, optionally combined with Redis reputation scores
 - **Docker + Kubernetes** ready with HPA, NetworkPolicy, health probes
 
@@ -69,6 +70,7 @@ MCP_SERVER_PRIMARY_TIMEOUT=10
 For clients already configured with the previous `ai-scraping-defense-mcp` hostname, Docker Compose and Kubernetes manifests include an optional legacy DNS alias/service that points to the same server.
 
 See [docs/compatibility-matrix.md](docs/compatibility-matrix.md) for full details.
+Trusted TLS producers must also follow [the attestation contract](docs/tls-fingerprint-attestation.md).
 
 ## Ready-to-run releases
 

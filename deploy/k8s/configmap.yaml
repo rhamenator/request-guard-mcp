@@ -12,3 +12,6 @@ data:
   global_concurrency: "256"
   per_tool_timeout_secs: "30"
   classify_timeout_secs: "5"
+  tls_fingerprint_attestation_max_age_seconds: "60"
+  tls_known_bad_ja3: ""
+  tls_known_bad_ja4: ""

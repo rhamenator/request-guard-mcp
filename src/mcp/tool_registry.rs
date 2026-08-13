@@ -154,6 +154,8 @@ impl McpTool for ClassifyTool {
                 tls_ja3: None,
                 tls_ja4: None,
                 tls_fingerprint_source: None,
+                tls_fingerprint_attestation: None,
+                tls_fingerprint_verified: false,
                 extra: None,
             });
         let result = crate::tools::classify::run_scoped(&state, req, caller_scope).await?;

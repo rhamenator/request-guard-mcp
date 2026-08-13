@@ -24,6 +24,8 @@ pub struct Config {
     pub geoip: GeoipConfig,
     #[serde(default)]
     pub features: FeatureConfig,
+    #[serde(default)]
+    pub tls_fingerprints: TlsFingerprintConfig,
     #[serde(default = "defaults::log_level")]
     pub log_level: String,
 }
@@ -112,6 +114,20 @@ pub struct FeatureConfig {
     pub enable_feedback: bool,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+pub struct TlsFingerprintConfig {
+    #[serde(default)]
+    pub attestation_key: Option<String>,
+    #[serde(default)]
+    pub previous_attestation_key: Option<String>,
+    #[serde(default = "defaults::tls_attestation_max_age_seconds")]
+    pub max_age_seconds: u64,
+    #[serde(default)]
+    pub known_bad_ja3: Vec<String>,
+    #[serde(default)]
+    pub known_bad_ja4: Vec<String>,
+}
+
 impl Config {
     /// Load configuration from environment variables and optional config file.
     pub fn load() -> Result<Self> {
@@ -153,6 +169,41 @@ impl Config {
             if !val.trim().is_empty() {
                 builder = builder.set_override("auth.cache_scope_hmac_key", val)?;
             }
+        }
+
+        if let Ok(val) = std::env::var("TLS_FINGERPRINT_ATTESTATION_KEY") {
+            if !val.trim().is_empty() {
+                builder = builder.set_override("tls_fingerprints.attestation_key", val)?;
+            }
+        }
+        if let Ok(val) = std::env::var("TLS_FINGERPRINT_ATTESTATION_PREVIOUS_KEY") {
+            if !val.trim().is_empty() {
+                builder = builder.set_override("tls_fingerprints.previous_attestation_key", val)?;
+            }
+        }
+        if let Ok(val) = std::env::var("TLS_FINGERPRINT_ATTESTATION_MAX_AGE_SECONDS") {
+            let max_age = val
+                .parse::<u64>()
+                .context("TLS_FINGERPRINT_ATTESTATION_MAX_AGE_SECONDS must be an integer")?;
+            builder = builder.set_override("tls_fingerprints.max_age_seconds", max_age)?;
+        }
+        if let Ok(val) = std::env::var("TLS_KNOWN_BAD_JA3") {
+            let values = val
+                .split(',')
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(str::to_string)
+                .collect::<Vec<_>>();
+            builder = builder.set_override("tls_fingerprints.known_bad_ja3", values)?;
+        }
+        if let Ok(val) = std::env::var("TLS_KNOWN_BAD_JA4") {
+            let values = val
+                .split(',')
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(str::to_string)
+                .collect::<Vec<_>>();
+            builder = builder.set_override("tls_fingerprints.known_bad_ja4", values)?;
         }
 
         if let Ok(val) = std::env::var("LOG_LEVEL") {
@@ -203,6 +254,45 @@ impl Config {
             .is_some_and(|key| key.len() < 32)
         {
             anyhow::bail!("CACHE_SCOPE_HMAC_KEY must contain at least 32 bytes when configured");
+        }
+        if self
+            .tls_fingerprints
+            .attestation_key
+            .as_deref()
+            .is_some_and(|key| key.len() < 32)
+        {
+            anyhow::bail!(
+                "TLS_FINGERPRINT_ATTESTATION_KEY must contain at least 32 bytes when configured"
+            );
+        }
+        if self
+            .tls_fingerprints
+            .previous_attestation_key
+            .as_deref()
+            .is_some_and(|key| key.len() < 32)
+        {
+            anyhow::bail!(
+                "TLS_FINGERPRINT_ATTESTATION_PREVIOUS_KEY must contain at least 32 bytes when configured"
+            );
+        }
+        if self.tls_fingerprints.max_age_seconds == 0 {
+            anyhow::bail!("TLS fingerprint attestation max age must be positive");
+        }
+        if self
+            .tls_fingerprints
+            .known_bad_ja3
+            .iter()
+            .any(|value| crate::util::tls_attestation::normalize_ja3(Some(value)).is_none())
+        {
+            anyhow::bail!("TLS_KNOWN_BAD_JA3 contains a malformed JA3 digest");
+        }
+        if self
+            .tls_fingerprints
+            .known_bad_ja4
+            .iter()
+            .any(|value| crate::util::tls_attestation::normalize_ja4(Some(value)).is_none())
+        {
+            anyhow::bail!("TLS_KNOWN_BAD_JA4 contains a malformed JA4 fingerprint");
         }
         if self.limits.max_request_bytes == 0
             || self.limits.max_batch_size == 0
@@ -332,6 +422,9 @@ mod defaults {
     pub fn enable_feedback() -> bool {
         true
     }
+    pub fn tls_attestation_max_age_seconds() -> u64 {
+        60
+    }
 }
 
 impl Default for AuthConfig {
@@ -397,6 +490,18 @@ impl Default for FeatureConfig {
     }
 }
 
+impl Default for TlsFingerprintConfig {
+    fn default() -> Self {
+        Self {
+            attestation_key: None,
+            previous_attestation_key: None,
+            max_age_seconds: defaults::tls_attestation_max_age_seconds(),
+            known_bad_ja3: vec![],
+            known_bad_ja4: vec![],
+        }
+    }
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
@@ -409,6 +514,7 @@ impl Default for Config {
             postgres: PostgresConfig::default(),
             geoip: GeoipConfig::default(),
             features: FeatureConfig::default(),
+            tls_fingerprints: TlsFingerprintConfig::default(),
             log_level: "info".to_string(),
         }
     }
@@ -474,6 +580,34 @@ mod tests {
             ..Config::default()
         };
         assert!(long_enough.validate().is_ok());
+    }
+
+    #[test]
+    fn tls_fingerprint_configuration_is_validated() {
+        let auth = AuthConfig {
+            enabled: false,
+            ..AuthConfig::default()
+        };
+        let short_previous = Config {
+            auth: auth.clone(),
+            tls_fingerprints: TlsFingerprintConfig {
+                attestation_key: Some("0123456789abcdef0123456789abcdef".into()),
+                previous_attestation_key: Some("too-short".into()),
+                ..TlsFingerprintConfig::default()
+            },
+            ..Config::default()
+        };
+        assert!(short_previous.validate().is_err());
+
+        let malformed_list = Config {
+            auth,
+            tls_fingerprints: TlsFingerprintConfig {
+                known_bad_ja3: vec!["not-a-ja3".into()],
+                ..TlsFingerprintConfig::default()
+            },
+            ..Config::default()
+        };
+        assert!(malformed_list.validate().is_err());
     }
 
     #[test]

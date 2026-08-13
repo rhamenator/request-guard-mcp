@@ -48,6 +48,13 @@ pub async fn run(state: &AppState, req: ConfigSnapshotRequest) -> ConfigSnapshot
             "asn_configured": cfg.geoip.asn_mmdb_path.is_some(),
             "anonymous_ip_configured": cfg.geoip.anonymous_ip_mmdb_path.is_some(),
         },
+        "tls_fingerprints": {
+            "attestation_key_configured": cfg.tls_fingerprints.attestation_key.is_some(),
+            "previous_attestation_key_configured": cfg.tls_fingerprints.previous_attestation_key.is_some(),
+            "max_age_seconds": cfg.tls_fingerprints.max_age_seconds,
+            "known_bad_ja3_count": cfg.tls_fingerprints.known_bad_ja3.len(),
+            "known_bad_ja4_count": cfg.tls_fingerprints.known_bad_ja4.len(),
+        },
     });
 
     if redact {

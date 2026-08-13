@@ -29,8 +29,9 @@ All WebSocket connections are authenticated at connection establishment using to
 - Batch requests are bounded by `max_batch_size` (default 50).
 - Per-tool timeouts prevent slow-loris and resource exhaustion attacks.
 - Caller-supplied JA3/JA4 values are format-validated metadata, not proof of a
-  TLS handshake. They are excluded from cache identity; callers must establish
-  provenance at their own trusted proxy/CDN boundary.
+  TLS handshake. Only a fresh, context-bound HMAC from a trusted producer sets
+  server-derived `tls_fingerprint_verified`; only verified values affect rules
+  and cache identity. See [TLS fingerprint attestation](tls-fingerprint-attestation.md).
 
 ## No Panics on Request Path
 
