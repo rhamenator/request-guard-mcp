@@ -103,7 +103,7 @@ mod inner {
                 return false;
             };
             deadpool_redis::redis::cmd("PING")
-                .query_async::<_, String>(&mut connection)
+                .query_async::<String>(&mut connection)
                 .await
                 .map(|reply| reply == "PONG")
                 .unwrap_or(false)
@@ -128,7 +128,7 @@ mod inner {
                 .arg(self.key(&format!("cache:{fingerprint}")))
                 .arg(self.cache_ttl_secs)
                 .arg(json)
-                .query_async::<_, ()>(&mut connection)
+                .query_async::<()>(&mut connection)
                 .await
                 .context("failed to write distributed classification cache")
         }
@@ -181,7 +181,7 @@ mod inner {
                 .arg(self.key(&format!("threats:{indicator_type}")))
                 .arg(indicator)
                 .arg(serde_json::to_string(record)?)
-                .query_async::<_, ()>(&mut connection)
+                .query_async::<()>(&mut connection)
                 .await
                 .context("failed to store Redis threat record")
         }
@@ -214,14 +214,14 @@ mod inner {
             deadpool_redis::redis::cmd("LPUSH")
                 .arg(self.key("canary_events"))
                 .arg(serde_json::to_string(&event)?)
-                .query_async::<_, ()>(&mut connection)
+                .query_async::<()>(&mut connection)
                 .await
                 .context("failed to record Redis canary event")?;
             deadpool_redis::redis::cmd("LTRIM")
                 .arg(self.key("canary_events"))
                 .arg(0)
                 .arg(9_999)
-                .query_async::<_, ()>(&mut connection)
+                .query_async::<()>(&mut connection)
                 .await
                 .context("failed to trim Redis canary events")?;
             Ok(Some(record))
@@ -233,7 +233,7 @@ mod inner {
                 .arg(self.key("canaries"))
                 .arg(sha256_hex(token.as_bytes()))
                 .arg(serde_json::to_string(record)?)
-                .query_async::<_, ()>(&mut connection)
+                .query_async::<()>(&mut connection)
                 .await
                 .context("failed to register Redis canary")
         }
@@ -259,7 +259,7 @@ mod inner {
                 .arg(&active_key)
                 .arg(timeout_secs.saturating_mul(4).max(60))
                 .ignore()
-                .query_async::<_, ()>(&mut connection)
+                .query_async::<()>(&mut connection)
                 .await
                 .context("failed to record Redis tool start")?;
             Ok(operation_id)
@@ -290,7 +290,7 @@ mod inner {
                 .arg(completed_key)
                 .arg(600)
                 .ignore()
-                .query_async::<_, ()>(&mut connection)
+                .query_async::<()>(&mut connection)
                 .await
                 .context("failed to record Redis tool completion")
         }
