@@ -75,7 +75,16 @@ async fn http_mcp_handler(
 
 fn authorize(headers: &HeaderMap, state: &AppState) -> Result<String, crate::error::AppError> {
     if state.config.auth.enabled {
-        return crate::auth::authenticated_cache_scope(headers, &state.config.auth.tokens);
+        return crate::auth::authenticated_cache_scope_with_key(
+            headers,
+            &state.config.auth.tokens,
+            state
+                .config
+                .auth
+                .cache_scope_hmac_key
+                .as_deref()
+                .map(str::as_bytes),
+        );
     }
     Ok("public".to_string())
 }

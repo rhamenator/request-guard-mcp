@@ -36,6 +36,11 @@ pub struct AuthConfig {
     /// If true, auth is enforced.
     #[serde(default = "defaults::auth_enabled")]
     pub enabled: bool,
+    /// Server-side HMAC key (>= 32 bytes) for deriving per-caller cache
+    /// scopes from bearer tokens. Leave unset to use a process-local random
+    /// key; configure it to keep scopes stable across restarts and replicas.
+    #[serde(default)]
+    pub cache_scope_hmac_key: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -144,6 +149,12 @@ impl Config {
             }
         }
 
+        if let Ok(val) = std::env::var("CACHE_SCOPE_HMAC_KEY") {
+            if !val.trim().is_empty() {
+                builder = builder.set_override("auth.cache_scope_hmac_key", val)?;
+            }
+        }
+
         if let Ok(val) = std::env::var("LOG_LEVEL") {
             builder = builder.set_override("log_level", val)?;
         }
@@ -184,6 +195,14 @@ impl Config {
             }) {
                 anyhow::bail!("AUTH_TOKENS contains an empty or placeholder token");
             }
+        }
+        if self
+            .auth
+            .cache_scope_hmac_key
+            .as_deref()
+            .is_some_and(|key| key.len() < 32)
+        {
+            anyhow::bail!("CACHE_SCOPE_HMAC_KEY must contain at least 32 bytes when configured");
         }
         if self.limits.max_request_bytes == 0
             || self.limits.max_batch_size == 0
@@ -320,6 +339,7 @@ impl Default for AuthConfig {
         Self {
             tokens: vec![],
             enabled: defaults::auth_enabled(),
+            cache_scope_hmac_key: None,
         }
     }
 }
@@ -428,6 +448,32 @@ mod tests {
             ..Config::default()
         };
         assert!(valid.validate().is_ok());
+    }
+
+    #[test]
+    fn short_cache_scope_hmac_keys_are_rejected() {
+        let base = AuthConfig {
+            tokens: vec!["a-real-test-token".to_string()],
+            ..AuthConfig::default()
+        };
+
+        let short = Config {
+            auth: AuthConfig {
+                cache_scope_hmac_key: Some("too-short".to_string()),
+                ..base.clone()
+            },
+            ..Config::default()
+        };
+        assert!(short.validate().is_err());
+
+        let long_enough = Config {
+            auth: AuthConfig {
+                cache_scope_hmac_key: Some("0123456789abcdef0123456789abcdef".to_string()),
+                ..base
+            },
+            ..Config::default()
+        };
+        assert!(long_enough.validate().is_ok());
     }
 
     #[test]

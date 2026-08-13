@@ -8,8 +8,12 @@ All WebSocket connections are authenticated at connection establishment using to
 - Tokens are configured via the `AUTH_TOKENS` environment variable (comma-separated).
 - An unauthenticated connection receives a JSON-RPC error and the connection is closed.
 - Authentication is enforced before any tool dispatch occurs.
-- Classification caches are partitioned by a server-derived hash of the
-  authenticated credential; raw bearer tokens are never used in cache keys.
+- Classification caches are partitioned by a server-derived, HMAC-SHA256-keyed
+  digest of the authenticated credential; raw bearer tokens are never used in
+  cache keys, and the keyed digest cannot be dictionary-attacked from Redis key
+  listings without the server-side key. Configure `CACHE_SCOPE_HMAC_KEY`
+  (>= 32 bytes) to keep scopes stable across restarts and replicas; otherwise a
+  process-local random key is used.
 
 ## Transport Security
 
