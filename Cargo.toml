@@ -108,7 +108,7 @@ dashmap = "6.2"
 rand = "0.10"
 
 # Process info
-sysinfo = "0.30"
+sysinfo = "0.39"
 
 [dev-dependencies]
 tokio-test = "0.4"
