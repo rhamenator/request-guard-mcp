@@ -29,8 +29,8 @@ tokio = { version = "1.36", features = ["full"] }
 tokio-stream = "0.1"
 
 # WebSocket
-axum = { version = "0.7", features = ["ws", "macros"] }
-tower = { version = "0.4", features = ["util", "timeout", "limit"] }
+axum = { version = "0.8", features = ["ws", "macros"] }
+tower = { version = "0.5", features = ["util", "timeout", "limit"] }
 tower-http = { version = "0.5", features = ["trace", "cors", "limit"] }
 
 # Serialization
@@ -50,7 +50,7 @@ opentelemetry_sdk = { version = "0.32.1", features = ["trace", "rt-tokio"] }
 opentelemetry-otlp = { version = "0.32", features = ["trace", "grpc-tonic"] }
 # Metrics
 prometheus = { version = "0.13", default-features = false, features = ["process"] }
-axum-prometheus = "0.6"
+axum-prometheus = "0.10"
 
 # Error handling
 thiserror = "1.0"
@@ -58,7 +58,6 @@ anyhow = "1.0"
 
 # Validation
 validator = { version = "0.20", features = ["derive"] }
-jsonschema = "0.17"
 
 # UUID / IDs
 uuid = { version = "1.7", features = ["v4", "serde"] }
@@ -113,7 +112,7 @@ sysinfo = "0.30"
 
 [dev-dependencies]
 tokio-test = "0.4"
-axum-test = "14.2"
+axum-test = "21.0"
 pretty_assertions = "1.4"
 serde_json = "1.0"
 tempfile = "3.10"

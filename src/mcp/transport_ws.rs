@@ -25,7 +25,7 @@ pub async fn handle_ws_connection(
                 if let Some(response) =
                     process_message(&text, &state, &registry, &caller_scope).await
                 {
-                    if let Err(e) = socket.send(Message::Text(response)).await {
+                    if let Err(e) = socket.send(Message::Text(response.into())).await {
                         warn!(error = %e, "failed to send WS response");
                         break;
                     }
@@ -36,7 +36,7 @@ pub async fn handle_ws_connection(
                     if let Some(response) =
                         process_message(text, &state, &registry, &caller_scope).await
                     {
-                        if let Err(e) = socket.send(Message::Text(response)).await {
+                        if let Err(e) = socket.send(Message::Text(response.into())).await {
                             warn!(error = %e, "failed to send WS response");
                             break;
                         }
@@ -49,7 +49,7 @@ pub async fn handle_ws_connection(
                         -32700,
                         "Parse error: MCP messages must be UTF-8",
                     ));
-                    if let Err(e) = socket.send(Message::Text(response)).await {
+                    if let Err(e) = socket.send(Message::Text(response.into())).await {
                         warn!(error = %e, "failed to send WS parse error");
                         break;
                     }
