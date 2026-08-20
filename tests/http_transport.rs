@@ -18,7 +18,7 @@ fn server(auth_enabled: bool) -> TestServer {
         app: Arc::new(AppState::new(config)),
         registry: Arc::new(build_registry()),
     };
-    TestServer::new(build_router(state, max_body)).unwrap()
+    TestServer::new(build_router(state, max_body))
 }
 
 #[tokio::test]
