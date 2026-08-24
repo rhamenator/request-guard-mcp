@@ -47,6 +47,11 @@ spec:
                 secretKeyRef:
                   name: mcp-secrets
                   key: auth_tokens
+            - name: CACHE_SCOPE_HMAC_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: mcp-secrets
+                  key: cache_scope_hmac_key
             - name: TLS_FINGERPRINT_ATTESTATION_KEY
               valueFrom:
                 secretKeyRef:
@@ -110,6 +115,16 @@ spec:
                 configMapKeyRef:
                   name: mcp-config
                   key: global_concurrency
+            - name: MCP__LIMITS__MAX_CONNECTIONS
+              valueFrom:
+                configMapKeyRef:
+                  name: mcp-config
+                  key: max_connections
+            - name: MCP__LIMITS__WEBSOCKET_IDLE_TIMEOUT_SECS
+              valueFrom:
+                configMapKeyRef:
+                  name: mcp-config
+                  key: websocket_idle_timeout_secs
             - name: MCP__LIMITS__PER_TOOL_TIMEOUT_SECS
               valueFrom:
                 configMapKeyRef:

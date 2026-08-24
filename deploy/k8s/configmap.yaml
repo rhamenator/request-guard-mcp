@@ -10,6 +10,8 @@ data:
   max_request_bytes: "1048576"
   max_batch_size: "50"
   global_concurrency: "256"
+  max_connections: "256"
+  websocket_idle_timeout_secs: "60"
   per_tool_timeout_secs: "30"
   classify_timeout_secs: "5"
   tls_fingerprint_attestation_max_age_seconds: "60"

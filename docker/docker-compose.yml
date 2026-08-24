@@ -17,6 +17,8 @@ services:
       - MCP__PORT=8085
       - LOG_LEVEL=info
       - AUTH_TOKENS=${AUTH_TOKENS:?Set AUTH_TOKENS to a strong non-placeholder token}
+      - CACHE_SCOPE_HMAC_KEY=${CACHE_SCOPE_HMAC_KEY:?Run python scripts/configure_credentials.py}
+      - TLS_FINGERPRINT_ATTESTATION_KEY=${TLS_FINGERPRINT_ATTESTATION_KEY:?Run python scripts/configure_credentials.py}
       - MCP__REDIS__URL=redis://:${REDIS_PASSWORD:?Set REDIS_PASSWORD}@redis:6379
       - MCP__POSTGRES__URL=postgresql://mcp:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/mcp
     depends_on:

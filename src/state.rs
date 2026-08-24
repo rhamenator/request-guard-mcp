@@ -14,6 +14,7 @@ use tokio::sync::Semaphore;
 pub struct AppState {
     pub config: Arc<Config>,
     pub semaphore: Arc<Semaphore>,
+    pub connection_semaphore: Arc<Semaphore>,
     pub cache: Arc<CacheStore>,
     pub redis: Arc<RedisClient>,
     pub postgres: Arc<PostgresClient>,
@@ -130,8 +131,10 @@ impl AppState {
         geoip: GeoipClient,
     ) -> Self {
         let concurrency = config.limits.global_concurrency;
+        let max_connections = config.limits.max_connections;
         let config = Arc::new(config);
         let semaphore = Arc::new(Semaphore::new(concurrency));
+        let connection_semaphore = Arc::new(Semaphore::new(max_connections));
         let cache = Arc::new(CacheStore::new());
         let redis = Arc::new(redis);
         let postgres = Arc::new(postgres);
@@ -160,6 +163,7 @@ impl AppState {
         Self {
             config,
             semaphore,
+            connection_semaphore,
             cache,
             redis,
             postgres,
