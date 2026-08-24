@@ -43,8 +43,9 @@ docker-build:
 	docker build -t request-guard-mcp:local -f docker/Dockerfile .
 
 docker-run: docker-build
+	@test -f .env || (echo "Run python scripts/configure_credentials.py first"; exit 1)
 	docker run --rm -p 8085:8085 \
-		-e AUTH_TOKENS=dev-token \
+		--env-file .env \
 		-e LOG_LEVEL=debug \
 		request-guard-mcp:local
 

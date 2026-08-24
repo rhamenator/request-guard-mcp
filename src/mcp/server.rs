@@ -31,7 +31,7 @@ pub fn build_router(state: ServerState, max_body: usize) -> Router {
 }
 
 async fn ws_handler(
-    ws: WebSocketUpgrade,
+    mut ws: WebSocketUpgrade,
     headers: HeaderMap,
     State(state): State<ServerState>,
 ) -> Response {
@@ -40,8 +40,28 @@ async fn ws_handler(
         Err(error) => return error_response(&error),
     };
 
+    let Ok(connection_permit) = Arc::clone(&state.app.connection_semaphore).try_acquire_owned()
+    else {
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            "WebSocket connection limit reached",
+        )
+            .into_response();
+    };
+    let max_message_bytes = state.app.config.limits.max_request_bytes;
+    ws = ws
+        .protocols(["mcp"])
+        .max_message_size(max_message_bytes)
+        .max_frame_size(max_message_bytes);
+
     ws.on_upgrade(move |socket| {
-        handle_ws_connection(socket, state.app, state.registry, caller_scope)
+        handle_ws_connection(
+            socket,
+            state.app,
+            state.registry,
+            caller_scope,
+            connection_permit,
+        )
     })
 }
 

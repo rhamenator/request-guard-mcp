@@ -6,7 +6,7 @@ use axum::extract::ws::{Message, WebSocket};
 use serde_json::Value;
 use std::sync::Arc;
 use std::time::Instant;
-use tokio::time::timeout;
+use tokio::{sync::OwnedSemaphorePermit, time::timeout};
 use tracing::{error, info, warn, Instrument};
 
 /// Handle a single WebSocket connection lifecycle.
@@ -15,13 +15,20 @@ pub async fn handle_ws_connection(
     state: Arc<AppState>,
     registry: Arc<ToolRegistry>,
     caller_scope: String,
+    _connection_permit: OwnedSemaphorePermit,
 ) {
     state.metrics.active_connections.inc();
     info!("WebSocket connection established");
 
     loop {
-        match socket.recv().await {
-            Some(Ok(Message::Text(text))) => {
+        let idle_timeout =
+            std::time::Duration::from_secs(state.config.limits.websocket_idle_timeout_secs);
+        match timeout(idle_timeout, socket.recv()).await {
+            Err(_) => {
+                warn!("WebSocket connection closed after idle timeout");
+                break;
+            }
+            Ok(Some(Ok(Message::Text(text)))) => {
                 if let Some(response) =
                     process_message(&text, &state, &registry, &caller_scope).await
                 {
@@ -31,7 +38,7 @@ pub async fn handle_ws_connection(
                     }
                 }
             }
-            Some(Ok(Message::Binary(bytes))) => match std::str::from_utf8(&bytes) {
+            Ok(Some(Ok(Message::Binary(bytes)))) => match std::str::from_utf8(&bytes) {
                 Ok(text) => {
                     if let Some(response) =
                         process_message(text, &state, &registry, &caller_scope).await
@@ -55,18 +62,18 @@ pub async fn handle_ws_connection(
                     }
                 }
             },
-            Some(Ok(Message::Ping(data))) => {
+            Ok(Some(Ok(Message::Ping(data)))) => {
                 let _ = socket.send(Message::Pong(data)).await;
             }
-            Some(Ok(Message::Close(_))) | None => {
+            Ok(Some(Ok(Message::Close(_)))) | Ok(None) => {
                 info!("WebSocket connection closed");
                 break;
             }
-            Some(Err(e)) => {
+            Ok(Some(Err(e))) => {
                 warn!(error = %e, "WebSocket error");
                 break;
             }
-            Some(Ok(Message::Pong(_))) => {}
+            Ok(Some(Ok(Message::Pong(_)))) => {}
         }
     }
 
@@ -103,11 +110,60 @@ pub(crate) async fn process_message(
     };
 
     let id = req.id.clone();
-    let tool_name = req
-        .method
-        .strip_prefix("tools/")
-        .unwrap_or(&req.method)
-        .to_string();
+
+    match req.method.as_str() {
+        "initialize" => {
+            let protocol_version = req
+                .params
+                .as_ref()
+                .and_then(|params| params.get("protocolVersion"))
+                .and_then(Value::as_str)
+                .unwrap_or("2025-06-18");
+            return Some(serialize_message(&McpMessage::success(
+                id,
+                serde_json::json!({
+                    "protocolVersion": protocol_version,
+                    "capabilities": { "tools": { "listChanged": false } },
+                    "serverInfo": {
+                        "name": "request-guard-mcp",
+                        "version": env!("CARGO_PKG_VERSION")
+                    }
+                }),
+            )));
+        }
+        "ping" => {
+            return Some(serialize_message(&McpMessage::success(
+                id,
+                serde_json::json!({}),
+            )));
+        }
+        "tools/list" => {
+            return Some(serialize_message(&McpMessage::success(
+                id,
+                serde_json::json!({ "tools": registry.definitions() }),
+            )));
+        }
+        _ => {}
+    }
+
+    let standard_tool_call = req.method == "tools/call";
+    let (tool_name, tool_params) = if standard_tool_call {
+        let Some(params) = req.params.as_ref() else {
+            return invalid_params(id, "tools/call requires params");
+        };
+        let Some(name) = params.get("name").and_then(Value::as_str) else {
+            return invalid_params(id, "tools/call requires a tool name");
+        };
+        (name.to_string(), params.get("arguments").cloned())
+    } else {
+        (
+            req.method
+                .strip_prefix("tools/")
+                .unwrap_or(&req.method)
+                .to_string(),
+            req.params.clone(),
+        )
+    };
 
     // Acquire global concurrency semaphore
     let _permit = match state.semaphore.acquire().await {
@@ -146,7 +202,7 @@ pub(crate) async fn process_message(
     let dispatch_result = timeout(
         tool_timeout,
         registry_arc
-            .dispatch(state_arc, &req, caller_scope)
+            .dispatch_named(state_arc, &tool_name, tool_params, caller_scope)
             .instrument(dispatch_span),
     )
     .await;
@@ -170,7 +226,17 @@ pub(crate) async fn process_message(
                 .requests_total
                 .with_label_values(&[&tool_name, "ok"])
                 .inc();
-            McpMessage::success(id, value)
+            let result = if standard_tool_call {
+                let text = serde_json::to_string(&value).unwrap_or_default();
+                serde_json::json!({
+                    "content": [{ "type": "text", "text": text }],
+                    "structuredContent": value,
+                    "isError": false
+                })
+            } else {
+                value
+            };
+            McpMessage::success(id, result)
         }
         Ok(Err(app_err)) => {
             warn!(tool = %tool_name, error = %app_err, "tool error");
@@ -213,15 +279,72 @@ fn serialize_message(message: &McpMessage) -> String {
     })
 }
 
+fn invalid_params(id: Value, message: &str) -> Option<String> {
+    Some(serialize_message(&McpMessage::error(id, -32602, message)))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::Config;
+    use crate::{config::Config, mcp::tool_registry::build_registry};
+
+    fn test_context() -> (Arc<AppState>, Arc<ToolRegistry>) {
+        (
+            Arc::new(AppState::new(Config::default())),
+            Arc::new(build_registry()),
+        )
+    }
+
+    #[tokio::test]
+    async fn standard_mcp_initialize_and_list_tools_work() {
+        let (state, registry) = test_context();
+        let initialize = process_message(
+            r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"test","version":"1"}}}"#,
+            &state,
+            &registry,
+            "test-caller",
+        )
+        .await
+        .expect("initialize response");
+        let initialize: Value = serde_json::from_str(&initialize).unwrap();
+        assert_eq!(initialize["result"]["protocolVersion"], "2025-06-18");
+        assert!(initialize["result"]["capabilities"]["tools"].is_object());
+
+        let list = process_message(
+            r#"{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}"#,
+            &state,
+            &registry,
+            "test-caller",
+        )
+        .await
+        .expect("tools/list response");
+        let list: Value = serde_json::from_str(&list).unwrap();
+        assert!(list["result"]["tools"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|tool| tool["name"] == "classify"));
+    }
+
+    #[tokio::test]
+    async fn standard_tools_call_dispatches_named_tool() {
+        let (state, registry) = test_context();
+        let response = process_message(
+            r#"{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"classify","arguments":{"ip":"192.0.2.1","user_agent":"GPTBot/1.0","path":"/"}}}"#,
+            &state,
+            &registry,
+            "test-caller",
+        )
+        .await
+        .expect("tools/call response");
+        let response: Value = serde_json::from_str(&response).unwrap();
+        assert_eq!(response["result"]["isError"], false);
+        assert!(response["result"]["structuredContent"]["score"].is_number());
+    }
 
     #[tokio::test]
     async fn notifications_do_not_generate_empty_response_frames() {
-        let state = Arc::new(AppState::new(Config::default()));
-        let registry = Arc::new(crate::mcp::tool_registry::build_registry());
+        let (state, registry) = test_context();
         let notification = r#"{"jsonrpc":"2.0","method":"warmup","params":{}}"#;
 
         assert!(
@@ -229,5 +352,13 @@ mod tests {
                 .await
                 .is_none()
         );
+    }
+
+    #[test]
+    fn error_response_omits_result() {
+        let response =
+            serde_json::to_value(McpMessage::error(Value::from(1), -32602, "bad")).unwrap();
+        assert!(response.get("result").is_none());
+        assert!(response.get("error").is_some());
     }
 }

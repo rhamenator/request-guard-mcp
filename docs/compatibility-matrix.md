@@ -2,7 +2,11 @@
 
 ## MCP Client Configuration
 
-Any MCP-capable client can connect to this server over WebSocket JSON-RPC. Clients that use `MODEL_URI` routing can use the following environment variables:
+Any MCP-capable client can connect to this server over WebSocket or HTTP
+JSON-RPC. The server implements the standard `initialize`, `ping`,
+`tools/list`, and `tools/call` methods while retaining direct tool-method
+compatibility. Clients that use `MODEL_URI` routing can use the following
+environment variables:
 
 ### `rhamenator/ai-scraping-defense` (Python/Django)
 

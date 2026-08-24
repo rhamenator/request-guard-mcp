@@ -1,7 +1,6 @@
 use crate::error::AppError;
 use crate::util::hashing::hmac_sha256_hex;
 use axum::http::HeaderMap;
-use std::collections::HashSet;
 use std::sync::OnceLock;
 use tracing::warn;
 
@@ -33,9 +32,6 @@ pub fn authenticated_cache_scope_with_key(
     allowed: &[String],
     hmac_key: Option<&[u8]>,
 ) -> Result<String, AppError> {
-    // Build a set for O(1) lookup
-    let allowed_set: HashSet<&str> = allowed.iter().map(String::as_str).collect();
-
     let Some(auth_header) = headers.get("authorization") else {
         warn!("request missing authorization header");
         return Err(AppError::Unauthenticated);
@@ -55,13 +51,27 @@ pub fn authenticated_cache_scope_with_key(
         return Err(AppError::Unauthenticated);
     };
 
-    if allowed_set.contains(token) {
+    if allowed
+        .iter()
+        .any(|expected| constant_time_eq(expected.as_bytes(), token.as_bytes()))
+    {
         let key = hmac_key.unwrap_or(ephemeral_scope_key());
         Ok(format!("caller:{}", hmac_sha256_hex(key, token.as_bytes())))
     } else {
         warn!("invalid bearer token presented");
         Err(AppError::Forbidden)
     }
+}
+
+fn constant_time_eq(left: &[u8], right: &[u8]) -> bool {
+    let max_len = left.len().max(right.len());
+    let mut difference = left.len() ^ right.len();
+    for index in 0..max_len {
+        difference |= usize::from(
+            left.get(index).copied().unwrap_or(0) ^ right.get(index).copied().unwrap_or(0),
+        );
+    }
+    difference == 0
 }
 
 /// Extract token from an `Authorization` header value (the raw string).
