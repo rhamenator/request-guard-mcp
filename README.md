@@ -1,5 +1,5 @@
 <p align="center">
-  <img src=".github/assets/logo.png" alt="Request Guard MCP logo" width="220">
+  <img src="https://raw.githubusercontent.com/rhamenator/request-guard-mcp/main/.github/assets/logo.png" alt="Request Guard MCP logo" width="220">
 </p>
 
 # request-guard-mcp
