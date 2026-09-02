@@ -179,32 +179,6 @@ fn tool_input_schema(name: &str) -> Value {
     })
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn definitions_publish_tool_specific_input_schemas() {
-        let definitions = build_registry().definitions();
-        let explain = definitions
-            .iter()
-            .find(|tool| tool["name"] == "explain")
-            .unwrap();
-        let health = definitions
-            .iter()
-            .find(|tool| tool["name"] == "health")
-            .unwrap();
-        assert_eq!(
-            explain["inputSchema"]["required"],
-            serde_json::json!(["classification"])
-        );
-        assert!(health["inputSchema"]["properties"]
-            .as_object()
-            .unwrap()
-            .is_empty());
-    }
-}
-
 impl Default for ToolRegistry {
     fn default() -> Self {
         Self::new()
@@ -755,4 +729,30 @@ pub fn build_registry() -> ToolRegistry {
     registry.register(Arc::new(ConfigSnapshotTool));
     registry.register(Arc::new(SelfTestTool));
     registry
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn definitions_publish_tool_specific_input_schemas() {
+        let definitions = build_registry().definitions();
+        let explain = definitions
+            .iter()
+            .find(|tool| tool["name"] == "explain")
+            .unwrap();
+        let health = definitions
+            .iter()
+            .find(|tool| tool["name"] == "health")
+            .unwrap();
+        assert_eq!(
+            explain["inputSchema"]["required"],
+            serde_json::json!(["classification"])
+        );
+        assert!(health["inputSchema"]["properties"]
+            .as_object()
+            .unwrap()
+            .is_empty());
+    }
 }
