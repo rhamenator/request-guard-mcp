@@ -94,10 +94,114 @@ impl ToolRegistry {
                 serde_json::json!({
                     "name": tool.name(),
                     "description": tool.description(),
-                    "inputSchema": { "type": "object" }
+                    "inputSchema": tool_input_schema(tool.name())
                 })
             })
             .collect()
+    }
+}
+
+fn tool_input_schema(name: &str) -> Value {
+    let (properties, required) = match name {
+        "classify" => (
+            serde_json::json!({"ip":{"type":"string"},"user_agent":{"type":"string"},"path":{"type":"string"},"method":{"type":"string"},"headers":{"type":"object","additionalProperties":{"type":"string"}},"body_snippet":{"type":"string"},"referer":{"type":"string"},"accept":{"type":"string"},"request_id":{"type":"string"},"timestamp":{"type":"string"},"tls_ja3":{"type":"string"},"tls_ja4":{"type":"string"},"tls_fingerprint_source":{"type":"string"},"tls_fingerprint_attestation":{"type":"string"},"extra":{}}),
+            vec![],
+        ),
+        "explain" => (
+            serde_json::json!({"classification":{},"format":{"type":"string"}}),
+            vec!["classification"],
+        ),
+        "replay_decision" => (
+            serde_json::json!({"request_id":{"type":"string"},"deterministic":{"type":"boolean"}}),
+            vec!["request_id"],
+        ),
+        "batch_classify" => (
+            serde_json::json!({"items":{"type":"array","items":{"type":"object"}},"options":{"type":"object","properties":{"fail_fast":{"type":"boolean"},"include_details":{"type":"boolean"}},"additionalProperties":false}}),
+            vec!["items"],
+        ),
+        "feedback" => (
+            serde_json::json!({"request_id":{"type":"string"},"correct_verdict":{"type":"string"},"notes":{"type":"string"},"reporter":{"type":"string"}}),
+            vec!["request_id", "correct_verdict"],
+        ),
+        "feature_flags" => (serde_json::json!({"flag":{"type":"string"}}), vec![]),
+        "warmup" => (serde_json::json!({"target":{"type":"string"}}), vec![]),
+        "redact_preview" => (
+            serde_json::json!({"payload":{},"fields":{"type":"array","items":{"type":"string"}}}),
+            vec!["payload"],
+        ),
+        "enrich_ip" => (serde_json::json!({"ip":{"type":"string"}}), vec!["ip"]),
+        "enrich_asn" => (serde_json::json!({"asn":{"type":"integer"}}), vec!["asn"]),
+        "enrich_ua" => (
+            serde_json::json!({"user_agent":{"type":"string"}}),
+            vec!["user_agent"],
+        ),
+        "threat_lookup" => (
+            serde_json::json!({"indicator":{"type":"string"},"type":{"type":"string"}}),
+            vec!["indicator"],
+        ),
+        "canary_eval" => (
+            serde_json::json!({"token":{"type":"string"},"context":{}}),
+            vec!["token"],
+        ),
+        "abuse_pattern_match" => (
+            serde_json::json!({"text":{"type":"string"},"categories":{"type":"array","items":{"type":"string"}}}),
+            vec!["text"],
+        ),
+        "score_breakdown" => (
+            serde_json::json!({"request_id":{"type":"string"},"signals":{}}),
+            vec![],
+        ),
+        "validate_payload" => (
+            serde_json::json!({"tool":{"type":"string"},"payload":{}}),
+            vec!["tool", "payload"],
+        ),
+        "drift_report" => (
+            serde_json::json!({"since":{"type":"string"},"window_hours":{"type":"integer","minimum":1}}),
+            vec![],
+        ),
+        "calibration_report" => (
+            serde_json::json!({"window_hours":{"type":"integer","minimum":1}}),
+            vec![],
+        ),
+        "queue_status" => (serde_json::json!({"queue":{"type":"string"}}), vec![]),
+        "config_snapshot" => (
+            serde_json::json!({"redact_secrets":{"type":"boolean"}}),
+            vec![],
+        ),
+        "self_test" => (serde_json::json!({"suite":{"type":"string"}}), vec![]),
+        _ => (serde_json::json!({}), vec![]),
+    };
+    serde_json::json!({
+        "type": "object",
+        "properties": properties,
+        "required": required,
+        "additionalProperties": false
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn definitions_publish_tool_specific_input_schemas() {
+        let definitions = build_registry().definitions();
+        let explain = definitions
+            .iter()
+            .find(|tool| tool["name"] == "explain")
+            .unwrap();
+        let health = definitions
+            .iter()
+            .find(|tool| tool["name"] == "health")
+            .unwrap();
+        assert_eq!(
+            explain["inputSchema"]["required"],
+            serde_json::json!(["classification"])
+        );
+        assert!(health["inputSchema"]["properties"]
+            .as_object()
+            .unwrap()
+            .is_empty());
     }
 }
 
