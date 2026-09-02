@@ -1,6 +1,6 @@
 use crate::config::TlsFingerprintConfig;
 use crate::models::request::ClassifyRequest;
-use hmac::{Hmac, Mac};
+use hmac::{Hmac, KeyInit, Mac};
 use sha2::Sha256;
 
 pub const ATTESTATION_VERSION: &str = "v1";

@@ -38,7 +38,7 @@ jobs:
             echo "Missing pull request template"; exit 1;
           }
       - name: Verify pull-request evidence sections
-        if: github.event_name == 'pull_request' && github.actor != 'dependabot[bot]' && github.actor != 'renovate[bot]'
+        if: github.event_name == 'pull_request' && github.event.pull_request.user.login != 'dependabot[bot]' && github.event.pull_request.user.login != 'renovate[bot]'
         shell: bash
         run: |
           set -euo pipefail
