@@ -21,6 +21,26 @@ def is_url_safe_secret(value: str) -> bool:
     return value.isascii() and all(character.isalnum() or character in "-_" for character in value)
 
 
+def is_valid_auth_tokens(value: str) -> bool:
+    tokens = [token.strip() for token in value.split(",")]
+    return bool(tokens) and all(
+        len(token) >= 32
+        and "replace_me" not in token
+        and is_url_safe_secret(token)
+        for token in tokens
+    )
+
+
+def is_valid_secret(key: str, value: str) -> bool:
+    if key == "AUTH_TOKENS":
+        return is_valid_auth_tokens(value)
+    return (
+        len(value) >= 32
+        and "replace_me" not in value
+        and is_url_safe_secret(value)
+    )
+
+
 def main() -> None:
     root = Path(__file__).resolve().parent.parent
     target = root / ".env"
@@ -38,16 +58,21 @@ def main() -> None:
     updates: dict[str, str] = {}
     for key in KEYS:
         existing = values.get(key, "")
-        keepable = existing if len(existing) >= 32 and "replace_me" not in existing and is_url_safe_secret(existing) else ""
+        keepable = existing if is_valid_secret(key, existing) else ""
         while True:
             entered = getpass.getpass(
                 f"{key} [{'keep existing' if keepable else 'generate'}]: "
             ).strip()
             value = entered or keepable or secrets.token_urlsafe(36)
-            if len(value) >= 32 and is_url_safe_secret(value):
+            if is_valid_secret(key, value):
                 updates[key] = value
                 break
-            print(f"{key} must be at least 32 URL-safe characters.")
+            if key == "AUTH_TOKENS":
+                print(
+                    f"{key} entries must each be at least 32 URL-safe characters."
+                )
+            else:
+                print(f"{key} must be at least 32 URL-safe characters.")
     output: list[str] = []
     remaining = dict(updates)
     for line in lines:
