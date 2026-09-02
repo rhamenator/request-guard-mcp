@@ -67,13 +67,37 @@ impl ToolRegistry {
         // Strip the "tools/" prefix if present
         let tool_name = req.method.strip_prefix("tools/").unwrap_or(&req.method);
 
+        self.dispatch_named(state, tool_name, req.params.clone(), caller_scope)
+            .await
+    }
+
+    pub async fn dispatch_named(
+        &self,
+        state: Arc<AppState>,
+        name: &str,
+        arguments: Option<Value>,
+        caller_scope: &str,
+    ) -> Result<Value, AppError> {
         let tool = self
             .tools
-            .get(tool_name)
-            .ok_or_else(|| AppError::ToolNotFound(tool_name.to_string()))?;
+            .get(name)
+            .ok_or_else(|| AppError::ToolNotFound(name.to_string()))?;
+        tool.call_scoped(state, arguments, caller_scope).await
+    }
 
-        tool.call_scoped(state, req.params.clone(), caller_scope)
-            .await
+    pub fn definitions(&self) -> Vec<Value> {
+        let mut tools = self.tools.values().collect::<Vec<_>>();
+        tools.sort_by_key(|tool| tool.name());
+        tools
+            .into_iter()
+            .map(|tool| {
+                serde_json::json!({
+                    "name": tool.name(),
+                    "description": tool.description(),
+                    "inputSchema": { "type": "object" }
+                })
+            })
+            .collect()
     }
 }
 

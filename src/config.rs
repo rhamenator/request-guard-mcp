@@ -53,6 +53,10 @@ pub struct LimitsConfig {
     pub max_batch_size: usize,
     #[serde(default = "defaults::global_concurrency")]
     pub global_concurrency: usize,
+    #[serde(default = "defaults::max_connections")]
+    pub max_connections: usize,
+    #[serde(default = "defaults::websocket_idle_timeout_secs")]
+    pub websocket_idle_timeout_secs: u64,
     #[serde(default = "defaults::per_tool_timeout_secs")]
     pub per_tool_timeout_secs: u64,
     #[serde(default = "defaults::classify_timeout_secs")]
@@ -240,12 +244,18 @@ impl Config {
                 anyhow::bail!("authentication is enabled but AUTH_TOKENS is empty");
             }
             if self.auth.tokens.iter().any(|token| {
-                token.is_empty()
+                token.len() < 32
                     || token == "replace_me"
                     || token == "replace_me_with_a_strong_token"
             }) {
-                anyhow::bail!("AUTH_TOKENS contains an empty or placeholder token");
+                anyhow::bail!(
+                    "AUTH_TOKENS entries must contain at least 32 characters and cannot be placeholders; run python scripts/configure_credentials.py"
+                );
             }
+        } else if !self.bind_addr()?.ip().is_loopback() {
+            anyhow::bail!(
+                "authentication may only be disabled when MCP__HOST is a loopback address"
+            );
         }
         if self
             .auth
@@ -297,6 +307,8 @@ impl Config {
         if self.limits.max_request_bytes == 0
             || self.limits.max_batch_size == 0
             || self.limits.global_concurrency == 0
+            || self.limits.max_connections == 0
+            || self.limits.websocket_idle_timeout_secs == 0
             || self.limits.per_tool_timeout_secs == 0
             || self.limits.classify_timeout_secs == 0
         {
@@ -383,6 +395,12 @@ mod defaults {
     pub fn global_concurrency() -> usize {
         256
     }
+    pub fn max_connections() -> usize {
+        256
+    }
+    pub fn websocket_idle_timeout_secs() -> u64 {
+        60
+    }
     pub fn per_tool_timeout_secs() -> u64 {
         30
     }
@@ -443,6 +461,8 @@ impl Default for LimitsConfig {
             max_request_bytes: defaults::max_request_bytes(),
             max_batch_size: defaults::max_batch_size(),
             global_concurrency: defaults::global_concurrency(),
+            max_connections: defaults::max_connections(),
+            websocket_idle_timeout_secs: defaults::websocket_idle_timeout_secs(),
             per_tool_timeout_secs: defaults::per_tool_timeout_secs(),
             classify_timeout_secs: defaults::classify_timeout_secs(),
         }
@@ -548,7 +568,7 @@ mod tests {
 
         let valid = Config {
             auth: AuthConfig {
-                tokens: vec!["a-real-test-token".to_string()],
+                tokens: vec!["a-real-test-token-with-32-characters".to_string()],
                 ..AuthConfig::default()
             },
             ..Config::default()
@@ -557,9 +577,27 @@ mod tests {
     }
 
     #[test]
+    fn disabled_auth_requires_a_loopback_bind_address() {
+        let exposed = Config {
+            auth: AuthConfig {
+                enabled: false,
+                ..AuthConfig::default()
+            },
+            ..Config::default()
+        };
+        assert!(exposed.validate().is_err());
+
+        let loopback = Config {
+            host: "127.0.0.1".to_string(),
+            ..exposed
+        };
+        assert!(loopback.validate().is_ok());
+    }
+
+    #[test]
     fn short_cache_scope_hmac_keys_are_rejected() {
         let base = AuthConfig {
-            tokens: vec!["a-real-test-token".to_string()],
+            tokens: vec!["a-real-test-token-with-32-characters".to_string()],
             ..AuthConfig::default()
         };
 

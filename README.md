@@ -35,7 +35,8 @@ in `opentelemetry-otlp` is used only to export telemetry to an OTLP collector.
 git clone https://github.com/rhamenator/request-guard-mcp
 cd request-guard-mcp
 cp .env.example .env
-# Set AUTH_TOKENS=your_strong_token
+# Prompt for strong application and backing-service credentials
+python scripts/configure_credentials.py
 cargo run --release
 ```
 

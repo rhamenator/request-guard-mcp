@@ -29,7 +29,9 @@ pub struct McpRequest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct McpResponse {
     pub id: Value,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub result: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<McpError>,
 }
 
@@ -38,6 +40,7 @@ pub struct McpResponse {
 pub struct McpError {
     pub code: i32,
     pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub data: Option<Value>,
 }
 
