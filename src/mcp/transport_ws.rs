@@ -113,16 +113,24 @@ pub(crate) async fn process_message(
 
     match req.method.as_str() {
         "initialize" => {
+            const SUPPORTED_PROTOCOL_VERSION: &str = "2025-06-18";
             let protocol_version = req
                 .params
                 .as_ref()
                 .and_then(|params| params.get("protocolVersion"))
                 .and_then(Value::as_str)
-                .unwrap_or("2025-06-18");
+                .unwrap_or(SUPPORTED_PROTOCOL_VERSION);
+            if protocol_version != SUPPORTED_PROTOCOL_VERSION {
+                return Some(serialize_message(&McpMessage::error(
+                    id,
+                    -32602,
+                    "Unsupported MCP protocol version",
+                )));
+            }
             return Some(serialize_message(&McpMessage::success(
                 id,
                 serde_json::json!({
-                    "protocolVersion": protocol_version,
+                    "protocolVersion": SUPPORTED_PROTOCOL_VERSION,
                     "capabilities": { "tools": { "listChanged": false } },
                     "serverInfo": {
                         "name": "request-guard-mcp",
@@ -324,6 +332,25 @@ mod tests {
             .unwrap()
             .iter()
             .any(|tool| tool["name"] == "classify"));
+    }
+
+    #[tokio::test]
+    async fn initialize_rejects_unsupported_protocol_version() {
+        let (state, registry) = test_context();
+        let response = process_message(
+            r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05"}}"#,
+            &state,
+            &registry,
+            "test-caller",
+        )
+        .await
+        .expect("initialize response");
+        let response: Value = serde_json::from_str(&response).unwrap();
+        assert_eq!(response["error"]["code"], -32602);
+        assert_eq!(
+            response["error"]["message"],
+            "Unsupported MCP protocol version"
+        );
     }
 
     #[tokio::test]
