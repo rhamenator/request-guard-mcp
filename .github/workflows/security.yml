@@ -20,13 +20,13 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@ce729e4d353d580e6cacd6a8cf2921b72e5e310a
+        uses: github/codeql-action/init@a6ef2c96fc0e37d0b44fb2bd0b32db4bcb89ae24
         with:
           languages: ${{ matrix.language }}
           build-mode: none
           queries: security-extended,security-and-quality
       - name: Analyze
-        uses: github/codeql-action/analyze@ce729e4d353d580e6cacd6a8cf2921b72e5e310a
+        uses: github/codeql-action/analyze@a6ef2c96fc0e37d0b44fb2bd0b32db4bcb89ae24
         with:
           category: /language:${{ matrix.language }}
 
