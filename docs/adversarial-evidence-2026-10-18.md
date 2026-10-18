@@ -22,6 +22,10 @@ This is an initial lab baseline, not a completed stable-release gate. Source bas
 
 Nikto also suggested HSTS, CSP, Permissions-Policy, and Referrer-Policy. The server is plain HTTP behind an intended TLS-terminating proxy, so HSTS belongs at that proxy. Browser document policies have limited meaning for a JSON-RPC API and require deployment-specific review. The `nosniff` finding was fixed in the server.
 
+## Probe review follow-up
+
+Review found that the first probe could follow a redirect with its bearer token and assumed a 1 MiB body limit. The probe now refuses redirects and accepts `--max-request-bytes` to match the tested server configuration. Stdlib regression tests confirmed that a redirect target received no request and that the oversized declaration is exactly one byte above a configured 2 MiB limit. Both tests passed with Python warnings treated as errors; the seven live HTTP cases still passed.
+
 ## Gaps before stable release
 
 Repeat against the actual packaged artifact. Test authenticated and unauthenticated WebSocket frames, slow clients and bounded concurrency, Redis/PostgreSQL failures and recovery, bot-evasion corpus, log redaction, and MCP client interoperability. Record timings, memory, logs, and artifact digest. Independent review must assess any remaining findings.

@@ -7,7 +7,8 @@ At minimum, exercise authentication boundaries, malformed JSON-RPC and MCP frame
 The stdlib-only `scripts/adversarial_probe.py` is a first HTTP smoke subset. Start a lab server with a temporary token of at least 32 characters, then run:
 
 ```bash
-python3 scripts/adversarial_probe.py --url http://LAB_HOST:8085 --token "$LAB_TOKEN"
+python3 scripts/adversarial_probe.py --url http://LAB_HOST:8085 --token "$LAB_TOKEN" \
+  --max-request-bytes 1048576
 ```
 
-Do not put the token in committed files or published logs. The probe prints no token. This subset does not validate WebSocket framing, sustained exhaustion, backend failures, or complete MCP interoperability; those cases need separate evidence before release.
+Set `--max-request-bytes` to the server's configured `MCP__LIMITS__MAX_REQUEST_BYTES`. The probe refuses to follow redirects, so the bearer token stays scoped to the explicitly named lab endpoint. Do not put the token in committed files or published logs. The probe prints no token. This subset does not validate WebSocket framing, sustained exhaustion, backend failures, or complete MCP interoperability; those cases need separate evidence before release.

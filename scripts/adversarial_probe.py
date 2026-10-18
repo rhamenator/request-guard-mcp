@@ -9,6 +9,11 @@ import urllib.error
 import urllib.request
 
 
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, request, fp, code, msg, headers, newurl):
+        return None
+
+
 def post(base, token, body, *, authorize=True):
     headers = {"Content-Type": "application/json"}
     if authorize:
@@ -17,10 +22,13 @@ def post(base, token, body, *, authorize=True):
         base.rstrip("/") + "/mcp", data=body, headers=headers, method="POST"
     )
     try:
-        with urllib.request.urlopen(request, timeout=8) as response:
+        with urllib.request.build_opener(NoRedirect).open(request, timeout=8) as response:
             return response.status, response.read(1024 * 1024 + 1)
     except urllib.error.HTTPError as error:
-        return error.code, error.read(1024 * 1024 + 1)
+        try:
+            return error.code, error.read(1024 * 1024 + 1)
+        finally:
+            error.close()
 
 
 def rpc(method, params=None, request_id=1):
@@ -35,14 +43,14 @@ def check(name, passed, detail):
     return bool(passed)
 
 
-def oversized_request(base, token):
+def oversized_request(base, token, max_request_bytes):
     target = urllib.parse.urlsplit(base)
     connection = http.client.HTTPConnection(target.hostname, target.port, timeout=8)
     try:
         connection.putrequest("POST", "/mcp")
         connection.putheader("Authorization", "Bearer " + token)
         connection.putheader("Content-Type", "application/json")
-        connection.putheader("Content-Length", str(1024 * 1024 + 1))
+        connection.putheader("Content-Length", str(max_request_bytes + 1))
         connection.endheaders()
         return connection.getresponse().status
     finally:
@@ -53,7 +61,15 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--url", default="http://127.0.0.1:8085")
     parser.add_argument("--token", required=True, help="lab-only bearer token")
+    parser.add_argument(
+        "--max-request-bytes",
+        type=int,
+        default=1024 * 1024,
+        help="configured server request-body limit (default: 1048576)",
+    )
     args = parser.parse_args()
+    if args.max_request_bytes < 1:
+        parser.error("--max-request-bytes must be positive")
     results = []
 
     status, body = post(args.url, args.token, rpc("health"), authorize=False)
@@ -98,7 +114,7 @@ def main():
         passed = False
     results.append(check("instruction_as_data", passed, status))
 
-    status = oversized_request(args.url, args.token)
+    status = oversized_request(args.url, args.token, args.max_request_bytes)
     results.append(check("oversized_body", status == 413, status))
 
     print(json.dumps({"passed": sum(results), "total": len(results)}))
