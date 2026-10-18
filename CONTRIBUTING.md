@@ -13,7 +13,7 @@ Search existing issues and pull requests before opening a new one. For larger or
 
 ## Development
 
-Use the pinned Rust toolchain and keep changes scoped. Add tests for behavioral changes and update the README, docs, schemas, deployment examples, or configuration references when they are affected.
+Use the declared minimum supported Rust version and current stable Rust, and keep changes scoped. Add tests for behavioral changes and update the README, docs, schemas, deployment examples, or configuration references when they are affected.
 
 Run the full local validation suite before submitting a pull request:
 
@@ -32,6 +32,13 @@ cargo deny check
 ```
 
 If a check cannot be run locally, explain why in the pull request and report what you ran instead.
+
+## Dependencies and Rust Compatibility
+
+- Add a direct dependency only when the project uses it; remove unused direct dependencies.
+- Keep `Cargo.lock` committed for reproducible builds. Compatible updates are accepted only after the full CI suite passes.
+- Treat major-version updates and changes that raise a dependency's Rust requirement as compatibility changes. State the impact in the pull request and update `rust-version` only through an explicit review decision.
+- CI validates both the declared MSRV and current stable Rust. Do not merge an update that breaks either supported toolchain unless the project has explicitly changed its MSRV policy.
 
 ## Pull Requests
 
