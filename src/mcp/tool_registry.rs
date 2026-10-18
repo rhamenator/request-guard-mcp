@@ -91,6 +91,9 @@ impl ToolRegistry {
         tools
             .into_iter()
             .map(|tool| {
+                if let Some(definition) = egress_definition(tool.name()) {
+                    return definition;
+                }
                 serde_json::json!({
                     "name": tool.name(),
                     "description": tool.description(),
@@ -98,6 +101,41 @@ impl ToolRegistry {
                 })
             })
             .collect()
+    }
+}
+
+fn egress_definition(name: &str) -> Option<Value> {
+    static DEFINITIONS: once_cell::sync::Lazy<Vec<Value>> = once_cell::sync::Lazy::new(|| {
+        serde_json::from_str(include_str!(
+            "../../docs/egress-design/tool-definitions.json"
+        ))
+        .expect("valid outbound tool declarations")
+    });
+    DEFINITIONS
+        .iter()
+        .find(|value| value["name"] == name)
+        .cloned()
+}
+
+pub struct EgressTool(pub &'static str);
+#[async_trait]
+impl McpTool for EgressTool {
+    fn name(&self) -> &str {
+        self.0
+    }
+    fn description(&self) -> &str {
+        "Opt-in outbound request guard"
+    }
+    async fn call(&self, state: Arc<AppState>, params: Option<Value>) -> Result<Value, AppError> {
+        crate::egress::call(self.0, &state, params, "public").await
+    }
+    async fn call_scoped(
+        &self,
+        state: Arc<AppState>,
+        params: Option<Value>,
+        caller_scope: &str,
+    ) -> Result<Value, AppError> {
+        crate::egress::call(self.0, &state, params, caller_scope).await
     }
 }
 
@@ -650,5 +688,15 @@ pub fn build_registry() -> ToolRegistry {
     registry.register(Arc::new(QueueStatusTool));
     registry.register(Arc::new(ConfigSnapshotTool));
     registry.register(Arc::new(SelfTestTool));
+    for name in [
+        "evaluate_egress",
+        "guarded_fetch",
+        "scan_outbound_payload",
+        "detect_bot_traps",
+        "scrub_external_content",
+        "rate_budget_check",
+    ] {
+        registry.register(Arc::new(EgressTool(name)));
+    }
     registry
 }

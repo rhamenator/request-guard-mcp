@@ -5,6 +5,10 @@
 
 A production-ready **Rust MCP (Model Context Protocol) server** for request risk classification, enrichment, and abuse-signal analysis. It can be used by any MCP-capable client over WebSocket or HTTP JSON-RPC; the `ai-scraping-defense` projects are supported clients, not required dependencies.
 
+An **experimental opt-in outbound guard** is under development. It adds `guarded_fetch` and five advisory/analysis tools when `MCP__EGRESS__ENABLED=true`. This first implementation blocks forbidden address ranges, known secret patterns, non-standard ports, unsafe redirects, oversized or slow responses, and configured domains. It does not intercept HTTP made by other tools. See [outbound design and remaining gates](docs/egress-design/README.md) before relying on it as a security boundary.
+
+For local MCP clients, set `MCP__TRANSPORT=stdio` and `MCP__EGRESS__ENABLED=true`, then launch the binary as a subprocess. Stdio mode opens no network listener; JSON-RPC messages use one line each on stdin/stdout. Server logs go to stderr. The existing HTTP POST and WebSocket transport remains the default.
+
 ## Features
 
 - **23 implemented MCP tool contracts** with truthful, backend-aware availability in `model_info`
@@ -23,10 +27,10 @@ A production-ready **Rust MCP (Model Context Protocol) server** for request risk
 
 ### Transport scope
 
-WebSocket and HTTP POST JSON-RPC are the final supported MCP transports for
-this server. A gRPC listener is intentionally out of scope because the project
-does not define a separate protobuf service contract; the `grpc-tonic` feature
-in `opentelemetry-otlp` is used only to export telemetry to an OTLP collector.
+Local stdio, WebSocket, and HTTP POST JSON-RPC are available. HTTP POST is not
+yet a fully conforming Streamable HTTP implementation. A gRPC listener is out
+of scope because this project has no separate protobuf service contract; the
+`grpc-tonic` feature in `opentelemetry-otlp` exports telemetry only.
 
 ## Quickstart
 

@@ -10,6 +10,7 @@ use axum::{
     Router,
 };
 use std::sync::Arc;
+use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tower_http::limit::RequestBodyLimitLayer;
 use tracing::info;
 
@@ -172,4 +173,93 @@ pub async fn run_server(app_state: AppState) -> anyhow::Result<()> {
 
     axum::serve(listener, router).await?;
     Ok(())
+}
+
+/// Local MCP transport. Each line is one JSON-RPC message; stdout is reserved
+/// for protocol responses and tracing writes to stderr.
+pub async fn run_stdio(app_state: AppState) -> anyhow::Result<()> {
+    let state = Arc::new(app_state);
+    let registry = Arc::new(crate::mcp::tool_registry::build_registry());
+    let mut input = BufReader::new(tokio::io::stdin());
+    let mut output = tokio::io::stdout();
+    while let Some(line) =
+        read_bounded_line(&mut input, state.config.limits.max_request_bytes).await?
+    {
+        let response = match line {
+            Ok(line) => process_message(&line, &state, &registry, "stdio").await,
+            Err(()) => Some(r#"{"jsonrpc":"2.0","id":null,"error":{"code":-413,"message":"REQUEST_TOO_LARGE_OR_INVALID_UTF8"}}"#.to_string()),
+        };
+        if let Some(response) = response {
+            output.write_all(response.as_bytes()).await?;
+            output.write_all(b"\n").await?;
+            output.flush().await?;
+        }
+    }
+    Ok(())
+}
+
+async fn read_bounded_line<R: AsyncBufRead + Unpin>(
+    input: &mut R,
+    max: usize,
+) -> std::io::Result<Option<Result<String, ()>>> {
+    let mut bytes = Vec::new();
+    let mut overflow = false;
+    loop {
+        let chunk = input.fill_buf().await?;
+        if chunk.is_empty() {
+            if bytes.is_empty() && !overflow {
+                return Ok(None);
+            }
+            return Ok(Some(if overflow {
+                Err(())
+            } else {
+                String::from_utf8(bytes).map_err(|_| ())
+            }));
+        }
+        let newline = chunk.iter().position(|byte| *byte == b'\n');
+        let used = newline.unwrap_or(chunk.len());
+        if !overflow {
+            if bytes.len().saturating_add(used) > max {
+                overflow = true;
+            } else {
+                bytes.extend_from_slice(&chunk[..used]);
+            }
+        }
+        input.consume(used + usize::from(newline.is_some()));
+        if newline.is_some() {
+            return Ok(Some(if overflow {
+                Err(())
+            } else {
+                String::from_utf8(bytes).map_err(|_| ())
+            }));
+        }
+    }
+}
+
+#[cfg(test)]
+mod stdio_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn bounded_reader_discards_oversize_line_and_recovers() {
+        let mut input = BufReader::new(&b"too-long\nok\n"[..]);
+        assert!(matches!(
+            read_bounded_line(&mut input, 3).await.unwrap(),
+            Some(Err(()))
+        ));
+        assert_eq!(
+            read_bounded_line(&mut input, 3).await.unwrap(),
+            Some(Ok("ok".into()))
+        );
+        assert!(read_bounded_line(&mut input, 3).await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn bounded_reader_rejects_invalid_utf8() {
+        let mut input = BufReader::new(&b"\xff\n"[..]);
+        assert!(matches!(
+            read_bounded_line(&mut input, 3).await.unwrap(),
+            Some(Err(()))
+        ));
+    }
 }

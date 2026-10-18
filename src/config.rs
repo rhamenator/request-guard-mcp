@@ -6,6 +6,10 @@ use std::time::Duration;
 /// Top-level application configuration.
 #[derive(Debug, Clone, Deserialize)]
 pub struct Config {
+    #[serde(default = "defaults::transport")]
+    pub transport: String,
+    #[serde(default)]
+    pub egress: EgressConfig,
     #[serde(default = "defaults::host")]
     pub host: String,
     #[serde(default = "defaults::port")]
@@ -28,6 +32,32 @@ pub struct Config {
     pub tls_fingerprints: TlsFingerprintConfig,
     #[serde(default = "defaults::log_level")]
     pub log_level: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct EgressConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default = "defaults::guard_mode")]
+    pub mode: String,
+    #[serde(default = "defaults::host_budget")]
+    pub host_per_minute: usize,
+    #[serde(default = "defaults::hour_budget")]
+    pub caller_per_hour: usize,
+    #[serde(default)]
+    pub blocked_domains: Vec<String>,
+}
+
+impl Default for EgressConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            mode: defaults::guard_mode(),
+            host_per_minute: defaults::host_budget(),
+            caller_per_hour: defaults::hour_budget(),
+            blocked_domains: Vec::new(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -213,12 +243,20 @@ impl Config {
         if let Ok(val) = std::env::var("LOG_LEVEL") {
             builder = builder.set_override("log_level", val)?;
         }
-
-        let cfg: Config = builder
+        if let Ok(val) = std::env::var("GUARD_MODE") {
+            builder = builder.set_override("egress.mode", val)?;
+        }
+        let mut cfg: Config = builder
             .build()
             .context("failed to build config")?
             .try_deserialize()
             .context("failed to deserialize config")?;
+
+        // Stdio inherits its caller's process boundary and has no bearer header.
+        // This also covers transport selected in a config file, not just env.
+        if cfg.transport == "stdio" {
+            cfg.auth.enabled = false;
+        }
 
         cfg.validate()?;
         Ok(cfg)
@@ -239,6 +277,26 @@ impl Config {
     }
 
     fn validate(&self) -> Result<()> {
+        if !matches!(self.transport.as_str(), "http" | "stdio") {
+            anyhow::bail!("MCP__TRANSPORT must be http or stdio");
+        }
+        if !matches!(self.egress.mode.as_str(), "audit" | "enforce") {
+            anyhow::bail!("GUARD_MODE must be audit or enforce");
+        }
+        if self.egress.host_per_minute == 0 || self.egress.caller_per_hour == 0 {
+            anyhow::bail!("egress budgets must be positive");
+        }
+        if self.egress.blocked_domains.iter().any(|domain| {
+            domain.is_empty()
+                || domain.len() > 253
+                || domain.starts_with('.')
+                || domain.ends_with('.')
+                || !domain
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || byte == b'.' || byte == b'-')
+        }) {
+            anyhow::bail!("egress.blocked_domains contains an invalid domain");
+        }
         if self.auth.enabled {
             if self.auth.tokens.is_empty() {
                 anyhow::bail!("authentication is enabled but AUTH_TOKENS is empty");
@@ -252,7 +310,7 @@ impl Config {
                     "AUTH_TOKENS entries must contain at least 32 characters and cannot be placeholders; run python scripts/configure_credentials.py"
                 );
             }
-        } else if !self.bind_addr()?.ip().is_loopback() {
+        } else if self.transport != "stdio" && !self.bind_addr()?.ip().is_loopback() {
             anyhow::bail!(
                 "authentication may only be disabled when MCP__HOST is a loopback address"
             );
@@ -377,6 +435,18 @@ impl Config {
 }
 
 mod defaults {
+    pub fn transport() -> String {
+        "http".to_string()
+    }
+    pub fn guard_mode() -> String {
+        "enforce".to_string()
+    }
+    pub fn host_budget() -> usize {
+        60
+    }
+    pub fn hour_budget() -> usize {
+        1000
+    }
     pub fn host() -> String {
         "0.0.0.0".to_string()
     }
@@ -525,6 +595,8 @@ impl Default for TlsFingerprintConfig {
 impl Default for Config {
     fn default() -> Self {
         Self {
+            transport: defaults::transport(),
+            egress: EgressConfig::default(),
             host: defaults::host(),
             port: defaults::port(),
             auth: AuthConfig::default(),

@@ -1,5 +1,6 @@
 pub mod auth;
 pub mod config;
+pub mod egress;
 pub mod engines;
 pub mod error;
 pub mod integrations;

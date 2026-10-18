@@ -12,6 +12,7 @@ use tokio::sync::Semaphore;
 /// Shared application state passed to every request handler.
 #[derive(Clone)]
 pub struct AppState {
+    pub egress: Arc<crate::egress::EgressState>,
     pub config: Arc<Config>,
     pub semaphore: Arc<Semaphore>,
     pub connection_semaphore: Arc<Semaphore>,
@@ -161,6 +162,7 @@ impl AppState {
         feature_flags.insert("geoip".to_string(), geoip.is_available());
 
         Self {
+            egress: Arc::new(crate::egress::EgressState::default()),
             config,
             semaphore,
             connection_semaphore,

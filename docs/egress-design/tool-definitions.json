@@ -1,0 +1,729 @@
+[
+  {
+    "name": "evaluate_egress",
+    "title": "Evaluate proposed egress",
+    "description": "Advisory URL and payload policy preview without opening a network connection; not authorization for a later fetch.",
+    "inputSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "maxLength": 2048
+        },
+        "method": {
+          "type": "string",
+          "enum": [
+            "GET",
+            "HEAD",
+            "POST"
+          ]
+        },
+        "headers": {
+          "type": "object",
+          "maxProperties": 32,
+          "propertyNames": {
+            "pattern": "^[A-Za-z0-9-]{1,64}$"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        },
+        "body_base64": {
+          "type": "string",
+          "contentEncoding": "base64",
+          "maxLength": 1398104
+        }
+      },
+      "required": [
+        "url"
+      ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "ALLOW",
+            "WARN",
+            "BLOCKED"
+          ]
+        },
+        "rule": {
+          "type": "string"
+        },
+        "remediation": {
+          "type": "string"
+        },
+        "correlation_id": {
+          "type": "string"
+        },
+        "findings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "severity": {
+                "type": "string",
+                "enum": [
+                  "info",
+                  "warning",
+                  "critical"
+                ]
+              },
+              "location": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "severity"
+            ]
+          }
+        },
+        "canonical_url": {
+          "type": "string"
+        },
+        "resolved_addresses": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "status",
+        "rule",
+        "remediation",
+        "correlation_id",
+        "findings"
+      ]
+    }
+  },
+  {
+    "name": "guarded_fetch",
+    "title": "Guarded HTTP fetch",
+    "description": "Execute one bounded HTTP(S) request through server-enforced egress policy; each redirect and resolved address is revalidated.",
+    "inputSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "maxLength": 2048
+        },
+        "method": {
+          "type": "string",
+          "enum": [
+            "GET",
+            "HEAD",
+            "POST"
+          ]
+        },
+        "headers": {
+          "type": "object",
+          "maxProperties": 32,
+          "propertyNames": {
+            "pattern": "^[A-Za-z0-9-]{1,64}$"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        },
+        "body_base64": {
+          "type": "string",
+          "contentEncoding": "base64",
+          "maxLength": 1398104,
+          "description": "Optional request body, at most 1 MiB decoded. POST only."
+        },
+        "accept": {
+          "type": "string",
+          "enum": [
+            "text",
+            "html",
+            "json"
+          ]
+        },
+        "max_return_bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 262144
+        }
+      },
+      "required": [
+        "url"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "body_base64"
+            ]
+          },
+          "then": {
+            "properties": {
+              "method": {
+                "const": "POST"
+              }
+            },
+            "required": [
+              "method"
+            ]
+          }
+        }
+      ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "ALLOW",
+            "WARN",
+            "BLOCKED"
+          ]
+        },
+        "rule": {
+          "type": "string"
+        },
+        "remediation": {
+          "type": "string"
+        },
+        "correlation_id": {
+          "type": "string"
+        },
+        "findings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "severity": {
+                "type": "string",
+                "enum": [
+                  "info",
+                  "warning",
+                  "critical"
+                ]
+              },
+              "location": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "severity"
+            ]
+          }
+        },
+        "final_url": {
+          "type": "string"
+        },
+        "http_status": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 599
+        },
+        "content_type": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "truncated": {
+          "type": "boolean"
+        },
+        "elapsed_ms": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "status",
+        "rule",
+        "remediation",
+        "correlation_id",
+        "findings",
+        "truncated",
+        "elapsed_ms"
+      ]
+    }
+  },
+  {
+    "name": "scan_outbound_payload",
+    "title": "Scan outbound payload",
+    "description": "Advisory bounded secret scan for a proposed URL, headers, and body; does not send traffic.",
+    "inputSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "url": {
+          "type": "string",
+          "maxLength": 2048
+        },
+        "headers": {
+          "type": "object",
+          "maxProperties": 32,
+          "propertyNames": {
+            "pattern": "^[A-Za-z0-9-]{1,64}$"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        },
+        "body_base64": {
+          "type": "string",
+          "contentEncoding": "base64",
+          "maxLength": 1398104
+        },
+        "content_type": {
+          "type": "string",
+          "maxLength": 128
+        }
+      },
+      "anyOf": [
+        {
+          "required": [
+            "url"
+          ]
+        },
+        {
+          "required": [
+            "headers"
+          ]
+        },
+        {
+          "required": [
+            "body_base64"
+          ]
+        }
+      ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "ALLOW",
+            "WARN",
+            "BLOCKED"
+          ]
+        },
+        "rule": {
+          "type": "string"
+        },
+        "remediation": {
+          "type": "string"
+        },
+        "correlation_id": {
+          "type": "string"
+        },
+        "findings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "severity": {
+                "type": "string",
+                "enum": [
+                  "info",
+                  "warning",
+                  "critical"
+                ]
+              },
+              "location": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "severity"
+            ]
+          }
+        },
+        "scanned_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "entropy_bits_per_char": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 8
+        }
+      },
+      "required": [
+        "status",
+        "rule",
+        "remediation",
+        "correlation_id",
+        "findings",
+        "scanned_bytes"
+      ]
+    }
+  },
+  {
+    "name": "detect_bot_traps",
+    "title": "Analyze transfer for bot traps",
+    "description": "Advisory analysis of bounded transfer samples; active fetch enforces its own deadlines and decompression caps.",
+    "inputSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "samples": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "elapsed_ms": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 600000
+              },
+              "wire_bytes_total": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "decoded_bytes_total": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "elapsed_ms",
+              "wire_bytes_total",
+              "decoded_bytes_total"
+            ]
+          }
+        },
+        "redirect_urls": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "type": "string",
+            "maxLength": 2048
+          }
+        },
+        "declared_content_length": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "content_encoding": {
+          "type": "string",
+          "enum": [
+            "identity",
+            "gzip",
+            "deflate",
+            "br"
+          ]
+        }
+      },
+      "required": [
+        "samples"
+      ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "ALLOW",
+            "WARN",
+            "BLOCKED"
+          ]
+        },
+        "rule": {
+          "type": "string"
+        },
+        "remediation": {
+          "type": "string"
+        },
+        "correlation_id": {
+          "type": "string"
+        },
+        "findings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "severity": {
+                "type": "string",
+                "enum": [
+                  "info",
+                  "warning",
+                  "critical"
+                ]
+              },
+              "location": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "severity"
+            ]
+          }
+        },
+        "average_bytes_per_second": {
+          "type": "number",
+          "minimum": 0
+        },
+        "expansion_ratio": {
+          "type": "number",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "status",
+        "rule",
+        "remediation",
+        "correlation_id",
+        "findings"
+      ]
+    }
+  },
+  {
+    "name": "scrub_external_content",
+    "title": "Inspect external content",
+    "description": "Return bounded visible text/links and findings; suspicious instructions are flagged or quarantined, not certified safe.",
+    "inputSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "content": {
+          "type": "string",
+          "maxLength": 1048576
+        },
+        "content_type": {
+          "type": "string",
+          "enum": [
+            "text/html",
+            "text/plain",
+            "text/markdown",
+            "application/json"
+          ]
+        },
+        "source_url": {
+          "type": "string",
+          "format": "uri",
+          "maxLength": 2048
+        },
+        "max_return_chars": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 262144
+        }
+      },
+      "required": [
+        "content",
+        "content_type"
+      ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "ALLOW",
+            "WARN",
+            "BLOCKED"
+          ]
+        },
+        "rule": {
+          "type": "string"
+        },
+        "remediation": {
+          "type": "string"
+        },
+        "correlation_id": {
+          "type": "string"
+        },
+        "findings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "severity": {
+                "type": "string",
+                "enum": [
+                  "info",
+                  "warning",
+                  "critical"
+                ]
+              },
+              "location": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "severity"
+            ]
+          }
+        },
+        "visible_text": {
+          "type": "string"
+        },
+        "visible_links": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "removed_nodes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "truncated": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "status",
+        "rule",
+        "remediation",
+        "correlation_id",
+        "findings",
+        "visible_text",
+        "visible_links",
+        "removed_nodes",
+        "truncated"
+      ]
+    }
+  },
+  {
+    "name": "rate_budget_check",
+    "title": "Check egress budget",
+    "description": "Read-only budget preview for authenticated caller and canonical host; guarded_fetch reserves budget atomically.",
+    "inputSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "maxLength": 2048
+        },
+        "planned_requests": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        }
+      },
+      "required": [
+        "url"
+      ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "ALLOW",
+            "WARN",
+            "BLOCKED"
+          ]
+        },
+        "rule": {
+          "type": "string"
+        },
+        "remediation": {
+          "type": "string"
+        },
+        "correlation_id": {
+          "type": "string"
+        },
+        "findings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "severity": {
+                "type": "string",
+                "enum": [
+                  "info",
+                  "warning",
+                  "critical"
+                ]
+              },
+              "location": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "severity"
+            ]
+          }
+        },
+        "allowed": {
+          "type": "boolean"
+        },
+        "remaining_host_minute": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "remaining_caller_hour": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "retry_after_seconds": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "status",
+        "rule",
+        "remediation",
+        "correlation_id",
+        "findings",
+        "allowed",
+        "remaining_host_minute",
+        "remaining_caller_hour"
+      ]
+    }
+  }
+]

@@ -24,7 +24,11 @@ async fn main() -> Result<()> {
     let app_state = state::AppState::initialize(config).await?;
 
     // Run the MCP server (blocks until shutdown)
-    let result = mcp::server::run_server(app_state).await;
+    let result = if app_state.config.transport == "stdio" {
+        mcp::server::run_stdio(app_state).await
+    } else {
+        mcp::server::run_server(app_state).await
+    };
     if let Some(provider) = tracer_provider {
         provider
             .shutdown()
