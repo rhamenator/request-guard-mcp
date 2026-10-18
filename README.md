@@ -3,7 +3,7 @@
 [![CI](https://github.com/rhamenator/request-guard-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/rhamenator/request-guard-mcp/actions/workflows/ci.yml)
 [![License: GPL v3+](https://img.shields.io/badge/License-GPLv3%2B-blue.svg)](LICENSE)
 
-A production-ready **Rust MCP (Model Context Protocol) server** for request risk classification, enrichment, and abuse-signal analysis. It can be used by any MCP-capable client over WebSocket or HTTP JSON-RPC; the `ai-scraping-defense` projects are supported clients, not required dependencies.
+A **Rust MCP (Model Context Protocol) server** for request risk classification, enrichment, and abuse-signal analysis. It can be used by MCP-capable clients over WebSocket or HTTP JSON-RPC; the `ai-scraping-defense` projects are supported clients, not required dependencies. Stable release readiness is subject to the [adversarial release gate](docs/adversarial-release-gate.md).
 
 The [companion skill](skills/request-guard-mcp/SKILL.md) tells a connected agent when and how to use this server’s classification tools. It does not deploy or replace the separate AI Scraping Defense products.
 
@@ -109,6 +109,8 @@ The application, Redis, and PostgreSQL intentionally refuse to start with the
 example credentials. Do not commit `deploy/k8s/secret.yaml`.
 
 ## Development
+
+Stable releases also require the [adversarial release gate](docs/adversarial-release-gate.md) against the packaged server in an authorized lab.
 
 ```bash
 make test        # Run all tests
