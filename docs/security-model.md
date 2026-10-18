@@ -2,9 +2,9 @@
 
 ## Authentication
 
-All WebSocket connections are authenticated at connection establishment using token-based authentication (HTTP ******
+All WebSocket connections are authenticated at connection establishment using a bearer token in the HTTP `Authorization` header.
 
-- The `Authorization` header (in ****** format) must be present on the WebSocket upgrade request.
+- The `Authorization` header (`Bearer <token>`) must be present on the WebSocket upgrade request.
 - Tokens are configured via the `AUTH_TOKENS` environment variable (comma-separated).
 - An unauthenticated connection receives a JSON-RPC error and the connection is closed.
 - Authentication is enforced before any tool dispatch occurs.
