@@ -738,6 +738,14 @@ mod tests {
     #[test]
     fn definitions_publish_tool_specific_input_schemas() {
         let definitions = build_registry().definitions();
+        for definition in &definitions {
+            let schema = &definition["inputSchema"];
+            assert_eq!(schema["type"], "object");
+            let properties = schema["properties"].as_object().unwrap();
+            for required in schema["required"].as_array().unwrap() {
+                assert!(properties.contains_key(required.as_str().unwrap()));
+            }
+        }
         let explain = definitions
             .iter()
             .find(|tool| tool["name"] == "explain")

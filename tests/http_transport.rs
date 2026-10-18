@@ -65,3 +65,19 @@ async fn post_mcp_notifications_return_no_content() {
         .await;
     response.assert_status(StatusCode::NO_CONTENT);
 }
+
+#[tokio::test]
+async fn initialize_counteroffers_supported_revision_over_http() {
+    let response = server(false)
+        .post("/mcp")
+        .json(&json!({
+            "jsonrpc": "2.0",
+            "id": 12,
+            "method": "initialize",
+            "params": {"protocolVersion": "2026-07-28", "capabilities": {}, "clientInfo": {"name": "probe", "version": "1"}}
+        }))
+        .await;
+    response.assert_status_ok();
+    let value: Value = response.json();
+    assert_eq!(value["result"]["protocolVersion"], "2025-06-18");
+}
