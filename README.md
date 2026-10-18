@@ -5,7 +5,7 @@
 
 A production-ready **Rust MCP (Model Context Protocol) server** for request risk classification, enrichment, and abuse-signal analysis. It can be used by any MCP-capable client over WebSocket or HTTP JSON-RPC; the `ai-scraping-defense` projects are supported clients, not required dependencies.
 
-An **experimental opt-in outbound guard** is under development. It adds `guarded_fetch` and five advisory/analysis tools when `MCP__EGRESS__ENABLED=true`. This first implementation blocks forbidden address ranges, known secret patterns, non-standard ports, unsafe redirects, oversized or slow responses, and configured domains. It does not intercept HTTP made by other tools. See [outbound design and remaining gates](docs/egress-design/README.md) before relying on it as a security boundary.
+The **experimental opt-in outbound guard** in this branch is the extraction source for the independent [Outbound Guard MCP](https://github.com/rhamenator/outbound-guard-mcp) project. It adds `guarded_fetch` and five advisory/analysis tools when `MCP__EGRESS__ENABLED=true`. This first implementation blocks forbidden address ranges, known secret patterns, non-standard ports, unsafe redirects, oversized or slow responses, and configured domains. It does not intercept HTTP made by other tools. See [the inbound release quality bar](docs/QUALITY_BAR.md) and [outbound design and remaining gates](docs/egress-design/README.md) before relying on it as a security boundary.
 
 For local MCP clients, set `MCP__TRANSPORT=stdio` and `MCP__EGRESS__ENABLED=true`, then launch the binary as a subprocess. Stdio mode opens no network listener; JSON-RPC messages use one line each on stdin/stdout. Server logs go to stderr. The existing HTTP POST and WebSocket transport remains the default.
 
