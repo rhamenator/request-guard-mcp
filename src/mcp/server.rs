@@ -4,7 +4,8 @@ use crate::state::AppState;
 use crate::telemetry::gather_metrics;
 use axum::{
     extract::{ws::WebSocketUpgrade, State},
-    http::{HeaderMap, StatusCode},
+    http::{header::X_CONTENT_TYPE_OPTIONS, HeaderMap, HeaderValue, StatusCode},
+    middleware::map_response,
     response::{IntoResponse, Response},
     routing::get,
     Router,
@@ -26,8 +27,16 @@ pub fn build_router(state: ServerState, max_body: usize) -> Router {
         .route("/health", get(http_health_handler))
         .route(&metrics_path, get(metrics_handler))
         .route("/ready", get(readiness_handler))
+        .layer(map_response(add_security_headers))
         .layer(RequestBodyLimitLayer::new(max_body))
         .with_state(state)
+}
+
+async fn add_security_headers(mut response: Response) -> Response {
+    response
+        .headers_mut()
+        .insert(X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff"));
+    response
 }
 
 async fn ws_handler(

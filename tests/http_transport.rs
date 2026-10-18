@@ -1,4 +1,7 @@
-use axum::http::{header::AUTHORIZATION, HeaderValue, StatusCode};
+use axum::http::{
+    header::{AUTHORIZATION, X_CONTENT_TYPE_OPTIONS},
+    HeaderValue, StatusCode,
+};
 use axum_test::TestServer;
 use request_guard_mcp::config::Config;
 use request_guard_mcp::mcp::{
@@ -45,6 +48,7 @@ async fn post_mcp_enforces_same_auth_as_websocket_upgrade() {
         .json(&json!({"jsonrpc": "2.0", "id": 1, "method": "health"}))
         .await;
     response.assert_status(StatusCode::UNAUTHORIZED);
+    assert_eq!(response.header(X_CONTENT_TYPE_OPTIONS), "nosniff");
 
     let authorized = server(true)
         .post("/mcp")
