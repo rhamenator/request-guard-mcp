@@ -102,7 +102,7 @@ def main() -> None:
     (args.output / "package.json").write_text(json.dumps(package, indent=2) + "\n", encoding="utf-8")
     (args.output / "README.md").write_text(
         f"# {args.name}\n\n"
-        "Native Request Guard MCP server for Linux x64, Windows x64, macOS Intel, and macOS Apple Silicon. "
+        "Native Request Guard MCP server for Linux x64 (glibc), Windows x64, macOS Intel, and macOS Apple Silicon. "
         "This package has no runtime npm dependencies and does not download executables during installation.\n\n"
         f"Install with `npm install -g {args.name}@{version}`. Set a unique `AUTH_TOKENS` value "
         "of at least 32 characters, then run `request-guard-mcp`. For local use, set "

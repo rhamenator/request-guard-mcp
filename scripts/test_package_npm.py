@@ -65,6 +65,13 @@ class NativeNpmPackageTests(unittest.TestCase):
             text=True, capture_output=True, check=True,
         )
         self.assertEqual(launched.stdout, "native:probe\n")
+        musl = subprocess.run(
+            ["node", "-e", "process.report.getReport = () => ({header: {}}); "
+             "require(process.argv[1])", str(output / "bin/request-guard-mcp.js")],
+            text=True, capture_output=True,
+        )
+        self.assertNotEqual(musl.returncode, 0)
+        self.assertIn("requires glibc", musl.stderr)
         packed = subprocess.run(
             ["npm", "pack", "--dry-run", "--json"], cwd=output,
             text=True, capture_output=True, check=True,

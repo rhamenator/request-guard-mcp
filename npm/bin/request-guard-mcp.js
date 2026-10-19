@@ -15,6 +15,10 @@ if (!target) {
   console.error(`Request Guard MCP has no binary for ${process.platform}/${process.arch}`);
   process.exit(1);
 }
+if (process.platform === "linux" && !process.report?.getReport?.().header?.glibcVersionRuntime) {
+  console.error("Request Guard MCP's Linux binary requires glibc; musl-based systems are unsupported.");
+  process.exit(1);
+}
 
 const binary = path.join(__dirname, "..", "vendor", target[0], target[1]);
 const child = spawn(binary, process.argv.slice(2), { stdio: "inherit", env: process.env });

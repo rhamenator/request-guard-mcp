@@ -10,6 +10,8 @@ binary from each archive, and produces one dependency-free npm package with
 all four supported platforms. Installation does not run a `postinstall` script
 or download executable code. The small Node launcher selects the bundled
 binary and forwards arguments, environment, stdio, and termination signals.
+The Linux x64 binary requires glibc; musl-based distributions such as Alpine
+are rejected with an explicit launcher error.
 
 After the official release has passed the adversarial gate and its assets are
 published:
