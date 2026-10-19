@@ -30,6 +30,15 @@ It does not clear the full adversarial release gate.
   `57f95ff2d9ac5fb85591c35db8cc69f63bbcaf152bcea7b2d21ec70460fc6df2`, and
   `85aacb03b31934275391420919cd186bbe007ca7b18db2d14f1bfc2b24e5a683`.
 
+Each Kali invocation read the token from stdin. The command forms were:
+
+```text
+python3 /tmp/adversarial_probe.py --url http://192.168.122.73:18086 --max-request-bytes 4096
+python3 /tmp/adversarial_ws_probe.py --host 192.168.122.73 --port 18086 --max-request-bytes 4096
+python3 /tmp/adversarial_classifier_probe.py --url http://192.168.122.73:18086
+python3 /tmp/adversarial_slow_client_probe.py --host 192.168.122.73 --port 18086 --max-request-bytes 4096
+```
+
 ## Results
 
 | Kali probe | Published v0.1.1 | Current main | Release failures |
