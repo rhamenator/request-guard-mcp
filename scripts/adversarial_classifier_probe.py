@@ -15,6 +15,8 @@ CASES = (
     ("raw_dotenv", "Mozilla/5.0", "/.env", "path_sensitive", set()),
     ("encoded_dotenv", "Mozilla/5.0", "/%2eenv", "path_sensitive", set()),
     ("double_encoded_dotenv", "Mozilla/5.0", "/%252eenv", "path_sensitive", set()),
+    ("triple_encoded_dotenv", "Mozilla/5.0", "/%25252eenv", "path_sensitive", set()),
+    ("quadruple_encoded_dotenv", "Mozilla/5.0", "/%2525252eenv", "path_sensitive", set()),
     ("encoded_separator", "Mozilla/5.0", "/%2fadmin", "path_sensitive", set()),
     ("double_encoded_backslash", "Mozilla/5.0", "/%255cadmin", "path_sensitive", set()),
 )

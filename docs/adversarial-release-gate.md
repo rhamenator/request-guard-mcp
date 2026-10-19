@@ -13,7 +13,7 @@ authentication boundaries, malformed JSON, invalid envelopes, invalid tool
 parameters, prompt-injection text as request data, and declared oversized
 HTTP bodies. The same CI job calls `tools/call` over HTTP for eight bounded
 classifier cases: a benign control, two named-bot user-agent variants, and
-raw, singly encoded, and doubly encoded sensitive paths. It checks expected
+raw through four-times percent-encoded sensitive paths. It checks expected
 signal names without treating a score as a visitor-block decision. These
 checks do not complete this gate. CI uses a 4096-byte request limit and
 one-second header/body timeouts to test incomplete headers, a stalled
