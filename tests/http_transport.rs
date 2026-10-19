@@ -88,14 +88,22 @@ async fn unauthenticated_post_is_rejected_before_body_arrives() {
         .write_all(b"POST /mcp HTTP/1.1\r\nHost: localhost\r\nContent-Length: 1000000\r\n\r\nx")
         .await
         .unwrap();
-    let mut response = [0_u8; 256];
-    let size = timeout(Duration::from_secs(2), stream.read(&mut response))
-        .await
-        .expect("authentication must not wait for the incomplete body")
-        .unwrap();
-    assert!(std::str::from_utf8(&response[..size])
+    let status_line = timeout(Duration::from_secs(5), async {
+        let mut line = Vec::new();
+        while !line.ends_with(b"\r\n") {
+            assert!(line.len() < 256, "HTTP status line is too long");
+            let mut byte = [0_u8; 1];
+            let read = stream.read(&mut byte).await.unwrap();
+            assert_ne!(read, 0, "connection closed before HTTP status line");
+            line.push(byte[0]);
+        }
+        line
+    })
+    .await
+    .expect("authentication must not wait for the incomplete body");
+    assert!(std::str::from_utf8(&status_line)
         .unwrap()
-        .starts_with("HTTP/1.1 401"));
+        .starts_with("HTTP/1.1 401 "));
     server_task.abort();
 }
 
