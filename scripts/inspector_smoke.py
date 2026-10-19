@@ -11,16 +11,31 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import secrets
 import socket
 import subprocess
 import tempfile
 import time
 import urllib.request
+from urllib.error import HTTPError
 from pathlib import Path
 
 
 INSPECTOR = "@modelcontextprotocol/inspector@2.5.0"
+
+
+def require(condition: bool, message: str) -> None:
+    if not condition:
+        raise RuntimeError(message)
+
+
+def check_node_version() -> None:
+    completed = subprocess.run(["node", "--version"], capture_output=True, text=True,
+                               timeout=10, check=True)
+    match = re.fullmatch(r"v(\d+)\.(\d+)\.(\d+)", completed.stdout.strip())
+    require(match is not None and tuple(map(int, match.groups())) >= (22, 19, 0),
+            "MCP Inspector 2.5.0 requires Node.js >=22.19.0")
 
 
 def free_loopback_port() -> int:
@@ -48,16 +63,19 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("binary", type=Path, help="Installed request-guard-mcp binary")
     args = parser.parse_args()
+    check_node_version()
     binary = args.binary.resolve(strict=True)
     token = secrets.token_urlsafe(32)
     port = free_loopback_port()
     url = f"http://127.0.0.1:{port}/mcp"
-    env = os.environ.copy()
-    env.update({"MCP__HOST": "127.0.0.1", "MCP__PORT": str(port), "AUTH_TOKENS": token})
-    # The smoke test must not inherit optional integrations from the operator.
-    for key in list(env):
-        if key.startswith(("MCP__REDIS__", "MCP__POSTGRES__", "MCP__GEOIP__")):
-            del env[key]
+    # Pass only process essentials, so operator config cannot disable auth or
+    # connect the test server to real optional services.
+    essentials = {"PATH", "SYSTEMROOT", "WINDIR", "TEMP", "TMP", "TMPDIR",
+                  "HOME", "USERPROFILE"}
+    env = {key: value for key, value in os.environ.items()
+           if key.upper() in essentials}
+    env.update({"MCP__HOST": "127.0.0.1", "MCP__PORT": str(port),
+                "MCP__AUTH__ENABLED": "true", "AUTH_TOKENS": token})
     clean_cwd = tempfile.TemporaryDirectory(prefix="request-guard-inspector-")
     server = subprocess.Popen([str(binary)], cwd=clean_cwd.name, env=env,
                               stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
@@ -73,27 +91,41 @@ def main() -> None:
         else:
             raise RuntimeError("server did not become ready")
 
+        probe = urllib.request.Request(url, data=b'{"jsonrpc":"2.0","id":1,"method":"ping"}',
+                                       headers={"Content-Type": "application/json"})
+        try:
+            urllib.request.urlopen(probe, timeout=5)
+        except HTTPError as error:
+            require(error.code == 401, "missing bearer token did not return HTTP 401")
+        else:
+            raise RuntimeError("missing bearer token was accepted")
+        print("PASS authentication: missing token rejected")
+
         initialized = inspector(url, token, "initialize")
-        assert initialized["protocolVersion"] == "2025-06-18", initialized
-        assert initialized["capabilities"]["tools"]["listChanged"] is False
+        require(initialized.get("protocolVersion") == "2025-06-18",
+                "initialize returned an unexpected protocol version")
+        require(initialized.get("capabilities", {}).get("tools", {}).get("listChanged") is False,
+                "initialize did not advertise the expected tools capability")
         print("PASS initialize: 2025-06-18, tools capability")
 
         listed = inspector(url, token, "tools/list")
         names = {tool["name"] for tool in listed["tools"]}
-        assert {"classify", "explain"} <= names, names
+        require({"classify", "explain"} <= names, "tools/list omitted core tools")
         print(f"PASS tools/list: {len(names)} contracts, classify and explain present")
 
         observed = {"ip": "192.0.2.1", "user_agent": "GPTBot/1.0", "path": "/"}
         classified = inspector(url, token, "tools/call", "--tool-name", "classify",
                                "--tool-args-json", json.dumps(observed))
-        assert classified["isError"] is False
-        assert classified["structuredContent"]["verdict"] in {"allow", "challenge", "block"}
+        require(classified.get("isError") is False, "classify returned an error")
+        require(classified.get("structuredContent", {}).get("verdict") in
+                {"allow", "challenge", "block"}, "classify omitted a structured verdict")
         print("PASS tools/call classify: structured verdict")
 
         explained = inspector(url, token, "tools/call", "--tool-name", "explain",
                               "--tool-args-json", json.dumps({"classification": observed}))
-        assert explained["isError"] is False
-        assert explained["structuredContent"]["factors"]
+        require(explained.get("isError") is False, "explain returned an error")
+        require(bool(explained.get("structuredContent", {}).get("factors")),
+                "explain omitted contributing factors")
         print("PASS tools/call explain: contributing factors")
     finally:
         server.terminate()

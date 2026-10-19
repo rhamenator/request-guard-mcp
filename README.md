@@ -81,7 +81,8 @@ For a clean client check against an installed binary, run
 `python3 scripts/inspector_smoke.py /path/to/request-guard-mcp`. It starts a
 loopback instance with a temporary bearer token and uses pinned official MCP
 Inspector 2.5.0 for `initialize`, `tools/list`, and `tools/call` (`classify` and
-`explain`). Node.js/npm and access to that Inspector package are required.
+`explain`). Node.js 22.19.0 or newer, npm, and access to that Inspector package
+are required.
 See [the interoperability evidence](docs/inspector-interoperability.md) for
 tested results and current protocol limits.
 

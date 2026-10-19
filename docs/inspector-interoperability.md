@@ -18,9 +18,9 @@ python3 scripts/inspector_smoke.py target/release/request-guard-mcp
 The smoke script starts the binary on a temporary loopback port with a random
 bearer token, then invokes `npx --yes @modelcontextprotocol/inspector@2.5.0
 --cli --transport http --method ... --format json`. It checks the 2025-06-18
-initialize response, all advertised tool definitions, a `classify` structured
+initialize response, missing-token rejection, all advertised tool definitions, a `classify` structured
 verdict, and an `explain` result with contributing factors. It exits nonzero
-if any step fails. Node.js/npm and package registry access (or a cached
+if any step fails. Node.js 22.19.0 or newer, npm, and package registry access (or a cached
 Inspector package) are required. No Redis, PostgreSQL, MaxMind data, or
 application credential is needed for these two core tools.
 
