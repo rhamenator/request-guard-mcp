@@ -146,6 +146,42 @@ def main():
                 process.kill()
                 process.wait(timeout=5)
 
+        cap_port = unused_loopback_port()
+        cap_environment = environment.copy()
+        cap_environment.update({
+            "MCP__PORT": str(cap_port),
+            "MCP__LIMITS__MAX_CONNECTIONS": "2",
+            "MCP__LIMITS__HTTP_HEADER_TIMEOUT_SECS": "10",
+        })
+        cap_process = subprocess.Popen(
+            [str(binary)],
+            cwd=working_directory,
+            env=cap_environment,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        try:
+            wait_for_health(cap_process, cap_port)
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts/adversarial_connection_cap_probe.py"),
+                    "--host", "127.0.0.1", "--port", str(cap_port),
+                ],
+                input=token + "\n",
+                text=True,
+                env=cap_environment,
+                check=True,
+                timeout=20,
+            )
+        finally:
+            cap_process.terminate()
+            try:
+                cap_process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                cap_process.kill()
+                cap_process.wait(timeout=5)
+
 
 if __name__ == "__main__":
     main()
