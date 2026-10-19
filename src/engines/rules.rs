@@ -260,7 +260,8 @@ fn normalize_path_for_signals(path: &str) -> String {
                 if let (Some(high), Some(low)) =
                     (hex_digit(bytes[index + 1]), hex_digit(bytes[index + 2]))
                 {
-                    decoded.push((high << 4) | low);
+                    let byte = (high << 4) | low;
+                    decoded.push(if byte == b'\\' { b'/' } else { byte });
                     index += 3;
                     continue;
                 }
@@ -414,7 +415,14 @@ mod tests {
 
     #[test]
     fn encoded_sensitive_paths_remain_visible_to_rules() {
-        for path in ["/%2eenv", "/%252eenv", "/%61dmin", "/%2fadmin", "\\admin"] {
+        for path in [
+            "/%2eenv",
+            "/%252eenv",
+            "/%61dmin",
+            "/%2fadmin",
+            "\\admin",
+            "/%255cadmin",
+        ] {
             let signals = RuleEngine::new().evaluate(&make_req(Some("Mozilla/5.0"), Some(path)));
             assert!(
                 signals
