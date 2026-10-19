@@ -15,7 +15,11 @@ HTTP bodies. The same CI job calls `tools/call` over HTTP for eight bounded
 classifier cases: a benign control, two named-bot user-agent variants, and
 raw, singly encoded, and doubly encoded sensitive paths. It checks expected
 signal names without treating a score as a visitor-block decision. These
-checks do not complete this gate.
+checks do not complete this gate. CI uses a 4096-byte request limit and
+one-second header/body timeouts to test incomplete headers, a stalled
+authenticated body, a chunked body over the limit, and a healthy request
+afterward. The slow-client probe is bounded to four connections and a
+30-second subprocess cap; it does not simulate sustained exhaustion.
 
 The stdlib-only `scripts/adversarial_probe.py` is a first HTTP smoke subset. Start a lab server with a temporary token of at least 32 characters, then run:
 
@@ -28,4 +32,14 @@ printf '%s\n' "$LAB_TOKEN" | python3 scripts/adversarial_classifier_probe.py \
   --url http://LAB_HOST:8085
 ```
 
-Set `--max-request-bytes` to the server's configured `MCP__LIMITS__MAX_REQUEST_BYTES`. The HTTP probes refuse to follow redirects, so the bearer token stays scoped to the explicitly named lab endpoint. All three probes can read a token from stdin; omit the first HTTP probe's `--token` argument to do so. The WebSocket probe tests bounded handshake and frame cases. Do not put the token in committed files or published logs. None of the probes prints the token. This subset does not validate sustained exhaustion, backend failures, unknown user-agent evasions, oversized WebSocket frames, or complete MCP interoperability; those cases need separate evidence before release.
+Set `--max-request-bytes` to the server's configured `MCP__LIMITS__MAX_REQUEST_BYTES`. The HTTP probes refuse to follow redirects, so the bearer token stays scoped to the explicitly named lab endpoint. All probes can read a token from stdin; omit the first HTTP probe's `--token` argument to do so. The WebSocket probe tests bounded handshake and frame cases. Do not put the token in committed files or published logs. None of the probes prints the token. This subset does not validate sustained exhaustion, backend failures, unknown user-agent evasions, oversized WebSocket frames, or complete MCP interoperability; those cases need separate evidence before release.
+
+For the slow-client subset, start a separate lab server with
+`MCP__LIMITS__MAX_REQUEST_BYTES=4096`,
+`MCP__LIMITS__HTTP_HEADER_TIMEOUT_SECS=1`, and
+`MCP__LIMITS__HTTP_BODY_TIMEOUT_SECS=1`, then run:
+
+```bash
+printf '%s\n' "$LAB_TOKEN" | python3 scripts/adversarial_slow_client_probe.py \
+  --host LAB_HOST --port 8085 --max-request-bytes 4096
+```
