@@ -18,6 +18,14 @@ because host I/O pressure rose substantially while both VMs were active.
   Python 3.14) and `copperfin-ubuntu26-deb` (`192.168.122.73`, Python 3.14).
   Both VMs were running concurrently. Temporary UFW rules limited TCP 18086
   access to these two VM addresses on `virbr0`.
+- The two probe scripts copied to each VM came from source commit
+  `86ee83bc24f60fe42f4e3ca2605ceb1c9f89930d`, not the later CI probe
+  revision. `scripts/adversarial_probe.py` had SHA-256
+  `d3f8407cf2156abd87e0fe1838656f27ccd11bb9149fc6077bf06e02b0cd5236`;
+  `scripts/adversarial_ws_probe.py` had SHA-256
+  `e02f1c0cb6932d00a2779cc9fc096b2ca88437353ba7322c8e0a107a4e7aad3f`.
+  These revisions implement the 7-case HTTP and 6-case WebSocket subsets
+  reported below.
 
 ## Commands and observations
 
