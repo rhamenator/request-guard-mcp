@@ -3,6 +3,14 @@ use crate::models::{request::FeedbackRequest, response::FeedbackResponse};
 use crate::state::AppState;
 
 pub async fn run(state: &AppState, req: FeedbackRequest) -> Result<FeedbackResponse, AppError> {
+    run_scoped(state, req, "internal").await
+}
+
+pub async fn run_scoped(
+    state: &AppState,
+    req: FeedbackRequest,
+    caller_scope: &str,
+) -> Result<FeedbackResponse, AppError> {
     if !state.postgres.is_available() {
         return Err(AppError::IntegrationUnavailable(
             "feedback requires PostgreSQL persistence".to_string(),
@@ -19,7 +27,7 @@ pub async fn run(state: &AppState, req: FeedbackRequest) -> Result<FeedbackRespo
     }
     let decision = state
         .postgres
-        .get_decision(&req.request_id)
+        .get_decision(caller_scope, &req.request_id)
         .await
         .map_err(|error| AppError::Upstream(error.to_string()))?;
     if decision.is_none() {
@@ -31,6 +39,7 @@ pub async fn run(state: &AppState, req: FeedbackRequest) -> Result<FeedbackRespo
     let feedback_id = state
         .postgres
         .record_feedback(
+            caller_scope,
             &req.request_id,
             &correct_verdict,
             req.notes.as_deref(),

@@ -331,13 +331,21 @@ impl McpTool for FeedbackTool {
         "Submit feedback on a classification"
     }
     async fn call(&self, state: Arc<AppState>, params: Option<Value>) -> Result<Value, AppError> {
+        self.call_scoped(state, params, "internal").await
+    }
+    async fn call_scoped(
+        &self,
+        state: Arc<AppState>,
+        params: Option<Value>,
+        caller_scope: &str,
+    ) -> Result<Value, AppError> {
         if !state.config.features.enable_feedback {
             return Err(AppError::IntegrationUnavailable(
                 "feedback is disabled by configuration".to_string(),
             ));
         }
         let req = required_params(params)?;
-        let result = crate::tools::feedback::run(&state, req).await?;
+        let result = crate::tools::feedback::run_scoped(&state, req, caller_scope).await?;
         serde_json::to_value(result).map_err(AppError::from)
     }
 }
@@ -395,8 +403,16 @@ impl McpTool for ReplayDecisionTool {
         "Replay a previous decision"
     }
     async fn call(&self, state: Arc<AppState>, params: Option<Value>) -> Result<Value, AppError> {
+        self.call_scoped(state, params, "internal").await
+    }
+    async fn call_scoped(
+        &self,
+        state: Arc<AppState>,
+        params: Option<Value>,
+        caller_scope: &str,
+    ) -> Result<Value, AppError> {
         let req = required_params(params)?;
-        let result = crate::tools::replay_decision::run(&state, req).await?;
+        let result = crate::tools::replay_decision::run_scoped(&state, req, caller_scope).await?;
         serde_json::to_value(result).map_err(AppError::from)
     }
 }
@@ -603,6 +619,14 @@ impl McpTool for DriftReportTool {
         "Report on score/signal drift"
     }
     async fn call(&self, state: Arc<AppState>, params: Option<Value>) -> Result<Value, AppError> {
+        self.call_scoped(state, params, "internal").await
+    }
+    async fn call_scoped(
+        &self,
+        state: Arc<AppState>,
+        params: Option<Value>,
+        caller_scope: &str,
+    ) -> Result<Value, AppError> {
         let req = params
             .map(serde_json::from_value)
             .transpose()
@@ -611,7 +635,7 @@ impl McpTool for DriftReportTool {
                 since: None,
                 window_hours: None,
             });
-        let result = crate::tools::drift_report::run(&state, req).await?;
+        let result = crate::tools::drift_report::run_scoped(&state, req, caller_scope).await?;
         serde_json::to_value(result).map_err(AppError::from)
     }
 }
@@ -627,12 +651,21 @@ impl McpTool for CalibrationReportTool {
         "Precision/recall calibration report"
     }
     async fn call(&self, state: Arc<AppState>, params: Option<Value>) -> Result<Value, AppError> {
+        self.call_scoped(state, params, "internal").await
+    }
+    async fn call_scoped(
+        &self,
+        state: Arc<AppState>,
+        params: Option<Value>,
+        caller_scope: &str,
+    ) -> Result<Value, AppError> {
         let req = params
             .map(serde_json::from_value)
             .transpose()
             .map_err(|error: serde_json::Error| AppError::InvalidRequest(error.to_string()))?
             .unwrap_or(crate::models::request::CalibrationReportRequest { window_hours: None });
-        let result = crate::tools::calibration_report::run(&state, req).await?;
+        let result =
+            crate::tools::calibration_report::run_scoped(&state, req, caller_scope).await?;
         serde_json::to_value(result).map_err(AppError::from)
     }
 }

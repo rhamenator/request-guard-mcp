@@ -20,7 +20,7 @@ To package the skill for a directory listing, run `python3 scripts/package_skill
 - **Two-level classification cache** (in-process Moka + shared Redis)
 - **Structured JSON logging** via `tracing`
 - **Redis-backed** threat reputation, canary registry, queue telemetry, and distributed cache
-- **PostgreSQL-backed** decision replay, feedback, drift, and calibration reports with automatic schema setup
+- **Caller-isolated PostgreSQL** decision replay, feedback, drift, and calibration reports with automatic schema setup; configure a stable `CACHE_SCOPE_HMAC_KEY` when PostgreSQL is enabled
 - **HMAC-attested JA3/JA4 rules** with known-bad sets, UA/TLS mismatch detection, and verified cache partitioning
 - **MaxMind City/ASN/Anonymous-IP enrichment**, optionally combined with Redis reputation scores
 - **Docker + Kubernetes** ready with HPA, NetworkPolicy, health probes
