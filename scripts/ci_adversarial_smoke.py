@@ -48,6 +48,7 @@ def main():
     port = unused_loopback_port()
     token = secrets.token_urlsafe(48)
     environment = os.environ.copy()
+    environment.pop("CONFIG_FILE", None)
     environment.pop("MCP__REDIS__URL", None)
     environment.update(
         {
