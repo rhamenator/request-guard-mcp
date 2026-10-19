@@ -70,7 +70,7 @@ in the build belongs exclusively to OTLP trace export.
 - **Global concurrency**: `tokio::sync::Semaphore` with configurable limit (default 256)
 - **Per-tool timeout**: wraps each dispatch with `tokio::time::timeout`
 - **Cache**: Moka in-process LRU cache (async, bounded capacity)
-- **Backpressure**: semaphore blocks new requests when all permits are taken
+- **Backpressure**: saturated tool calls return `RATE_LIMIT_EXCEEDED` immediately when no permit is available
 
 ## Observability
 
