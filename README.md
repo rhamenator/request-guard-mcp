@@ -7,7 +7,7 @@ A **Rust MCP (Model Context Protocol) server** for request risk classification, 
 
 The [companion skill](skills/request-guard-mcp/SKILL.md) tells a connected agent when and how to use this server’s classification tools. It does not deploy or replace the separate AI Scraping Defense products.
 
-To package the skill for a directory listing, run `python3 scripts/package_skill.py`. The resulting `dist/request-guard-mcp-skill.zip` contains only `request-guard-mcp/SKILL.md`; install and configure the server separately. Verify the skill against a connected client before submitting a listing.
+To package the skill for a directory listing, run `python3 scripts/package_skill.py`. The resulting local-only `dist/request-guard-mcp-skill.zip` contains only `request-guard-mcp/SKILL.md`; GitHub releases carry server binaries, not the skill ZIP. Install and configure the server separately. Verify the skill against a connected client before submitting a listing.
 
 ## Features
 
