@@ -42,7 +42,8 @@ The independent Claude Code review identified slow HTTP clients, globally
 addressable PostgreSQL request IDs, encoded-path evasion, and an unredacted
 OTLP configuration URL. The four integration branches address those findings.
 The review also noted incomplete JSON-RPC validation and limited signal inputs;
-the server's documented client and classifier limits still apply. This local
+[issue #59](https://github.com/rhamenator/request-guard-mcp/issues/59) tracks
+strict envelope conformance. The server's documented client and classifier limits still apply. This local
 candidate did not exercise sustained exhaustion, backend failure/recovery,
 other MCP clients, or Windows/macOS runtime outside release CI. Those gaps
 remain open for the full production-readiness gate.
