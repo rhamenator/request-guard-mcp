@@ -51,6 +51,9 @@ checks recovery. These probes cap their counts at 256, avoid sustained load,
 and run without additional Python dependencies. The expanded Kali-to-Ubuntu
 evidence, including a live Redis outage and cache-scope observation, is in
 `adversarial-evidence-expanded-2026-10-19.md`.
+The live PostgreSQL outage/recovery procedure and 9/9 Kali-to-Ubuntu result
+are in `adversarial-postgres-kali-ubuntu-2026-10-19.md`; its reusable probe is
+`scripts/adversarial_postgres_probe.py`.
 
 The stdlib-only `scripts/adversarial_probe.py` is a first HTTP smoke subset. Start a lab server with a temporary token of at least 32 characters, then run:
 
