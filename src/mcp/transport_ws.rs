@@ -418,7 +418,6 @@ mod tests {
     }
 
     #[tokio::test]
-<<<<<<< HEAD
     async fn saturated_tool_capacity_rejects_without_waiting() {
         let mut config = Config::default();
         config.limits.global_concurrency = 1;
@@ -443,7 +442,9 @@ mod tests {
             .expect("capacity recovered");
         let response: Value = serde_json::from_str(&response).unwrap();
         assert!(response.get("result").is_some());
-=======
+    }
+
+    #[tokio::test]
     async fn unknown_tool_names_use_one_metric_label() {
         let (state, registry) = test_context();
         for name in ["probe_random_001", "probe_random_002"] {
@@ -460,7 +461,6 @@ mod tests {
         assert!(metrics.contains("tool=\"__unknown__\""));
         assert!(!metrics.contains("probe_random_001"));
         assert!(!metrics.contains("probe_random_002"));
->>>>>>> 9ea119c (Bound metrics and Redis keys for unknown MCP tools)
     }
 
     #[test]
