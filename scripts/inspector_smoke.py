@@ -76,6 +76,7 @@ def inspector(launcher: Path, url: str, token: str, method: str, *args: str) -> 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--expected-version", help="Expected packaged serverInfo.version")
     parser.add_argument("binary", type=Path, help="Installed request-guard-mcp binary")
     args = parser.parse_args()
     check_node_version()
@@ -121,6 +122,9 @@ def main() -> None:
         initialized = inspector(launcher, url, token, "initialize")
         require(initialized.get("protocolVersion") == "2025-06-18",
                 "initialize returned an unexpected protocol version")
+        if args.expected_version:
+            require(initialized.get("serverInfo", {}).get("version") == args.expected_version,
+                    "initialize reported a server version that differs from the package")
         require(initialized.get("capabilities", {}).get("tools", {}).get("listChanged") is False,
                 "initialize did not advertise the expected tools capability")
         print("PASS initialize: 2025-06-18, tools capability")
