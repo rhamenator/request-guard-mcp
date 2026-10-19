@@ -4,6 +4,10 @@ Stable releases require a repeatable adversarial run against the packaged server
 
 At minimum, exercise authentication boundaries, malformed JSON-RPC and MCP frames, invalid and oversized inputs, prompt-injection text treated as request data, bot-evasion variations, concurrency and slow clients, backend failure and recovery, and logging of sensitive fields. Use Kali and Ubuntu lab VMs when available; scope scanners to the owned test endpoint, record their request counts, and bound runtime and rate to preserve shared host responsiveness. Confirm each exploit or anomaly with a regression test, rerun the affected probe, then rerun the full gate. Reconcile independent Claude Code and Codex reviews with the observed runtime results and document remaining limits before a release.
 
+The HTTP transport regression suite checks that valid JSON with an invalid JSON-RPC
+version, ID type, or envelope receives `-32600` with a null ID; malformed JSON
+receives `-32700`. These checks cover HTTP only and do not complete this gate.
+
 The stdlib-only `scripts/adversarial_probe.py` is a first HTTP smoke subset. Start a lab server with a temporary token of at least 32 characters, then run:
 
 ```bash
