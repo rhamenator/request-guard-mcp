@@ -41,8 +41,32 @@ application credential is needed for these two core tools.
   for unconstrained nested input schemas. Schema precision remains follow-up
   work; these warnings did not prevent the two core calls.
 
-The fresh-clone release build and packaged-binary repeat are tracked as part
-of the release candidate evidence. The broader adversarial gate remains open.
+## Local candidate bundle
+
+The same clean clone was advanced to documentation and smoke-script commit
+`910047b81f5173bee65ccddea9335240dce3148b` and packaged using:
+
+```bash
+cargo build --locked --release
+python3 scripts/package_release.py \
+  --version 0.1.0-rc.2+910047b --target . --platform linux-x64
+sha256sum artifacts/request-guard-mcp-0.1.0-rc.2+910047b-linux-x64.tar.gz
+```
+
+The local Linux x64 archive checksum was
+`9c36a7d79cc9b36cde23bcceedfd5a0644abd6f5e03fd4b75b89b9d91eeebcfb`;
+the contained binary checksum was
+`eb738f3e0787b62ccd768d8326f213d0cb63b5f2311ae47468391356aeb5b6d9`.
+Archive contents were inspected: binary, `.env.example`, `Cargo.lock`,
+`LICENSE`, and `README.md`. After extraction, the same four Inspector smoke
+checks passed against the bundled binary. The binary still reports Cargo
+version `0.1.0`; the suffix labels this local candidate and is not a published
+release. The archive format currently embeds file timestamps, so this checksum
+identifies this build rather than promising bit-for-bit identical archives on
+another host.
+
+The broader adversarial gate remains open. This candidate has not been
+uploaded as a release or marketplace package.
 
 ## Current client limits
 
