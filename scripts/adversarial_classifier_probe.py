@@ -19,6 +19,15 @@ CASES = (
     ("quadruple_encoded_dotenv", "Mozilla/5.0", "/%2525252eenv", "path_sensitive", set()),
     ("encoded_separator", "Mozilla/5.0", "/%2fadmin", "path_sensitive", set()),
     ("double_encoded_backslash", "Mozilla/5.0", "/%255cadmin", "path_sensitive", set()),
+    ("masscan_scanner", "masscan/1.3", "/welcome", "ua_scraper", set()),
+    ("nikto_scanner", "Nikto/2.6.1", "/welcome", "ua_scraper", set()),
+    ("sqlmap_scanner", "sqlmap/1.9", "/welcome", "ua_scraper", set()),
+    ("httpclient_library", "Apache-HttpClient/4.5", "/welcome", "ua_scraper", set()),
+    ("internal_path", "Mozilla/5.0", "/internal", "path_sensitive", set()),
+    ("internal_child", "Mozilla/5.0", "/internal/metrics", "path_sensitive", set()),
+    ("xmlrpc_path", "Mozilla/5.0", "/xmlrpc.php", "path_sensitive", set()),
+    ("internalized_control", "Mozilla/5.0", "/internalized", None, {"path_sensitive"}),
+    ("xmlrpc_suffix_control", "Mozilla/5.0", "/xmlrpc.phpish", None, {"path_sensitive"}),
 )
 
 

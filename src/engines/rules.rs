@@ -19,7 +19,8 @@ static AI_BOT_UA: Lazy<Regex> = Lazy::new(|| {
 static SCRAPING_UA: Lazy<Regex> = Lazy::new(|| {
     Regex::new(concat!(
         r"(?i)(scrapy|beautifulsoup|mechanize|selenium|phantom|puppeteer|playwright|",
-        r"headless|crawler|spider|bot|scraper)"
+        r"headless|crawler|spider|bot|scraper|",
+        r"\bmasscan\b|\bnikto\b|\bsqlmap\b|\bhttpclient\b)"
     ))
     .expect("compile regex")
 });
@@ -27,7 +28,8 @@ static SCRAPING_UA: Lazy<Regex> = Lazy::new(|| {
 static SENSITIVE_PATH: Lazy<Regex> = Lazy::new(|| {
     Regex::new(concat!(
         r"(?i)(\.env|/admin|/api/internal|/wp-admin|/phpmyadmin|\.git/|",
-        r"/etc/passwd|/proc/|/debug|/actuator|/swagger|/graphql|/config)"
+        r"/etc/passwd|/proc/|/debug|/actuator|/swagger|/graphql|/config|",
+        r"/internal(?:/|$|\?)|/xmlrpc\.php(?:/|$|\?))"
     ))
     .expect("compile regex")
 });
@@ -371,6 +373,10 @@ mod tests {
             "spider",
             "bot",
             "scraper",
+            "masscan",
+            "nikto",
+            "sqlmap",
+            "httpclient",
         ] {
             assert!(
                 SCRAPING_UA.is_match(sample),
@@ -382,6 +388,7 @@ mod tests {
             .as_slice()
             .iter()
             .any(|signal| signal.name == "ua_scraper"));
+        assert!(!SCRAPING_UA.is_match("masscanary browser"));
     }
 
     #[test]
@@ -400,6 +407,9 @@ mod tests {
             "/swagger",
             "/graphql",
             "/config",
+            "/internal",
+            "/internal/metrics",
+            "/xmlrpc.php",
         ] {
             assert!(
                 SENSITIVE_PATH.is_match(sample),
@@ -411,6 +421,8 @@ mod tests {
             .as_slice()
             .iter()
             .any(|signal| signal.name == "path_sensitive"));
+        assert!(!SENSITIVE_PATH.is_match("/internalized"));
+        assert!(!SENSITIVE_PATH.is_match("/xmlrpc.phpish"));
     }
 
     #[test]
