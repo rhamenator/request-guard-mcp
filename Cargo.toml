@@ -1,9 +1,9 @@
 [package]
 name = "request-guard-mcp"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 rust-version = "1.89"
-description = "Production-ready Rust MCP server for request risk classification and enrichment"
+description = "Rust MCP server for request risk classification and enrichment"
 authors = ["rhamenator"]
 license = "GPL-3.0-or-later"
 repository = "https://github.com/rhamenator/request-guard-mcp"

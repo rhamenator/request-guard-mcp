@@ -16,8 +16,26 @@ env:
   RELEASE_VERSION: ${{ inputs.candidate_version || github.ref_name }}
 
 jobs:
+  verify-release-ref:
+    name: Verify release version and source
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Validate version, lockfile, and tag ancestry
+        env:
+          INPUT_CANDIDATE_VERSION: ${{ inputs.candidate_version }}
+        run: python scripts/verify_release_ref.py
+
   build-release:
     name: Build ${{ matrix.platform }} binary
+    needs: verify-release-ref
     strategy:
       fail-fast: false
       matrix:
@@ -74,6 +92,7 @@ jobs:
         shell: bash
         run: |
           python scripts/inspector_smoke.py \
+            --expected-version "$(python -c 'import tomllib; print(tomllib.load(open("Cargo.toml", "rb"))["package"]["version"])')" \
             "artifacts/request-guard-mcp-${RELEASE_VERSION}-${{ matrix.platform }}/request-guard-mcp${{ matrix.suffix }}"
       - name: Verify archive checksums
         shell: bash
@@ -92,7 +111,7 @@ jobs:
   create-release:
     name: Create GitHub Release
     if: github.ref_type == 'tag'
-    needs: build-release
+    needs: [verify-release-ref, build-release]
     runs-on: ubuntu-latest
     permissions:
       contents: write
