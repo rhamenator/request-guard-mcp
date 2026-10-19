@@ -54,6 +54,8 @@ evidence, including a live Redis outage and cache-scope observation, is in
 The live PostgreSQL outage/recovery procedure and 9/9 Kali-to-Ubuntu result
 are in `adversarial-postgres-kali-ubuntu-2026-10-19.md`; its reusable probe is
 `scripts/adversarial_postgres_probe.py`.
+The bounded Nmap and Nikto on-wire request counts and capture method are in
+`adversarial-scanner-counts-kali-ubuntu-2026-10-19.md`.
 
 The stdlib-only `scripts/adversarial_probe.py` is a first HTTP smoke subset. Start a lab server with a temporary token of at least 32 characters, then run:
 
