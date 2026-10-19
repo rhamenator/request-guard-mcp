@@ -90,8 +90,8 @@ tested results and current protocol limits.
 
 Each GitHub release includes a checksum-protected native bundle for Linux x64,
 Windows x64, macOS Intel, and macOS Apple Silicon. Download the archive for your
-platform, extract it, copy `.env.example` to `.env`, set `AUTH_TOKENS`, and run
-`request-guard-mcp` (or `request-guard-mcp.exe` on Windows). A signed container
+platform and follow the bundled [INSTALL.md](INSTALL.md) for checksum verification,
+token setup, startup, and MCP client connection. A signed container
 image is also published to `ghcr.io/rhamenator/request-guard-mcp`. Package the
 companion skill locally with `python3 scripts/package_skill.py` if you need a
 directory listing ZIP; GitHub releases do not include that ZIP.

@@ -44,15 +44,28 @@ def main() -> None:
         lockfiles = list(root.rglob("Cargo.lock"))
         if len(lockfiles) != 1:
             raise RuntimeError(f"expected packaged Cargo.lock inventory, found: {lockfiles}")
+        guides = list(root.rglob("INSTALL.md"))
+        if len(guides) != 1:
+            raise RuntimeError(f"expected one packaged INSTALL.md, found: {guides}")
 
+        example = matches[0].parent / ".env.example"
+        if not example.is_file():
+            raise RuntimeError("release bundle is missing .env.example")
+        settings = example.read_text(encoding="utf-8")
+        for old, new in (
+            ("AUTH_TOKENS=replace_me_with_a_strong_token", "AUTH_TOKENS=release-smoke-token-with-at-least-32-characters"),
+            ("MCP__HOST=0.0.0.0", "MCP__HOST=127.0.0.1"),
+            ("MCP__PORT=8085", f"MCP__PORT={args.port}"),
+        ):
+            if old not in settings:
+                raise RuntimeError(f"release .env.example is missing expected setting: {old.split('=')[0]}")
+            settings = settings.replace(old, new, 1)
+        dotenv = matches[0].parent / ".env"
+        dotenv.write_text(settings, encoding="utf-8")
+        dotenv.chmod(0o600)
         environment = os.environ.copy()
-        environment.update(
-            {
-                "AUTH_TOKENS": "release-smoke-token-with-at-least-32-characters",
-                "MCP__HOST": "127.0.0.1",
-                "MCP__PORT": str(args.port),
-            }
-        )
+        for name in ("AUTH_TOKENS", "MCP__HOST", "MCP__PORT"):
+            environment.pop(name, None)
         process = subprocess.Popen(
             [str(matches[0])],
             cwd=matches[0].parent,

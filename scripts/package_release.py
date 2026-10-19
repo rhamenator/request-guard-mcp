@@ -40,6 +40,7 @@ def main() -> None:
     stage.mkdir(parents=True, exist_ok=True)
     shutil.copy2(binary, stage / binary.name)
     shutil.copy2("README.md", stage / "README.md")
+    shutil.copy2("INSTALL.md", stage / "INSTALL.md")
     shutil.copy2("LICENSE", stage / "LICENSE")
     shutil.copy2(".env.example", stage / ".env.example")
     shutil.copy2("Cargo.lock", stage / "Cargo.lock")
