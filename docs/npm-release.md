@@ -1,8 +1,9 @@
 # npm release package
 
 The GitHub Packages entry for `request-guard-mcp` is a container image. The npm
-package is a separate installation option for the official native release. No
-npm package is published by this repository yet.
+package is a separate installation option for the official native release.
+Check [npm](https://www.npmjs.com/package/request-guard-mcp) for the published
+version; do not assume a GitHub release also published an npm package.
 
 The package builder uses only the four native release archives and their
 SHA-256 sidecars. It verifies every checksum, extracts only the expected

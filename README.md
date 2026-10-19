@@ -13,7 +13,7 @@ To package the skill for a directory listing, run `python3 scripts/package_skill
 
 - **23 implemented MCP tool contracts** with truthful, backend-aware availability in `model_info`
 - **Path reconnaissance signals** inspect raw, percent-encoded, and double-encoded spellings without rewriting the original request
-- **WebSocket and HTTP POST transports** with JSON-RPC 2.0 protocol
+- **WebSocket and HTTP POST transports** for implemented MCP methods; see the [current protocol limits](docs/inspector-interoperability.md#current-client-limits)
 - **Token-based authentication** (Bearer scheme) before HTTP POST body buffering and at WebSocket connection establishment
 - **Global concurrency control** with fail-fast tool rejection when capacity is full
 - **HTTP header and body read deadlines**, a whole-connection cap, and per-tool execution timeouts; deploy proxy read and connection timeouts as an additional boundary
@@ -92,14 +92,15 @@ tested results and current protocol limits.
 Each GitHub release includes a checksum-protected native bundle for Linux x64,
 Windows x64, macOS Intel, and macOS Apple Silicon. Download the archive for your
 platform and follow the bundled [INSTALL.md](INSTALL.md) for checksum verification,
-token setup, startup, and MCP client connection. A signed container
-image is also published to `ghcr.io/rhamenator/request-guard-mcp`. Package the
+token setup, startup, and MCP client connection. A container
+image is also published to `ghcr.io/rhamenator/request-guard-mcp`. For a
+long-running service deployment, use the container deployment examples. Package the
 companion skill locally with `python3 scripts/package_skill.py` if you need a
 directory listing ZIP; GitHub releases do not include that ZIP.
 
-An [npm installation package](docs/npm-release.md) is being prepared for the
-official release. It is separate from the GitHub container image and is not
-published yet.
+The [`request-guard-mcp` npm package](https://www.npmjs.com/package/request-guard-mcp)
+is a separate native installation option. See the [npm release guide](docs/npm-release.md)
+for supported platforms and version verification.
 
 ## Docker
 
