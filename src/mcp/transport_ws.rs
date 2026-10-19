@@ -2,12 +2,14 @@ use crate::error::AppError;
 use crate::mcp::protocol::{McpMessage, McpPayload};
 use crate::mcp::tool_registry::ToolRegistry;
 use crate::state::AppState;
-use axum::extract::ws::{Message, WebSocket};
+use axum::extract::ws::{CloseFrame, Message, WebSocket};
 use serde_json::Value;
+use std::error::Error as _;
 use std::sync::Arc;
 use std::time::Instant;
 use tokio::{sync::OwnedSemaphorePermit, time::timeout};
 use tracing::{error, info, warn, Instrument};
+use tungstenite::error::CapacityError;
 
 const UNKNOWN_TOOL_METRIC_LABEL: &str = "__unknown__";
 
@@ -73,6 +75,20 @@ pub async fn handle_ws_connection(
             }
             Ok(Some(Err(e))) => {
                 warn!(error = %e, "WebSocket error");
+                if matches!(
+                    e.source()
+                        .and_then(|source| source.downcast_ref::<tungstenite::Error>()),
+                    Some(tungstenite::Error::Capacity(
+                        CapacityError::MessageTooLong { .. }
+                    ))
+                ) {
+                    let _ = socket
+                        .send(Message::Close(Some(CloseFrame {
+                            code: 1009,
+                            reason: "Message too big".into(),
+                        })))
+                        .await;
+                }
                 break;
             }
             Ok(Some(Ok(Message::Pong(_)))) => {}

@@ -19,6 +19,7 @@ Send tool requests in a JSON-RPC `2.0` envelope with a string or numeric ID. Tre
 - Configuration snapshots are redacted. Do not request `redact_secrets:false`; the server rejects unredacted snapshots.
 - If a tool call returns `RATE_LIMIT_EXCEEDED`, treat it as temporary capacity pressure; retry later with bounded backoff rather than assuming the request is safe or sending a burst of retries.
 - Incomplete or slow HTTP requests can receive HTTP 408, and new sockets can be closed when the server's connection cap is full. Treat either as an availability signal, not an allow verdict.
+- On source builds with the WebSocket size-limit fix, close code 1009 means a frame or fragmented message exceeded the configured request limit. Published v0.1.1 may instead close that connection without a close frame.
 
 Record the returned request ID, verdict, confidence, and contributing signals. User-agent strings are self-declared, so a bot-name signal is a heuristic rather than proof of identity. TLS fingerprints supplied by an ordinary caller are unverified without the server's attestation path; never invent that provenance. The result supports a site owner's policy decision. A website must explicitly send requests to the classifier and enforce its own response; this skill cannot route live traffic or block a visitor by itself.
 Sensitive-path checks account for common percent encoding and backslash spellings, but a verdict does not replace the website's own URL normalization or authorization rules.

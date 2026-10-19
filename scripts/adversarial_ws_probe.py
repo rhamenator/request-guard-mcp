@@ -105,7 +105,7 @@ if args.max_request_bytes is not None:
                 close_code=None
                 op=None
                 closed_without_frame=True
-            check(name,op==8 or closed_without_frame,{'upgrade':status,'opcode':op,'close_code':close_code,'hard_close':closed_without_frame})
+            check(name,op==8 and close_code==1009 and not closed_without_frame,{'upgrade':status,'opcode':op,'close_code':close_code,'hard_close':closed_without_frame})
         else:
             check(name,False,{'upgrade':status})
         sock.close()
