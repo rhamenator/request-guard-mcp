@@ -47,6 +47,30 @@ async fn post_mcp_dispatches_json_rpc_request() {
 }
 
 #[tokio::test]
+async fn post_mcp_rejects_invalid_json_rpc_envelopes() {
+    let server = server(false);
+    for payload in [
+        json!({"jsonrpc": "1.0", "id": 1, "method": "ping"}),
+        json!({"id": 1, "method": "ping"}),
+        json!({"jsonrpc": "2.0", "id": true, "method": "ping"}),
+        json!({"jsonrpc": "2.0", "id": {}, "method": "ping"}),
+        json!({"jsonrpc": "2.0", "id": [], "method": "ping"}),
+        json!({"jsonrpc": "2.0", "id": 1}),
+        json!({"jsonrpc": "2.0", "id": 1, "method": 42}),
+        json!({"jsonrpc": "2.0", "id": 1, "method": "ping", "result": {}}),
+        json!({"jsonrpc": "2.0", "id": 1, "result": {}, "error": {}}),
+        json!([]),
+    ] {
+        let response = server.post("/mcp").json(&payload).await;
+        response.assert_status_ok();
+        let body: Value = response.json();
+        assert_eq!(body["error"]["code"], -32600, "payload: {payload}");
+        assert_eq!(body["id"], Value::Null);
+        assert!(body.get("result").is_none());
+    }
+}
+
+#[tokio::test]
 async fn post_mcp_enforces_same_auth_as_websocket_upgrade() {
     let response = server(true)
         .post("/mcp")

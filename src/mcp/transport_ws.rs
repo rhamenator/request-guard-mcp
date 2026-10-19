@@ -96,14 +96,40 @@ pub(crate) async fn process_message(
         return Some(serialize_message(&err));
     }
 
-    // Parse JSON-RPC message
-    let msg: McpMessage = match serde_json::from_str(text) {
-        Ok(m) => m,
+    // Distinguish malformed JSON from a valid JSON value with an invalid
+    // JSON-RPC envelope. Do this before deserializing the untagged payload.
+    let value: Value = match serde_json::from_str(text) {
+        Ok(value) => value,
         Err(e) => {
             warn!(error = %e, "failed to parse MCP message");
             let err = McpMessage::error(Value::Null, -32700, "Parse error");
             return Some(serialize_message(&err));
         }
+    };
+    let Some(envelope) = value.as_object() else {
+        return invalid_request(Value::Null);
+    };
+    if envelope.get("jsonrpc").and_then(Value::as_str) != Some("2.0") {
+        return invalid_request(Value::Null);
+    }
+    if let Some(id) = envelope.get("id") {
+        if !id.is_null() && !id.is_string() && !id.is_number() {
+            return invalid_request(Value::Null);
+        }
+    }
+    if let Some(method) = envelope.get("method") {
+        if !method.is_string() || envelope.contains_key("result") || envelope.contains_key("error")
+        {
+            return invalid_request(Value::Null);
+        }
+    } else if !envelope.contains_key("id")
+        || envelope.contains_key("result") == envelope.contains_key("error")
+    {
+        return invalid_request(Value::Null);
+    }
+    let msg: McpMessage = match serde_json::from_value(value) {
+        Ok(message) => message,
+        Err(_) => return invalid_request(Value::Null),
     };
 
     let McpPayload::Request(req) = msg.payload else {
@@ -310,6 +336,14 @@ fn serialize_message(message: &McpMessage) -> String {
         error!(%error, "failed to serialize MCP response");
         r#"{"jsonrpc":"2.0","id":null,"error":{"code":-500,"message":"INTERNAL_ERROR","data":null}}"#.to_string()
     })
+}
+
+fn invalid_request(id: Value) -> Option<String> {
+    Some(serialize_message(&McpMessage::error(
+        id,
+        -32600,
+        "Invalid Request",
+    )))
 }
 
 fn invalid_params(id: Value, message: &str) -> Option<String> {

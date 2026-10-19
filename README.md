@@ -32,6 +32,9 @@ WebSocket and HTTP POST JSON-RPC are the final supported MCP transports for
 this server. A gRPC listener is intentionally out of scope because the project
 does not define a separate protobuf service contract; the `grpc-tonic` feature
 in `opentelemetry-otlp` is used only to export telemetry to an OTLP collector.
+Use a JSON-RPC `2.0` envelope and a string or numeric request ID (or `null`).
+Source builds after v0.1.1 return `-32600` for invalid envelope shapes and
+`-32700` for malformed JSON. Client notifications receive no response.
 
 ## Quickstart
 
