@@ -1,12 +1,20 @@
+use crate::error::AppError;
 use crate::models::{request::ConfigSnapshotRequest, response::ConfigSnapshotResponse};
 use crate::state::AppState;
 use crate::util::time::now_rfc3339;
 
-pub async fn run(state: &AppState, req: ConfigSnapshotRequest) -> ConfigSnapshotResponse {
-    let redact = req.redact_secrets.unwrap_or(true);
+pub async fn run(
+    state: &AppState,
+    req: ConfigSnapshotRequest,
+) -> Result<ConfigSnapshotResponse, AppError> {
+    if req.redact_secrets == Some(false) {
+        return Err(AppError::InvalidRequest(
+            "unredacted configuration snapshots are not available through MCP".to_string(),
+        ));
+    }
     let cfg = &state.config;
 
-    let mut snapshot = serde_json::json!({
+    let snapshot = serde_json::json!({
         "host": cfg.host,
         "port": cfg.port,
         "log_level": cfg.log_level,
@@ -29,7 +37,7 @@ pub async fn run(state: &AppState, req: ConfigSnapshotRequest) -> ConfigSnapshot
         "telemetry": {
             "service_name": cfg.telemetry.service_name,
             "metrics_path": cfg.telemetry.metrics_path,
-            "otlp_endpoint": if redact { serde_json::Value::String("[REDACTED]".to_string()) } else { serde_json::json!(cfg.telemetry.otlp_endpoint) },
+            "otlp_endpoint": if cfg.telemetry.otlp_endpoint.is_some() { serde_json::Value::String("[REDACTED]".to_string()) } else { serde_json::Value::Null },
         },
         "redis": {
             "configured": cfg.redis.url.is_some(),
@@ -57,16 +65,36 @@ pub async fn run(state: &AppState, req: ConfigSnapshotRequest) -> ConfigSnapshot
         },
     });
 
-    if redact {
-        if let Some(obj) = snapshot.as_object_mut() {
-            if let Some(auth) = obj.get_mut("auth").and_then(|v| v.as_object_mut()) {
-                auth.remove("tokens");
-            }
-        }
-    }
-
-    ConfigSnapshotResponse {
+    Ok(ConfigSnapshotResponse {
         snapshot,
         generated_at: now_rfc3339(),
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::Config;
+
+    #[tokio::test]
+    async fn mcp_snapshot_never_exposes_otlp_credentials() {
+        let mut config = Config::default();
+        config.telemetry.otlp_endpoint = Some("http://user:secret@collector:4317".into());
+        let state = AppState::new(config);
+        let request = ConfigSnapshotRequest {
+            redact_secrets: Some(true),
+        };
+        let response = run(&state, request).await.unwrap();
+        let rendered = response.snapshot.to_string();
+        assert!(!rendered.contains("secret"));
+        assert!(!rendered.contains("collector"));
+        assert_eq!(
+            response.snapshot["telemetry"]["otlp_endpoint"],
+            "[REDACTED]"
+        );
+        let unredacted = ConfigSnapshotRequest {
+            redact_secrets: Some(false),
+        };
+        assert!(run(&state, unredacted).await.is_err());
     }
 }
