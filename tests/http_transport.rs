@@ -11,6 +11,11 @@ use request_guard_mcp::mcp::{
 use request_guard_mcp::state::AppState;
 use serde_json::{json, Value};
 use std::sync::Arc;
+use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt},
+    net::TcpStream,
+    time::{timeout, Duration},
+};
 
 fn server(auth_enabled: bool) -> TestServer {
     let mut config = Config::default();
@@ -59,6 +64,47 @@ async fn post_mcp_enforces_same_auth_as_websocket_upgrade() {
         .json(&json!({"jsonrpc": "2.0", "id": 2, "method": "health"}))
         .await;
     authorized.assert_status_ok();
+}
+
+#[tokio::test]
+async fn unauthenticated_post_is_rejected_before_body_arrives() {
+    let mut config = Config::default();
+    config.auth.enabled = true;
+    config.auth.tokens = vec!["http-test-token".to_string()];
+    let max_body = config.limits.max_request_bytes;
+    let state = ServerState {
+        app: Arc::new(AppState::new(config)),
+        registry: Arc::new(build_registry()),
+    };
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let server_task = tokio::spawn(async move {
+        axum::serve(listener, build_router(state, max_body))
+            .await
+            .unwrap();
+    });
+    let mut stream = TcpStream::connect(address).await.unwrap();
+    stream
+        .write_all(b"POST /mcp HTTP/1.1\r\nHost: localhost\r\nContent-Length: 1000000\r\n\r\nx")
+        .await
+        .unwrap();
+    let status_line = timeout(Duration::from_secs(5), async {
+        let mut line = Vec::new();
+        while !line.ends_with(b"\r\n") {
+            assert!(line.len() < 256, "HTTP status line is too long");
+            let mut byte = [0_u8; 1];
+            let read = stream.read(&mut byte).await.unwrap();
+            assert_ne!(read, 0, "connection closed before HTTP status line");
+            line.push(byte[0]);
+        }
+        line
+    })
+    .await
+    .expect("authentication must not wait for the incomplete body");
+    assert!(std::str::from_utf8(&status_line)
+        .unwrap()
+        .starts_with("HTTP/1.1 401 "));
+    server_task.abort();
 }
 
 #[tokio::test]

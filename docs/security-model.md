@@ -64,6 +64,9 @@ All WebSocket connections are authenticated at connection establishment using a 
   `RATE_LIMIT_EXCEEDED` error without waiting for a permit. This limit applies
   after HTTP body receipt and authentication; it is not a connection limit.
 - Per-tool timeouts (configurable per tool) prevent long-running requests from holding permits.
+- Unknown tool names are rejected before Redis operation bookkeeping and use a
+  single `__unknown__` metrics label. Arbitrary caller-chosen names do not
+  create unbounded Prometheus series or Redis queue keys.
 
 ## Audit Logging
 

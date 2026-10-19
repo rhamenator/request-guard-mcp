@@ -3,7 +3,8 @@ use crate::mcp::transport_ws::{handle_ws_connection, process_message};
 use crate::state::AppState;
 use crate::telemetry::gather_metrics;
 use axum::{
-    extract::{ws::WebSocketUpgrade, State},
+    body::to_bytes,
+    extract::{ws::WebSocketUpgrade, Request, State},
     http::{header::X_CONTENT_TYPE_OPTIONS, HeaderMap, HeaderValue, StatusCode},
     middleware::map_response,
     response::{IntoResponse, Response},
@@ -74,14 +75,21 @@ async fn ws_handler(
     })
 }
 
-async fn http_mcp_handler(
-    headers: HeaderMap,
-    State(state): State<ServerState>,
-    body: axum::body::Bytes,
-) -> Response {
-    let caller_scope = match authorize(&headers, &state.app) {
+async fn http_mcp_handler(State(state): State<ServerState>, request: Request) -> Response {
+    let caller_scope = match authorize(request.headers(), &state.app) {
         Ok(scope) => scope,
         Err(error) => return error_response(&error),
+    };
+    let body = match to_bytes(
+        request.into_body(),
+        state.app.config.limits.max_request_bytes,
+    )
+    .await
+    {
+        Ok(body) => body,
+        Err(_) => {
+            return (StatusCode::PAYLOAD_TOO_LARGE, "Request body exceeds limit").into_response()
+        }
     };
     let Ok(text) = std::str::from_utf8(&body) else {
         return (
