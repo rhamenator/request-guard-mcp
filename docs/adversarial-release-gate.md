@@ -37,6 +37,12 @@ error, then verifies `classify` still succeeds on the same server. This proves
 one optional-backend failure path and core-tool recovery; it does not prove
 recovery from a live Redis or PostgreSQL outage. See
 `adversarial-evidence-backend-2026-10-19.md`.
+The CI wrapper also starts an isolated debug-log server, sends a rejected
+synthetic bearer token and an authenticated `classify` call containing a
+synthetic request marker, then confirms expected log events occurred without
+either value appearing in a bounded capture. This checks direct log leakage
+for those calls, not every tool, proxy, collector, or encoding. See
+`adversarial-evidence-logs-2026-10-19.md`.
 
 The stdlib-only `scripts/adversarial_probe.py` is a first HTTP smoke subset. Start a lab server with a temporary token of at least 32 characters, then run:
 
