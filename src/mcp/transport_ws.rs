@@ -170,8 +170,9 @@ pub(crate) async fn process_message(
         )
     };
 
-    // Acquire global concurrency semaphore
-    let _permit = match state.semaphore.acquire().await {
+    // Shed excess work instead of leaving an unbounded queue of callers holding
+    // request bodies and connections while all tool permits are occupied.
+    let _permit = match state.semaphore.try_acquire() {
         Ok(p) => p,
         Err(_) => {
             let err = McpMessage::error(id, -429, AppError::RateLimitExceeded.code());
@@ -387,6 +388,33 @@ mod tests {
                 .await
                 .is_none()
         );
+    }
+
+    #[tokio::test]
+    async fn saturated_tool_capacity_rejects_without_waiting() {
+        let mut config = Config::default();
+        config.limits.global_concurrency = 1;
+        let state = Arc::new(AppState::new(config));
+        let registry = Arc::new(build_registry());
+        let held = state.semaphore.acquire().await.unwrap();
+        let request = r#"{"jsonrpc":"2.0","id":42,"method":"tools/call","params":{"name":"classify","arguments":{"user_agent":"GPTBot/1.0"}}}"#;
+
+        let response = tokio::time::timeout(
+            std::time::Duration::from_millis(100),
+            process_message(request, &state, &registry, "test-caller"),
+        )
+        .await
+        .expect("saturated capacity must not queue")
+        .expect("error response");
+        let response: Value = serde_json::from_str(&response).unwrap();
+        assert_eq!(response["error"]["code"], -429);
+
+        drop(held);
+        let response = process_message(request, &state, &registry, "test-caller")
+            .await
+            .expect("capacity recovered");
+        let response: Value = serde_json::from_str(&response).unwrap();
+        assert!(response.get("result").is_some());
     }
 
     #[test]
