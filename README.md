@@ -2,8 +2,11 @@
 
 [![CI](https://github.com/rhamenator/request-guard-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/rhamenator/request-guard-mcp/actions/workflows/ci.yml)
 [![License: GPL v3+](https://img.shields.io/badge/License-GPLv3%2B-blue.svg)](LICENSE)
+[![npm version](https://img.shields.io/npm/v/request-guard-mcp.svg)](https://www.npmjs.com/package/request-guard-mcp)
 
 A **Rust MCP (Model Context Protocol) server** for request risk classification, enrichment, and abuse-signal analysis. The official MCP Inspector can call its tools over HTTP POST; custom WebSocket clients can use the JSON-RPC endpoint. Client support depends on transport and authentication compatibility. The `ai-scraping-defense` projects are optional clients. Stable release readiness is subject to the [adversarial release gate](docs/adversarial-release-gate.md).
+
+Install the experimental [npm release](https://www.npmjs.com/package/request-guard-mcp/v/0.1.1) with `npm install -g request-guard-mcp@0.1.1`, configure `AUTH_TOKENS`, then run `request-guard-mcp`. The package includes native binaries for Linux x64 (glibc), Windows x64, macOS Intel, and macOS Apple Silicon. See [INSTALL.md](INSTALL.md) for authentication and MCP client setup.
 
 The [companion skill](skills/request-guard-mcp/SKILL.md) tells a connected agent when and how to use this server’s classification tools. It does not deploy or replace the separate AI Scraping Defense products.
 
@@ -106,8 +109,9 @@ companion skill locally with `python3 scripts/package_skill.py` if you need a
 directory listing ZIP; GitHub releases do not include that ZIP.
 
 The [`request-guard-mcp` npm package](https://www.npmjs.com/package/request-guard-mcp)
-is a separate native installation option. See the [npm release guide](docs/npm-release.md)
-for supported platforms and version verification.
+is a separate native installation option. A fresh registry install of 0.1.1
+passed official MCP Inspector initialization, tool listing, `classify`, and
+`explain`. See the [npm release guide](docs/npm-release.md) for package details.
 
 ## Docker
 
