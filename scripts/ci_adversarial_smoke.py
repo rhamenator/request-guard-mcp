@@ -161,6 +161,14 @@ def main():
                 process.kill()
                 process.wait(timeout=5)
 
+        subprocess.run(
+            [sys.executable, str(ROOT / "scripts/adversarial_log_probe.py"),
+             "--binary", str(binary)],
+            env=environment,
+            check=True,
+            timeout=30,
+        )
+
         cap_port = unused_loopback_port()
         cap_environment = environment.copy()
         cap_environment.update({
