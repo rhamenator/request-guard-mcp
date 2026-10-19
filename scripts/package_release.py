@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import re
 import shutil
 import tarfile
 import zipfile
@@ -26,6 +27,8 @@ def main() -> None:
     parser.add_argument("--platform", required=True)
     parser.add_argument("--suffix", default="")
     args = parser.parse_args()
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9.+_-]*", args.version):
+        parser.error("version must be a single safe filename component")
 
     prefix = f"request-guard-mcp-{args.version}-{args.platform}"
     artifacts = Path("artifacts")
@@ -53,7 +56,8 @@ def main() -> None:
             output.add(stage, arcname=prefix)
 
     checksum = archive.with_name(f"{archive.name}.sha256")
-    checksum.write_text(f"{sha256(archive)} *{archive.name}\n", encoding="ascii")
+    with checksum.open("w", encoding="ascii", newline="\n") as output:
+        output.write(f"{sha256(archive)} *{archive.name}\n")
 
 
 if __name__ == "__main__":

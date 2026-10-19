@@ -2,8 +2,9 @@
 
 ## MCP Client Configuration
 
-Any MCP-capable client can connect to this server over WebSocket or HTTP
-JSON-RPC. The server implements the standard `initialize`, `ping`,
+Clients with compatible HTTP POST JSON-RPC behavior can connect to `/mcp`.
+Custom WebSocket clients can also use that path with bearer authentication.
+The server implements the standard `initialize`, `ping`,
 `tools/list`, and `tools/call` methods while retaining direct tool-method
 compatibility. Clients that use `MODEL_URI` routing can use the following
 environment variables:
@@ -11,8 +12,10 @@ environment variables:
 The current handshake revision is `2025-06-18`. If a client offers another
 revision, `initialize` counter-offers `2025-06-18`; the client must decide
 whether it supports that revision. The server does not yet implement the
-`2026-07-28` discovery lifecycle. Full transport and client conformance remain
-part of the adversarial release gate.
+`2026-07-28` discovery lifecycle. It does not expose stdio, OAuth discovery,
+SSE GET streams, resources, or prompts. HTTP support has been smoke tested with
+MCP Inspector 2.5.0, but full transport and client conformance remain part of
+the adversarial release gate. See [the client evidence](inspector-interoperability.md).
 
 ### `rhamenator/ai-scraping-defense` (Python/Django)
 
@@ -66,9 +69,9 @@ Fallback is triggered when:
 
 | Version | Transport | Supported |
 |---------|-----------|-----------|
-| MCP 1.0 | WebSocket (JSON-RPC 2.0) | ✅ |
-| MCP 1.0 | HTTP POST (JSON-RPC 2.0) | ✅ |
-| MCP 1.0 | gRPC | ❌ (out of scope; no project-specific gRPC contract is defined) |
+| 2025-06-18 | WebSocket JSON-RPC (custom client transport) | Implemented; client interoperability gate open |
+| 2025-06-18 | HTTP POST JSON-RPC | Inspector 2.5.0 smoke passed; full conformance gate open |
+| 2025-06-18 | stdio, SSE GET, gRPC | Not implemented |
 
 ## Tool Availability by Feature Flag
 

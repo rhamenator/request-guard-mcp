@@ -3,7 +3,7 @@
 [![CI](https://github.com/rhamenator/request-guard-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/rhamenator/request-guard-mcp/actions/workflows/ci.yml)
 [![License: GPL v3+](https://img.shields.io/badge/License-GPLv3%2B-blue.svg)](LICENSE)
 
-A **Rust MCP (Model Context Protocol) server** for request risk classification, enrichment, and abuse-signal analysis. It can be used by MCP-capable clients over WebSocket or HTTP JSON-RPC; the `ai-scraping-defense` projects are supported clients, not required dependencies. Stable release readiness is subject to the [adversarial release gate](docs/adversarial-release-gate.md).
+A **Rust MCP (Model Context Protocol) server** for request risk classification, enrichment, and abuse-signal analysis. The official MCP Inspector can call its tools over HTTP POST; custom WebSocket clients can use the JSON-RPC endpoint. Client support depends on transport and authentication compatibility. The `ai-scraping-defense` projects are optional clients. Stable release readiness is subject to the [adversarial release gate](docs/adversarial-release-gate.md).
 
 The [companion skill](skills/request-guard-mcp/SKILL.md) tells a connected agent when and how to use this server’s classification tools. It does not deploy or replace the separate AI Scraping Defense products.
 
@@ -77,13 +77,24 @@ For clients already configured with the previous `ai-scraping-defense-mcp` hostn
 See [docs/compatibility-matrix.md](docs/compatibility-matrix.md) for full details.
 Trusted TLS producers must also follow [the attestation contract](docs/tls-fingerprint-attestation.md).
 
+For a clean client check against an installed binary, run
+`python3 scripts/inspector_smoke.py /path/to/request-guard-mcp`. It starts a
+loopback instance with a temporary bearer token and uses pinned official MCP
+Inspector 2.5.0 for `initialize`, `tools/list`, and `tools/call` (`classify` and
+`explain`). Node.js 22.19.0 or newer, npm, and access to that Inspector package
+are required.
+See [the interoperability evidence](docs/inspector-interoperability.md) for
+tested results and current protocol limits.
+
 ## Ready-to-run releases
 
 Each GitHub release includes a checksum-protected native bundle for Linux x64,
 Windows x64, macOS Intel, and macOS Apple Silicon. Download the archive for your
 platform, extract it, copy `.env.example` to `.env`, set `AUTH_TOKENS`, and run
 `request-guard-mcp` (or `request-guard-mcp.exe` on Windows). A signed container
-image is also published to `ghcr.io/rhamenator/request-guard-mcp`.
+image is also published to `ghcr.io/rhamenator/request-guard-mcp`. Releases from
+v0.1.1-rc.1 also include a separate companion skill ZIP for agent instructions;
+it contains no server binary and does not configure authentication for you.
 
 ## Docker
 
