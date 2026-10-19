@@ -16,12 +16,18 @@ ARCHIVE_NAME = "request-guard-mcp/SKILL.md"
 
 def validate_skill(data: bytes) -> None:
     text = data.decode("utf-8")
-    if not text.startswith("---\n"):
+    lines = text.splitlines()
+    if not lines or lines[0] != "---":
         raise ValueError("SKILL.md must start with YAML frontmatter")
-    _, frontmatter, body = text.split("---", 2)
+    try:
+        closing = lines.index("---", 1)
+    except ValueError as error:
+        raise ValueError("SKILL.md needs a standalone closing frontmatter delimiter") from error
+    frontmatter = lines[1:closing]
+    body = "\n".join(lines[closing + 1 :])
     fields = dict(
         match.groups()
-        for line in frontmatter.splitlines()
+        for line in frontmatter
         if (match := re.fullmatch(r"(name|description):\s*(.+)", line))
     )
     if fields.get("name") != "request-guard-mcp":
@@ -44,6 +50,7 @@ def main() -> None:
     validate_skill(data)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     entry = ZipInfo(ARCHIVE_NAME, (1980, 1, 1, 0, 0, 0))
+    entry.create_system = 3
     entry.compress_type = ZIP_DEFLATED
     entry.external_attr = 0o644 << 16
     with ZipFile(args.output, "w") as archive:
