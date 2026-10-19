@@ -10,9 +10,9 @@ this small run; all VMs remained off.
 
 Command: `python3 scripts/ci_adversarial_smoke.py --binary
 <locally-built-request-guard-mcp>`. The cap probe opened two partial-header
-sockets, observed that a third socket was closed promptly, released both
+sockets, verified both remained pending, observed that a third socket was closed promptly, released both
 held sockets, then received a successful authenticated `ping` on a new
-connection. It passed 2/2. The same wrapper passed HTTP 10/10, WebSocket
+connection. It passed 3/3. The same wrapper passed HTTP 10/10, WebSocket
 11/11, classifier 8/8, and slow-client 4/4. The wrapper stops both server
 processes after its probes.
 

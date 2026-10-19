@@ -36,14 +36,30 @@ def main():
             held.append(connection)
         # A partial HTTP header keeps each permit occupied until its read deadline.
         time.sleep(0.2)
-        with socket.create_connection((args.host, args.port), timeout=3) as excess:
-            excess.settimeout(3)
+        both_held = True
+        for connection in held:
+            connection.settimeout(0.2)
             try:
-                rejected = excess.recv(1) == b""
-            except ConnectionResetError:
-                rejected = True
-        results.append(check("connection_cap_sheds_third", rejected, "closed" if rejected else "open"))
+                connection.recv(1, socket.MSG_PEEK)
+                both_held = False
+            except socket.timeout:
+                pass
+            except OSError:
+                both_held = False
+        results.append(check("connection_cap_holds_two", both_held, "pending" if both_held else "closed_or_replied"))
+        if both_held:
+            with socket.create_connection((args.host, args.port), timeout=3) as excess:
+                excess.settimeout(3)
+                try:
+                    rejected = excess.recv(1) == b""
+                except ConnectionResetError:
+                    rejected = True
+            results.append(check("connection_cap_sheds_third", rejected, "closed" if rejected else "open"))
+        else:
+            results.append(check("connection_cap_sheds_third", False, "slots_not_held"))
     except OSError as error:
+        if len(results) == 0:
+            results.append(check("connection_cap_holds_two", False, type(error).__name__))
         results.append(check("connection_cap_sheds_third", False, type(error).__name__))
     finally:
         for connection in held:

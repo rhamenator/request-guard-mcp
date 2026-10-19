@@ -26,8 +26,8 @@ connection afterward. The server must send WebSocket close code 1009 for
 oversized frames and completed fragmented messages; a hard TCP close fails
 the probe. See `adversarial-evidence-ws-close-2026-10-19.md` for the fix.
 CI also starts a second loopback server with `MAX_CONNECTIONS=2` and a
-ten-second header deadline. It holds two incomplete-header connections,
-checks that a third connection is shed, releases the held connections, and
+ten-second header deadline. It verifies two incomplete-header connections
+remain pending, checks that a third connection is shed, releases the held connections, and
 checks that an authenticated `ping` succeeds. This bounded probe does not
 establish sustained exhaustion resistance; see
 `adversarial-evidence-connection-cap-2026-10-19.md`.
