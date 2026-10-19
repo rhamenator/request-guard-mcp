@@ -11,6 +11,19 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
+  npm-package:
+    name: npm Package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22.20.0"
+      - run: node --check npm/bin/request-guard-mcp.js
+      - run: python3 scripts/test_package_npm.py
+
   fmt:
     name: Formatting
     runs-on: ubuntu-latest

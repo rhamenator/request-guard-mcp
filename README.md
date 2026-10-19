@@ -96,6 +96,10 @@ image is also published to `ghcr.io/rhamenator/request-guard-mcp`. Package the
 companion skill locally with `python3 scripts/package_skill.py` if you need a
 directory listing ZIP; GitHub releases do not include that ZIP.
 
+An [npm installation package](docs/npm-release.md) is being prepared for the
+official release. It is separate from the GitHub container image and is not
+published yet.
+
 ## Docker
 
 ```bash
