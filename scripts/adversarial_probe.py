@@ -4,6 +4,7 @@
 import argparse
 import http.client
 import json
+import sys
 import urllib.parse
 import urllib.error
 import urllib.request
@@ -60,7 +61,7 @@ def oversized_request(base, token, max_request_bytes):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--url", default="http://127.0.0.1:8085")
-    parser.add_argument("--token", required=True, help="lab-only bearer token")
+    parser.add_argument("--token", help="lab-only bearer token; omit to read one line from stdin")
     parser.add_argument(
         "--max-request-bytes",
         type=int,
@@ -68,6 +69,10 @@ def main():
         help="configured server request-body limit (default: 1048576)",
     )
     args = parser.parse_args()
+    if args.token is None:
+        args.token = sys.stdin.readline().strip()
+    if len(args.token) < 32:
+        parser.error("provide a lab bearer token of at least 32 characters")
     if args.max_request_bytes < 1:
         parser.error("--max-request-bytes must be positive")
     results = []
