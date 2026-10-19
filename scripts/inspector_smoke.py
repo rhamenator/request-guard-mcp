@@ -45,11 +45,23 @@ def free_loopback_port() -> int:
         return listener.getsockname()[1]
 
 
-def inspector(url: str, token: str, method: str, *args: str) -> dict:
-    npx = shutil.which("npx.cmd" if os.name == "nt" else "npx")
-    require(npx is not None, "npm npx executable was not found")
+def install_inspector(directory: str) -> Path:
+    npm = shutil.which("npm.cmd" if os.name == "nt" else "npm")
+    require(npm is not None, "npm executable was not found")
+    command = [npm, "install", "--prefix", directory, "--ignore-scripts",
+               "--no-audit", "--no-fund", "--no-package-lock", INSPECTOR]
+    completed = subprocess.run(command, capture_output=True, text=True, timeout=180)
+    if completed.returncode:
+        raise RuntimeError(f"Inspector install failed: {completed.stderr[-1000:]}")
+    launcher = (Path(directory) / "node_modules" / "@modelcontextprotocol" /
+                "inspector" / "clients" / "launcher" / "build" / "index.js")
+    require(launcher.is_file(), "installed Inspector CLI entrypoint was not found")
+    return launcher
+
+
+def inspector(launcher: Path, url: str, token: str, method: str, *args: str) -> dict:
     command = [
-        npx, "--yes", INSPECTOR, "--cli", "--transport", "http",
+        "node", str(launcher), "--cli", "--transport", "http",
         "--server-url", url, "--header", f"Authorization: Bearer {token}",
         "--method", method, "--format", "json", *args,
     ]
@@ -104,27 +116,29 @@ def main() -> None:
             raise RuntimeError("missing bearer token was accepted")
         print("PASS authentication: missing token rejected")
 
-        initialized = inspector(url, token, "initialize")
+        launcher = install_inspector(clean_cwd.name)
+
+        initialized = inspector(launcher, url, token, "initialize")
         require(initialized.get("protocolVersion") == "2025-06-18",
                 "initialize returned an unexpected protocol version")
         require(initialized.get("capabilities", {}).get("tools", {}).get("listChanged") is False,
                 "initialize did not advertise the expected tools capability")
         print("PASS initialize: 2025-06-18, tools capability")
 
-        listed = inspector(url, token, "tools/list")
+        listed = inspector(launcher, url, token, "tools/list")
         names = {tool["name"] for tool in listed["tools"]}
         require({"classify", "explain"} <= names, "tools/list omitted core tools")
         print(f"PASS tools/list: {len(names)} contracts, classify and explain present")
 
         observed = {"ip": "192.0.2.1", "user_agent": "GPTBot/1.0", "path": "/"}
-        classified = inspector(url, token, "tools/call", "--tool-name", "classify",
+        classified = inspector(launcher, url, token, "tools/call", "--tool-name", "classify",
                                "--tool-args-json", json.dumps(observed))
         require(classified.get("isError") is False, "classify returned an error")
         require(classified.get("structuredContent", {}).get("verdict") in
                 {"allow", "challenge", "block"}, "classify omitted a structured verdict")
         print("PASS tools/call classify: structured verdict")
 
-        explained = inspector(url, token, "tools/call", "--tool-name", "explain",
+        explained = inspector(launcher, url, token, "tools/call", "--tool-name", "explain",
                               "--tool-args-json", json.dumps({"classification": observed}))
         require(explained.get("isError") is False, "explain returned an error")
         require(bool(explained.get("structuredContent", {}).get("factors")),
