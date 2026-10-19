@@ -211,7 +211,8 @@ async fn serve_listener(
     loop {
         let (stream, peer) = listener.accept().await?;
         let Ok(permit) = Arc::clone(&connection_limit).try_acquire_owned() else {
-            tracing::warn!(%peer, "HTTP connection limit reached");
+            // This path is attacker-reachable; per-rejection logs would turn
+            // connection shedding into unbounded log growth.
             drop(stream);
             continue;
         };
