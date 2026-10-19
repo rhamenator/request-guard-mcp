@@ -126,6 +126,19 @@ def main():
             subprocess.run(
                 [
                     sys.executable,
+                    str(ROOT / "scripts/adversarial_envelope_fuzz_probe.py"),
+                    "--url", f"http://127.0.0.1:{port}",
+                    "--cases", "128",
+                ],
+                input=token + "\n",
+                text=True,
+                env=environment,
+                check=True,
+                timeout=30,
+            )
+            subprocess.run(
+                [
+                    sys.executable,
                     str(ROOT / "scripts/adversarial_backend_probe.py"),
                     "--url",
                     f"http://127.0.0.1:{port}",
@@ -190,6 +203,19 @@ def main():
                     sys.executable,
                     str(ROOT / "scripts/adversarial_connection_cap_probe.py"),
                     "--host", "127.0.0.1", "--port", str(cap_port),
+                ],
+                input=token + "\n",
+                text=True,
+                env=cap_environment,
+                check=True,
+                timeout=20,
+            )
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts/adversarial_connection_burst_probe.py"),
+                    "--host", "127.0.0.1", "--port", str(cap_port),
+                    "--attempts", "128",
                 ],
                 input=token + "\n",
                 text=True,
