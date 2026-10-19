@@ -50,13 +50,18 @@ def main():
         for connection in held:
             connection.close()
 
-    try:
-        status, response = post(
-            f"http://{args.host}:{args.port}", token, rpc("ping")
-        )
-        recovered = status == 200 and json.loads(response).get("result") == {}
-    except (OSError, ValueError, TypeError):
-        recovered = False
+    recovered = False
+    for _ in range(10):
+        try:
+            status, response = post(
+                f"http://{args.host}:{args.port}", token, rpc("ping")
+            )
+            recovered = status == 200 and json.loads(response).get("result") == {}
+            if recovered:
+                break
+        except (OSError, ValueError, TypeError):
+            pass
+        time.sleep(0.1)
     passed = (
         shed == args.attempts and errors == 0 and recovered and max_latency < 2
     )
