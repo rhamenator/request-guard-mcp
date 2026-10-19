@@ -9,6 +9,8 @@ It does not clear the full adversarial release gate.
 
 - Server: `copperfin-ubuntu26-deb`, `192.168.122.73:18086`. Client:
   `copperfin-kali-full`, `192.168.122.74`. Both guests ran simultaneously.
+  Ubuntu used Python 3.14.4; Kali used Python 3.14.7. The current-main
+  release-profile binary was built with rustc 1.96.0.
 - Auth: fresh synthetic 64-character bearer token, supplied through a private
   temporary file and stdin; no real credential was used or recorded.
 - Configuration: `MCP__HOST=192.168.122.73`, `MCP__PORT=18086`,
