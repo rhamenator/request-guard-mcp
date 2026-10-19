@@ -32,7 +32,10 @@ def connect(token=None):
     if token is not None: headers.append('Authorization: Bearer '+token)
     sock.sendall(('\r\n'.join(headers)+'\r\n\r\n').encode())
     raw=b''
-    while b'\r\n\r\n' not in raw: raw+=sock.recv(4096)
+    while b'\r\n\r\n' not in raw:
+        chunk=sock.recv(4096)
+        if not chunk: raise ConnectionError('peer closed during WebSocket handshake')
+        raw+=chunk
     return sock,int(raw.split(b' ',2)[1])
 def send_text(sock,content):
     payload=content.encode()
