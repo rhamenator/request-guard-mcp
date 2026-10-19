@@ -31,6 +31,12 @@ remain pending, checks that a third connection is shed, releases the held connec
 checks that an authenticated `ping` succeeds. This bounded probe does not
 establish sustained exhaustion resistance; see
 `adversarial-evidence-connection-cap-2026-10-19.md`.
+The CI fixture also leaves Redis unconfigured, calls `threat_lookup` through
+standard MCP `tools/call`, checks its deterministic `INTEGRATION_UNAVAILABLE`
+error, then verifies `classify` still succeeds on the same server. This proves
+one optional-backend failure path and core-tool recovery; it does not prove
+recovery from a live Redis or PostgreSQL outage. See
+`adversarial-evidence-backend-2026-10-19.md`.
 
 The stdlib-only `scripts/adversarial_probe.py` is a first HTTP smoke subset. Start a lab server with a temporary token of at least 32 characters, then run:
 
