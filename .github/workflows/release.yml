@@ -81,8 +81,13 @@ jobs:
         run: |
           python scripts/package_skill.py \
             --output "artifacts/request-guard-mcp-skill-${RELEASE_VERSION}.zip"
-          sha256sum "artifacts/request-guard-mcp-skill-${RELEASE_VERSION}.zip" \
-            > "artifacts/request-guard-mcp-skill-${RELEASE_VERSION}.zip.sha256"
+          (cd artifacts && sha256sum "request-guard-mcp-skill-${RELEASE_VERSION}.zip" \
+            > "request-guard-mcp-skill-${RELEASE_VERSION}.zip.sha256")
+      - name: Verify archive checksums
+        shell: bash
+        run: |
+          cd artifacts
+          sha256sum -c *.sha256
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: request-guard-mcp-${{ matrix.platform }}
