@@ -14,8 +14,8 @@ To package the skill for a directory listing, run `python3 scripts/package_skill
 - **23 implemented MCP tool contracts** with truthful, backend-aware availability in `model_info`
 - **WebSocket and HTTP POST transports** with JSON-RPC 2.0 protocol
 - **Token-based authentication** (Bearer scheme) at connection establishment
-- **Global concurrency control** via semaphore with backpressure
-- **Per-tool timeouts** to prevent resource exhaustion
+- **Global concurrency control** with fail-fast tool rejection when capacity is full
+- **Per-tool execution timeouts** after dispatch; deploy proxy read and connection timeouts
 - **Prometheus metrics** at `/metrics` with p50/p95/p99 histograms
 - **Two-level classification cache** (in-process Moka + shared Redis)
 - **Structured JSON logging** via `tracing`
