@@ -2,12 +2,18 @@ name: Release
 
 on:
   workflow_dispatch:
+    inputs:
+      candidate_version:
+        description: Version label for a private candidate artifact (no GitHub release)
+        required: true
+        type: string
   push:
     tags:
       - "v*.*.*"
 
 env:
   CARGO_TERM_COLOR: always
+  RELEASE_VERSION: ${{ inputs.candidate_version || github.ref_name }}
 
 jobs:
   build-release:
@@ -50,7 +56,7 @@ jobs:
         shell: bash
         run: |
           python scripts/package_release.py \
-            --version "${GITHUB_REF_NAME}" \
+            --version "${RELEASE_VERSION}" \
             --target "${{ matrix.target }}" \
             --platform "${{ matrix.platform }}" \
             --suffix "${{ matrix.suffix }}"
@@ -61,6 +67,11 @@ jobs:
             --artifacts artifacts \
             --binary "request-guard-mcp${{ matrix.suffix }}" \
             --port 18766
+      - name: Verify standard MCP calls with official Inspector
+        shell: bash
+        run: |
+          python scripts/inspector_smoke.py \
+            "artifacts/request-guard-mcp-${RELEASE_VERSION}-${{ matrix.platform }}/request-guard-mcp${{ matrix.suffix }}"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: request-guard-mcp-${{ matrix.platform }}
