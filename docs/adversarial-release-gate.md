@@ -6,7 +6,12 @@ At minimum, exercise authentication boundaries, malformed JSON-RPC and MCP frame
 
 The HTTP transport regression suite checks that valid JSON with an invalid JSON-RPC
 version, ID type, or envelope receives `-32600` with a null ID; malformed JSON
-receives `-32700`. These checks cover HTTP only and do not complete this gate.
+receives `-32700`. CI also runs `scripts/ci_adversarial_smoke.py` against its
+freshly built server on loopback. It records the binary SHA-256 and runs bounded
+HTTP and WebSocket probes with a temporary synthetic token. The probes cover
+authentication boundaries, malformed JSON, invalid envelopes, invalid tool
+parameters, prompt-injection text as request data, and declared oversized
+HTTP bodies. These checks do not complete this gate.
 
 The stdlib-only `scripts/adversarial_probe.py` is a first HTTP smoke subset. Start a lab server with a temporary token of at least 32 characters, then run:
 

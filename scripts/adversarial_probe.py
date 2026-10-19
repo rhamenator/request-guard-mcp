@@ -93,6 +93,19 @@ def main():
         code = None
     results.append(check("malformed_json", code == -32700, {"http": status, "rpc": code}))
 
+    for name, envelope in (
+        ("wrong_jsonrpc_version", {"jsonrpc": "1.0", "id": 1, "method": "ping"}),
+        ("invalid_request_id", {"jsonrpc": "2.0", "id": {}, "method": "ping"}),
+        ("scalar_params", {"jsonrpc": "2.0", "id": 1, "method": "ping", "params": 42}),
+    ):
+        status, body = post(args.url, args.token, json.dumps(envelope).encode())
+        try:
+            value = json.loads(body)
+            passed = status == 200 and value["error"]["code"] == -32600 and value["id"] is None
+        except (ValueError, KeyError, TypeError):
+            passed = False
+        results.append(check(name, passed, status))
+
     status, body = post(args.url, args.token, rpc("classify", {"user_agent": 42}))
     try:
         value = json.loads(body)
