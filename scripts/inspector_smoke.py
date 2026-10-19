@@ -13,6 +13,7 @@ import json
 import os
 import re
 import secrets
+import shutil
 import socket
 import subprocess
 import tempfile
@@ -45,8 +46,10 @@ def free_loopback_port() -> int:
 
 
 def inspector(url: str, token: str, method: str, *args: str) -> dict:
+    npx = shutil.which("npx.cmd" if os.name == "nt" else "npx")
+    require(npx is not None, "npm npx executable was not found")
     command = [
-        "npx", "--yes", INSPECTOR, "--cli", "--transport", "http",
+        npx, "--yes", INSPECTOR, "--cli", "--transport", "http",
         "--server-url", url, "--header", f"Authorization: Bearer {token}",
         "--method", method, "--format", "json", *args,
     ]
