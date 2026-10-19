@@ -92,14 +92,14 @@ tested results and current protocol limits.
 Each GitHub release includes a checksum-protected native bundle for Linux x64,
 Windows x64, macOS Intel, and macOS Apple Silicon. Download the archive for your
 platform and follow the bundled [INSTALL.md](INSTALL.md) for checksum verification,
-token setup, startup, and MCP client connection. A signed container
-image is also published to `ghcr.io/rhamenator/request-guard-mcp`. Package the
+token setup, startup, and MCP client connection. A container
+image is also published to `ghcr.io/rhamenator/request-guard-mcp`. For a
+long-running service deployment, use the container deployment examples. Package the
 companion skill locally with `python3 scripts/package_skill.py` if you need a
 directory listing ZIP; GitHub releases do not include that ZIP.
 
-An [npm installation package](docs/npm-release.md) is being prepared for the
-official release. It is separate from the GitHub container image and is not
-published yet.
+The [npm installation package](docs/npm-release.md) is a separate native
+installation option. Check its release guide for the currently published version.
 
 ## Docker
 
