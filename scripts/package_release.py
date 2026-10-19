@@ -56,7 +56,8 @@ def main() -> None:
             output.add(stage, arcname=prefix)
 
     checksum = archive.with_name(f"{archive.name}.sha256")
-    checksum.write_text(f"{sha256(archive)} *{archive.name}\n", encoding="ascii")
+    with checksum.open("w", encoding="ascii", newline="\n") as output:
+        output.write(f"{sha256(archive)} *{archive.name}\n")
 
 
 if __name__ == "__main__":
