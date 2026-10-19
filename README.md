@@ -6,7 +6,7 @@
 
 A **Rust MCP (Model Context Protocol) server** for request risk classification, enrichment, and abuse-signal analysis. The official MCP Inspector can call its tools over HTTP POST; custom WebSocket clients can use the JSON-RPC endpoint. Client support depends on transport and authentication compatibility. The `ai-scraping-defense` projects are optional clients. Stable release readiness is subject to the [adversarial release gate](docs/adversarial-release-gate.md).
 
-Install the experimental [npm release](https://www.npmjs.com/package/request-guard-mcp/v/0.1.1) with `npm install -g request-guard-mcp@0.1.1`, configure `AUTH_TOKENS`, then run `request-guard-mcp`. The package includes native binaries for Linux x64 (glibc), Windows x64, macOS Intel, and macOS Apple Silicon. See [INSTALL.md](INSTALL.md) for authentication and MCP client setup.
+Install the experimental [npm release](https://www.npmjs.com/package/request-guard-mcp/v/0.1.1) with `npm install -g request-guard-mcp@0.1.1`, configure `AUTH_TOKENS`, then run `request-guard-mcp`. The package includes native binaries for Linux x64 (glibc), Windows x64, macOS Intel, and macOS Apple Silicon. Follow the [npm setup guide](docs/npm-release.md#install-and-connect) for environment and MCP client steps; [INSTALL.md](INSTALL.md) applies to downloaded native bundles.
 
 The [companion skill](skills/request-guard-mcp/SKILL.md) tells a connected agent when and how to use this server’s classification tools. It does not deploy or replace the separate AI Scraping Defense products.
 
