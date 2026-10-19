@@ -11,10 +11,11 @@ freshly built server on loopback. It records the binary SHA-256 and runs bounded
 HTTP and WebSocket probes with a temporary synthetic token. The probes cover
 authentication boundaries, malformed JSON, invalid envelopes, invalid tool
 parameters, prompt-injection text as request data, and declared oversized
-HTTP bodies. The same CI job calls `tools/call` over HTTP for ten bounded
+HTTP bodies. The same CI job calls `tools/call` over HTTP for 19 bounded
 classifier cases: a benign control, two named-bot user-agent variants, raw
-through four-times percent-encoded `.env` paths, and two encoded separator
-variants. It checks expected
+through four-times percent-encoded `.env` paths, two encoded separator
+variants, four scanner user agents, three sensitive-path variants, and two
+near-match path controls. It checks expected
 signal names without treating a score as a visitor-block decision. These
 checks do not complete this gate. CI uses a 4096-byte request limit and
 one-second header/body timeouts to test incomplete headers, a stalled
