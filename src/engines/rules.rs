@@ -7,28 +7,28 @@ use regex::Regex;
 use std::collections::HashSet;
 
 static AI_BOT_UA: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(
-        r"(?i)(GPTBot|ChatGPT-User|Claude-Web|anthropic-ai|Bytespider|CCBot|\
-         cohere-ai|DuckAssistBot|FacebookBot|Google-Extended|ImagesiftBot|\
-         PerplexityBot|Scrapy|python-httpx|python-requests|aiohttp|curl/|wget/|\
-         libwww-perl|Go-http-client|Java/|okhttp)",
-    )
+    Regex::new(concat!(
+        r"(?i)(GPTBot|ChatGPT-User|Claude-Web|anthropic-ai|Bytespider|CCBot|",
+        r"cohere-ai|DuckAssistBot|FacebookBot|Google-Extended|ImagesiftBot|",
+        r"PerplexityBot|Scrapy|python-httpx|python-requests|aiohttp|curl/|wget/|",
+        r"libwww-perl|Go-http-client|Java/|okhttp)"
+    ))
     .expect("compile regex")
 });
 
 static SCRAPING_UA: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(
-        r"(?i)(scrapy|beautifulsoup|mechanize|selenium|phantom|puppeteer|playwright|\
-         headless|crawler|spider|bot|scraper)",
-    )
+    Regex::new(concat!(
+        r"(?i)(scrapy|beautifulsoup|mechanize|selenium|phantom|puppeteer|playwright|",
+        r"headless|crawler|spider|bot|scraper)"
+    ))
     .expect("compile regex")
 });
 
 static SENSITIVE_PATH: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(
-        r"(?i)(\.env|/admin|/api/internal|/wp-admin|/phpmyadmin|\.git/|\
-         /etc/passwd|/proc/|/debug|/actuator|/swagger|/graphql|/config)",
-    )
+    Regex::new(concat!(
+        r"(?i)(\.env|/admin|/api/internal|/wp-admin|/phpmyadmin|\.git/|",
+        r"/etc/passwd|/proc/|/debug|/actuator|/swagger|/graphql|/config)"
+    ))
     .expect("compile regex")
 });
 
@@ -283,6 +283,93 @@ mod tests {
         let req = make_req(Some("GPTBot/1.0"), None);
         let signals = engine.evaluate(&req);
         assert!(signals.as_slice().iter().any(|s| s.name == "ua_ai_bot"));
+    }
+
+    #[test]
+    fn every_ai_bot_pattern_is_active() {
+        for sample in [
+            "GPTBot",
+            "ChatGPT-User",
+            "Claude-Web",
+            "anthropic-ai",
+            "Bytespider",
+            "CCBot",
+            "cohere-ai",
+            "DuckAssistBot",
+            "FacebookBot",
+            "Google-Extended",
+            "ImagesiftBot",
+            "PerplexityBot",
+            "Scrapy",
+            "python-httpx",
+            "python-requests",
+            "aiohttp",
+            "curl/",
+            "wget/",
+            "libwww-perl",
+            "Go-http-client",
+            "Java/",
+            "okhttp",
+        ] {
+            assert!(AI_BOT_UA.is_match(sample), "AI bot pattern missed {sample}");
+        }
+    }
+
+    #[test]
+    fn every_scraper_pattern_is_active() {
+        for sample in [
+            "scrapy",
+            "beautifulsoup",
+            "mechanize",
+            "selenium",
+            "phantom",
+            "puppeteer",
+            "playwright",
+            "headless",
+            "crawler",
+            "spider",
+            "bot",
+            "scraper",
+        ] {
+            assert!(
+                SCRAPING_UA.is_match(sample),
+                "scraper pattern missed {sample}"
+            );
+        }
+        let signals = RuleEngine::new().evaluate(&make_req(Some("HeadlessChrome/120"), None));
+        assert!(signals
+            .as_slice()
+            .iter()
+            .any(|signal| signal.name == "ua_scraper"));
+    }
+
+    #[test]
+    fn every_sensitive_path_pattern_is_active() {
+        for sample in [
+            "/.env",
+            "/admin",
+            "/api/internal",
+            "/wp-admin",
+            "/phpmyadmin",
+            "/.git/config",
+            "/etc/passwd",
+            "/proc/self/environ",
+            "/debug",
+            "/actuator",
+            "/swagger",
+            "/graphql",
+            "/config",
+        ] {
+            assert!(
+                SENSITIVE_PATH.is_match(sample),
+                "sensitive path missed {sample}"
+            );
+        }
+        let signals = RuleEngine::new().evaluate(&make_req(None, Some("/etc/passwd")));
+        assert!(signals
+            .as_slice()
+            .iter()
+            .any(|signal| signal.name == "path_sensitive"));
     }
 
     #[test]
