@@ -4,6 +4,14 @@ use crate::state::AppState;
 use uuid::Uuid;
 
 pub async fn run(state: &AppState, req: ReplayRequest) -> Result<ReplayResponse, AppError> {
+    run_scoped(state, req, "internal").await
+}
+
+pub async fn run_scoped(
+    state: &AppState,
+    req: ReplayRequest,
+    caller_scope: &str,
+) -> Result<ReplayResponse, AppError> {
     if !state.postgres.is_available() {
         return Err(AppError::IntegrationUnavailable(
             "decision replay requires PostgreSQL persistence".to_string(),
@@ -16,7 +24,7 @@ pub async fn run(state: &AppState, req: ReplayRequest) -> Result<ReplayResponse,
     }
     let original = state
         .postgres
-        .get_decision(&req.request_id)
+        .get_decision(caller_scope, &req.request_id)
         .await
         .map_err(|error| AppError::Upstream(error.to_string()))?
         .ok_or_else(|| {

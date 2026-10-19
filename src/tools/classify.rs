@@ -75,7 +75,7 @@ async fn run_internal(
             resp.request_id = request_id;
             resp.latency_ms = elapsed_ms(start);
             if persist {
-                persist_decision(state, &req, &resp).await?;
+                persist_decision(state, caller_scope, &req, &resp).await?;
             }
             return Ok(resp);
         }
@@ -116,7 +116,7 @@ async fn run_internal(
     }
 
     if persist {
-        persist_decision(state, &req, &resp).await?;
+        persist_decision(state, caller_scope, &req, &resp).await?;
     }
     Ok(resp)
 }
@@ -167,13 +167,14 @@ fn validate_tls_fingerprints(request: &ClassifyRequest) -> Result<(), AppError> 
 
 async fn persist_decision(
     state: &AppState,
+    caller_scope: &str,
     request: &ClassifyRequest,
     response: &ClassifyResponse,
 ) -> Result<(), AppError> {
     if state.postgres.is_available() {
         state
             .postgres
-            .record_decision(request, response)
+            .record_decision(caller_scope, request, response)
             .await
             .map_err(|error| {
                 AppError::Upstream(format!("PostgreSQL decision write failed: {error}"))

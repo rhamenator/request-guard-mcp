@@ -11,6 +11,14 @@ pub async fn run(
     state: &AppState,
     req: DriftReportRequest,
 ) -> Result<DriftReportResponse, AppError> {
+    run_scoped(state, req, "internal").await
+}
+
+pub async fn run_scoped(
+    state: &AppState,
+    req: DriftReportRequest,
+    caller_scope: &str,
+) -> Result<DriftReportResponse, AppError> {
     if !state.postgres.is_available() {
         return Err(AppError::IntegrationUnavailable(
             "drift reporting requires PostgreSQL persistence".to_string(),
@@ -53,7 +61,7 @@ pub async fn run(
     let midpoint = start + now.signed_duration_since(start) / 2;
     let summary = state
         .postgres
-        .drift_summary(start, midpoint)
+        .drift_summary(caller_scope, start, midpoint)
         .await
         .map_err(|error| AppError::Upstream(error.to_string()))?;
     let score_shift = (summary.score_mean - summary.previous_score_mean).abs();

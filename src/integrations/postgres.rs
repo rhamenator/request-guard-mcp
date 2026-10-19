@@ -2,6 +2,16 @@ use crate::models::{request::ClassifyRequest, response::ClassifyResponse};
 use anyhow::{anyhow, Result};
 use std::collections::HashMap;
 
+/// Never use a caller-supplied request ID as a global persistence key.
+/// The caller scope is already a server-keyed digest of the bearer token.
+fn scoped_decision_key(caller_scope: &str, request_id: &str) -> String {
+    let mut input = Vec::with_capacity(caller_scope.len() + request_id.len() + 1);
+    input.extend_from_slice(caller_scope.as_bytes());
+    input.push(0);
+    input.extend_from_slice(request_id.as_bytes());
+    crate::util::hashing::sha256_hex(&input)
+}
+
 #[derive(Debug, Clone)]
 pub struct PersistedDecision {
     pub request: ClassifyRequest,
@@ -89,6 +99,7 @@ mod inner {
                 r#"
                 CREATE TABLE IF NOT EXISTS mcp_decisions (
                     request_id TEXT PRIMARY KEY,
+                    caller_scope TEXT,
                     request_payload JSONB NOT NULL,
                     response_payload JSONB NOT NULL,
                     verdict TEXT NOT NULL,
@@ -103,6 +114,7 @@ mod inner {
                 CREATE TABLE IF NOT EXISTS mcp_feedback (
                     feedback_id TEXT PRIMARY KEY,
                     request_id TEXT NOT NULL REFERENCES mcp_decisions(request_id) ON DELETE CASCADE,
+                    caller_scope TEXT,
                     correct_verdict TEXT NOT NULL,
                     notes TEXT,
                     reporter TEXT,
@@ -112,6 +124,15 @@ mod inner {
                     ON mcp_feedback (request_id);
                 CREATE INDEX IF NOT EXISTS idx_mcp_feedback_created_at
                     ON mcp_feedback (created_at DESC);
+
+                -- Existing unscoped rows are retained for offline migration, but
+                -- are invisible to authenticated replay and reporting.
+                ALTER TABLE mcp_decisions ADD COLUMN IF NOT EXISTS caller_scope TEXT;
+                ALTER TABLE mcp_feedback ADD COLUMN IF NOT EXISTS caller_scope TEXT;
+                CREATE INDEX IF NOT EXISTS idx_mcp_decisions_caller_created
+                    ON mcp_decisions (caller_scope, created_at DESC);
+                CREATE INDEX IF NOT EXISTS idx_mcp_feedback_caller_created
+                    ON mcp_feedback (caller_scope, created_at DESC);
 
                 DO $$
                 BEGIN
@@ -135,6 +156,7 @@ mod inner {
 
         pub async fn record_decision(
             &self,
+            caller_scope: &str,
             request: &ClassifyRequest,
             response: &ClassifyResponse,
         ) -> Result<()> {
@@ -144,9 +166,10 @@ mod inner {
             sqlx::query(
                 r#"
                 INSERT INTO mcp_decisions
-                    (request_id, request_payload, response_payload, verdict, score, created_at)
-                VALUES ($1, $2, $3, $4, $5, NOW())
+                    (request_id, caller_scope, request_payload, response_payload, verdict, score, created_at)
+                VALUES ($1, $2, $3, $4, $5, $6, NOW())
                 ON CONFLICT (request_id) DO UPDATE SET
+                    caller_scope = EXCLUDED.caller_scope,
                     request_payload = EXCLUDED.request_payload,
                     response_payload = EXCLUDED.response_payload,
                     verdict = EXCLUDED.verdict,
@@ -154,7 +177,8 @@ mod inner {
                     created_at = EXCLUDED.created_at
                 "#,
             )
-            .bind(&response.request_id)
+            .bind(scoped_decision_key(caller_scope, &response.request_id))
+            .bind(caller_scope)
             .bind(request_payload)
             .bind(response_payload)
             .bind(response.verdict.to_string())
@@ -165,12 +189,17 @@ mod inner {
             Ok(())
         }
 
-        pub async fn get_decision(&self, request_id: &str) -> Result<Option<PersistedDecision>> {
+        pub async fn get_decision(
+            &self,
+            caller_scope: &str,
+            request_id: &str,
+        ) -> Result<Option<PersistedDecision>> {
             let pool = self.pool()?;
             let row = sqlx::query(
-                "SELECT request_payload, response_payload FROM mcp_decisions WHERE request_id = $1",
+                "SELECT request_payload, response_payload FROM mcp_decisions WHERE request_id = $1 AND caller_scope = $2",
             )
-            .bind(request_id)
+            .bind(scoped_decision_key(caller_scope, request_id))
+            .bind(caller_scope)
             .fetch_optional(pool)
             .await
             .context("failed to load persisted decision")?;
@@ -187,16 +216,19 @@ mod inner {
 
         pub async fn record_feedback(
             &self,
+            caller_scope: &str,
             request_id: &str,
             correct_verdict: &str,
             notes: Option<&str>,
             reporter: Option<&str>,
         ) -> Result<String> {
             let pool = self.pool()?;
+            let decision_key = scoped_decision_key(caller_scope, request_id);
             let exists: bool = sqlx::query_scalar(
-                "SELECT EXISTS(SELECT 1 FROM mcp_decisions WHERE request_id = $1)",
+                "SELECT EXISTS(SELECT 1 FROM mcp_decisions WHERE request_id = $1 AND caller_scope = $2)",
             )
-            .bind(request_id)
+            .bind(&decision_key)
+            .bind(caller_scope)
             .fetch_one(pool)
             .await
             .context("failed to verify feedback request id")?;
@@ -207,12 +239,13 @@ mod inner {
             sqlx::query(
                 r#"
                 INSERT INTO mcp_feedback
-                    (feedback_id, request_id, correct_verdict, notes, reporter)
-                VALUES ($1, $2, $3, $4, $5)
+                    (feedback_id, request_id, caller_scope, correct_verdict, notes, reporter)
+                VALUES ($1, $2, $3, $4, $5, $6)
                 "#,
             )
             .bind(&feedback_id)
-            .bind(request_id)
+            .bind(&decision_key)
+            .bind(caller_scope)
             .bind(correct_verdict)
             .bind(notes)
             .bind(reporter)
@@ -224,6 +257,7 @@ mod inner {
 
         pub async fn drift_summary(
             &self,
+            caller_scope: &str,
             start: DateTime<Utc>,
             midpoint: DateTime<Utc>,
         ) -> Result<DriftSummary> {
@@ -239,11 +273,12 @@ mod inner {
                        COALESCE(AVG(score) FILTER (WHERE created_at < $2), 0)::DOUBLE PRECISION
                            AS previous_score_mean
                 FROM mcp_decisions
-                WHERE created_at >= $1
+                WHERE created_at >= $1 AND caller_scope = $3
                 "#,
             )
             .bind(start)
             .bind(midpoint)
+            .bind(caller_scope)
             .fetch_one(pool)
             .await
             .context("failed to aggregate decision drift")?;
@@ -252,11 +287,12 @@ mod inner {
                 r#"
                 SELECT verdict, COUNT(*)::BIGINT AS count
                 FROM mcp_decisions
-                WHERE created_at >= $1
+                WHERE created_at >= $1 AND caller_scope = $2
                 GROUP BY verdict
                 "#,
             )
             .bind(start)
+            .bind(caller_scope)
             .fetch_all(pool)
             .await
             .context("failed to aggregate verdict distribution")?;
@@ -268,12 +304,13 @@ mod inner {
                        COUNT(*) FILTER (WHERE d.created_at >= $2)::BIGINT AS current_count
                 FROM mcp_decisions d
                 CROSS JOIN LATERAL jsonb_array_elements(d.response_payload->'signals') signal
-                WHERE d.created_at >= $1
+                WHERE d.created_at >= $1 AND d.caller_scope = $3
                 GROUP BY signal->>'name'
                 "#,
             )
             .bind(start)
             .bind(midpoint)
+            .bind(caller_scope)
             .fetch_all(pool)
             .await
             .context("failed to aggregate signal drift")?;
@@ -316,6 +353,7 @@ mod inner {
 
         pub async fn calibration_summary(
             &self,
+            caller_scope: &str,
             start: DateTime<Utc>,
         ) -> Result<CalibrationSummary> {
             let pool = self.pool()?;
@@ -341,13 +379,14 @@ mod inner {
                     SELECT DISTINCT ON (request_id)
                            request_id, correct_verdict, created_at
                     FROM mcp_feedback
-                    WHERE created_at >= $1
+                    WHERE created_at >= $1 AND caller_scope = $2
                     ORDER BY request_id, created_at DESC
                 ) f
-                JOIN mcp_decisions d ON d.request_id = f.request_id
+                JOIN mcp_decisions d ON d.request_id = f.request_id AND d.caller_scope = $2
                 "#,
             )
             .bind(start)
+            .bind(caller_scope)
             .fetch_one(pool)
             .await
             .context("failed to aggregate calibration data")?;
@@ -385,16 +424,22 @@ mod inner {
         }
         pub async fn record_decision(
             &self,
+            _caller_scope: &str,
             _request: &ClassifyRequest,
             _response: &ClassifyResponse,
         ) -> Result<()> {
             Err(anyhow!("PostgreSQL integration feature is disabled"))
         }
-        pub async fn get_decision(&self, _request_id: &str) -> Result<Option<PersistedDecision>> {
+        pub async fn get_decision(
+            &self,
+            _caller_scope: &str,
+            _request_id: &str,
+        ) -> Result<Option<PersistedDecision>> {
             Err(anyhow!("PostgreSQL integration feature is disabled"))
         }
         pub async fn record_feedback(
             &self,
+            _caller_scope: &str,
             _request_id: &str,
             _correct_verdict: &str,
             _notes: Option<&str>,
@@ -404,6 +449,7 @@ mod inner {
         }
         pub async fn drift_summary(
             &self,
+            _caller_scope: &str,
             _start: DateTime<Utc>,
             _midpoint: DateTime<Utc>,
         ) -> Result<DriftSummary> {
@@ -411,6 +457,7 @@ mod inner {
         }
         pub async fn calibration_summary(
             &self,
+            _caller_scope: &str,
             _start: DateTime<Utc>,
         ) -> Result<CalibrationSummary> {
             Err(anyhow!("PostgreSQL integration feature is disabled"))
@@ -419,3 +466,17 @@ mod inner {
 }
 
 pub use inner::PostgresClient;
+
+#[cfg(test)]
+mod scoped_key_tests {
+    use super::scoped_decision_key;
+
+    #[test]
+    fn identical_request_ids_have_distinct_persistence_keys_per_caller() {
+        let first = scoped_decision_key("caller:first", "same-id");
+        let second = scoped_decision_key("caller:second", "same-id");
+        assert_ne!(first, second);
+        assert_eq!(first, scoped_decision_key("caller:first", "same-id"));
+        assert!(!first.contains("same-id"));
+    }
+}

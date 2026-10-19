@@ -14,6 +14,12 @@ All WebSocket connections are authenticated at connection establishment using a 
   listings without the server-side key. Configure `CACHE_SCOPE_HMAC_KEY`
   (>= 32 bytes) to keep scopes stable across restarts and replicas; otherwise a
   process-local random key is used.
+- PostgreSQL decision, replay, feedback, drift, and calibration records are
+  partitioned by the authenticated caller scope. `CACHE_SCOPE_HMAC_KEY` is
+  required with PostgreSQL so a caller's scope remains stable after restart.
+  Existing records created before this partitioning are retained in the
+  database but are not exposed through caller-scoped tools; migrate or archive
+  them offline before relying on historical reports.
 
 ## Transport Security
 

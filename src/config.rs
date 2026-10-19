@@ -265,6 +265,12 @@ impl Config {
         {
             anyhow::bail!("CACHE_SCOPE_HMAC_KEY must contain at least 32 bytes when configured");
         }
+        if self.auth.enabled
+            && self.postgres.url.is_some()
+            && self.auth.cache_scope_hmac_key.is_none()
+        {
+            anyhow::bail!("CACHE_SCOPE_HMAC_KEY is required with PostgreSQL so caller-scoped decisions survive restarts");
+        }
         if self
             .tls_fingerprints
             .attestation_key
@@ -618,6 +624,16 @@ mod tests {
             ..Config::default()
         };
         assert!(long_enough.validate().is_ok());
+    }
+
+    #[test]
+    fn postgres_requires_stable_caller_scope_key() {
+        let mut config = Config::default();
+        config.auth.tokens = vec!["a-real-test-token-with-32-characters".to_string()];
+        config.postgres.url = Some("postgresql://localhost/test".to_string());
+        assert!(config.validate().is_err());
+        config.auth.cache_scope_hmac_key = Some("0123456789abcdef0123456789abcdef".to_string());
+        assert!(config.validate().is_ok());
     }
 
     #[test]

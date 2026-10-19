@@ -98,6 +98,7 @@ async fn redis_and_postgres_backed_tools_complete_real_round_trip() {
     config.redis.url = Some(redis_url);
     config.redis.key_prefix = format!("request_guard_test_{suffix}");
     config.postgres.url = Some(postgres_url);
+    config.auth.cache_scope_hmac_key = Some("integration-test-scope-key-32-bytes-long".to_string());
     let state = AppState::initialize(config).await.unwrap();
 
     assert!(state.redis.ping().await);
@@ -109,7 +110,7 @@ async fn redis_and_postgres_backed_tools_complete_real_round_trip() {
         .unwrap();
     let persisted = state
         .postgres
-        .get_decision(&request_id)
+        .get_decision("internal", &request_id)
         .await
         .unwrap()
         .unwrap();
@@ -281,4 +282,112 @@ async fn redis_and_postgres_backed_tools_complete_real_round_trip() {
 
     let health = tools::health::run(&state).await;
     assert_eq!(health.status, "healthy");
+}
+
+#[tokio::test]
+async fn postgres_decisions_and_reports_are_isolated_by_caller() {
+    let Ok(postgres_url) = std::env::var("TEST_POSTGRES_URL") else {
+        eprintln!("skipping PostgreSQL isolation test: TEST_POSTGRES_URL not set");
+        return;
+    };
+    let mut config = Config::default();
+    config.postgres.url = Some(postgres_url);
+    config.auth.cache_scope_hmac_key = Some("integration-test-scope-key-32-bytes-long".to_string());
+    let state = AppState::initialize(config).await.unwrap();
+    let request_id = format!("scope-test-{}", Uuid::new_v4());
+    let a = "caller:integration-a";
+    let b = "caller:integration-b";
+    let original = tools::classify::run_scoped(
+        &state,
+        classify_request(request_id.clone(), "GPTBot/1.0"),
+        a,
+    )
+    .await
+    .unwrap();
+    assert!(state
+        .postgres
+        .get_decision(a, &request_id)
+        .await
+        .unwrap()
+        .is_some());
+    assert!(state
+        .postgres
+        .get_decision(b, &request_id)
+        .await
+        .unwrap()
+        .is_none());
+    assert!(tools::replay_decision::run_scoped(
+        &state,
+        ReplayRequest {
+            request_id: request_id.clone(),
+            deterministic: Some(true)
+        },
+        b,
+    )
+    .await
+    .is_err());
+    assert!(tools::feedback::run_scoped(
+        &state,
+        FeedbackRequest {
+            request_id: request_id.clone(),
+            correct_verdict: "allow".into(),
+            notes: None,
+            reporter: None
+        },
+        b,
+    )
+    .await
+    .is_err());
+    let a_report = tools::drift_report::run_scoped(
+        &state,
+        DriftReportRequest {
+            since: None,
+            window_hours: Some(1),
+        },
+        a,
+    )
+    .await
+    .unwrap();
+    let b_report = tools::drift_report::run_scoped(
+        &state,
+        DriftReportRequest {
+            since: None,
+            window_hours: Some(1),
+        },
+        b,
+    )
+    .await
+    .unwrap();
+    assert!(a_report.metrics.samples >= 1);
+    assert_eq!(b_report.metrics.samples, 0);
+    let other = tools::classify::run_scoped(
+        &state,
+        classify_request(request_id.clone(), "Mozilla/5.0"),
+        b,
+    )
+    .await
+    .unwrap();
+    assert_ne!(original.verdict, other.verdict);
+    assert_eq!(
+        state
+            .postgres
+            .get_decision(a, &request_id)
+            .await
+            .unwrap()
+            .unwrap()
+            .response
+            .verdict,
+        original.verdict
+    );
+    assert_eq!(
+        state
+            .postgres
+            .get_decision(b, &request_id)
+            .await
+            .unwrap()
+            .unwrap()
+            .response
+            .verdict,
+        other.verdict
+    );
 }
