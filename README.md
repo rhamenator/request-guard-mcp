@@ -98,8 +98,9 @@ long-running service deployment, use the container deployment examples. Package 
 companion skill locally with `python3 scripts/package_skill.py` if you need a
 directory listing ZIP; GitHub releases do not include that ZIP.
 
-The [npm installation package](docs/npm-release.md) is a separate native
-installation option. Check its release guide for the currently published version.
+The [`request-guard-mcp` npm package](https://www.npmjs.com/package/request-guard-mcp)
+is a separate native installation option. See the [npm release guide](docs/npm-release.md)
+for supported platforms and version verification.
 
 ## Docker
 
