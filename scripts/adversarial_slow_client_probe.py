@@ -45,8 +45,8 @@ def main():
     parser.add_argument("--port", type=int, required=True)
     parser.add_argument("--max-request-bytes", type=int, required=True)
     args = parser.parse_args()
-    if args.max_request_bytes < 1 or args.max_request_bytes > 65536:
-        parser.error("use a positive lab body limit of at most 65536 bytes")
+    if args.max_request_bytes < 2 or args.max_request_bytes > 65536:
+        parser.error("use a lab body limit from 2 to 65536 bytes")
     token = sys.stdin.readline().strip()
     if len(token) < 32:
         parser.error("read a lab bearer token of at least 32 characters from stdin")
@@ -58,7 +58,7 @@ def main():
         b"POST /mcp HTTP/1.1\r\n"
         + host_header
         + authorization
-        + b"Content-Type: application/json\r\nContent-Length: 128\r\n\r\nx"
+        + f"Content-Type: application/json\r\nContent-Length: {min(128, args.max_request_bytes)}\r\n\r\nx".encode()
     )
     body = b"x" * (args.max_request_bytes + 1)
     chunked_body = (

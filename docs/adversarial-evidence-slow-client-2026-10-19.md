@@ -26,6 +26,12 @@ avg10 was 0.01% and load averages were 1.65, 1.55, 1.27. All VMs remained
 off. The CI job will rerun this subset against a fresh build on an independent
 host after merge.
 
+After review identified a standalone-probe edge case, the same binary was
+started in a second local fixture with a 64-byte body limit and the same
+one-second timeouts. `scripts/adversarial_slow_client_probe.py
+--max-request-bytes 64` passed 4/4: the stalled body still received 408,
+the 65-byte chunked body received 413, and the subsequent ping succeeded.
+
 This is a small timeout and body-limit check, not sustained exhaustion or a
 measurement of maximum memory use. It does not cover a packaged release,
 backend failure/recovery, WebSocket oversized frames, or secret logging. The
