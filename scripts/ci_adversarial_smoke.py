@@ -100,6 +100,19 @@ def main():
                 check=True,
                 timeout=90,
             )
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts/adversarial_classifier_probe.py"),
+                    "--url",
+                    f"http://127.0.0.1:{port}",
+                ],
+                input=token + "\n",
+                text=True,
+                env=environment,
+                check=True,
+                timeout=90,
+            )
         finally:
             process.terminate()
             try:
