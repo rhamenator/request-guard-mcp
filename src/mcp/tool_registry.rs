@@ -165,7 +165,7 @@ fn tool_input_schema(name: &str) -> Value {
         ),
         "queue_status" => (serde_json::json!({"queue":{"type":"string"}}), vec![]),
         "config_snapshot" => (
-            serde_json::json!({"redact_secrets":{"type":"boolean"}}),
+            serde_json::json!({"redact_secrets":{"type":"boolean","const":true,"description":"Only redacted snapshots are available through MCP"}}),
             vec![],
         ),
         "self_test" => (serde_json::json!({"suite":{"type":"string"}}), vec![]),
@@ -709,7 +709,7 @@ impl McpTool for ConfigSnapshotTool {
             .unwrap_or(crate::models::request::ConfigSnapshotRequest {
                 redact_secrets: None,
             });
-        let result = crate::tools::config_snapshot::run(&state, req).await;
+        let result = crate::tools::config_snapshot::run(&state, req).await?;
         serde_json::to_value(result).map_err(AppError::from)
     }
 }

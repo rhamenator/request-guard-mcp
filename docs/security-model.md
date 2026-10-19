@@ -52,6 +52,8 @@ All WebSocket connections are authenticated at connection establishment using a 
 - All engine code returns `Result<_, AppError>` and handles errors gracefully.
 - `AppError` variants carry non-leaky messages for clients.
 - Internal details are logged server-side but not exposed to clients.
+- `config_snapshot` never returns an OTLP endpoint or its embedded credentials;
+  requests with `redact_secrets:false` are rejected.
 
 ## Log Redaction
 
