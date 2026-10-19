@@ -8,13 +8,14 @@ import socket
 import struct
 import sys
 
+INITIALIZE_MESSAGE = json.dumps({'jsonrpc':'2.0','id':1,'method':'initialize','params':{'protocolVersion':'2025-06-18','capabilities':{},'clientInfo':{'name':'kali-probe','version':'1'}}})
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--host", default="127.0.0.1")
 parser.add_argument("--port", type=int, default=8085)
 parser.add_argument("--max-request-bytes", type=int, help="enable bounded frame-limit tests with this configured server limit (max 65536)")
 args = parser.parse_args()
-if args.max_request_bytes is not None and not 2 <= args.max_request_bytes <= 65536:
-    parser.error("--max-request-bytes must be from 2 to 65536 for frame-limit tests")
+if args.max_request_bytes is not None and not len(INITIALIZE_MESSAGE.encode()) <= args.max_request_bytes <= 65536:
+    parser.error(f"--max-request-bytes must be from {len(INITIALIZE_MESSAGE.encode())} to 65536 so initialize fits the configured limit")
 HOST = args.host
 PORT = args.port
 TOKEN = sys.stdin.readline().strip()
@@ -67,7 +68,7 @@ for name,auth,expected in [('ws_missing_auth',None,401),('ws_wrong_auth',TOKEN+'
 sock,status=connect(TOKEN)
 check('ws_authorized_upgrade',status==101,status)
 if status==101:
-    send_text(sock,json.dumps({'jsonrpc':'2.0','id':1,'method':'initialize','params':{'protocolVersion':'2025-06-18','capabilities':{},'clientInfo':{'name':'kali-probe','version':'1'}}}))
+    send_text(sock,INITIALIZE_MESSAGE)
     op,payload=recv_frame(sock);value=json.loads(payload)
     check('ws_initialize',op==1 and value.get('result',{}).get('protocolVersion')=='2025-06-18',{'opcode':op,'id':value.get('id')})
     send_text(sock,'{broken')
