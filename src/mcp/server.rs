@@ -1,9 +1,10 @@
+use crate::config::LimitsConfig;
 use crate::mcp::tool_registry::ToolRegistry;
 use crate::mcp::transport_ws::{handle_ws_connection, process_message};
 use crate::state::AppState;
 use crate::telemetry::gather_metrics;
 use axum::{
-    body::to_bytes,
+    body::{to_bytes, Body},
     extract::{ws::WebSocketUpgrade, Request, State},
     http::{header::X_CONTENT_TYPE_OPTIONS, HeaderMap, HeaderValue, StatusCode},
     middleware::map_response,
@@ -11,7 +12,14 @@ use axum::{
     routing::get,
     Router,
 };
-use std::sync::Arc;
+use hyper::{body::Incoming, service::service_fn};
+use hyper_util::{
+    rt::{TokioExecutor, TokioIo, TokioTimer},
+    server::conn::auto::Builder,
+};
+use std::{sync::Arc, time::Duration};
+use tokio::sync::Semaphore;
+use tower::Service;
 use tower_http::limit::RequestBodyLimitLayer;
 use tracing::info;
 
@@ -80,16 +88,20 @@ async fn http_mcp_handler(State(state): State<ServerState>, request: Request) ->
         Ok(scope) => scope,
         Err(error) => return error_response(&error),
     };
-    let body = match to_bytes(
-        request.into_body(),
-        state.app.config.limits.max_request_bytes,
+    let body = match tokio::time::timeout(
+        Duration::from_secs(state.app.config.limits.http_body_timeout_secs),
+        to_bytes(
+            request.into_body(),
+            state.app.config.limits.max_request_bytes,
+        ),
     )
     .await
     {
-        Ok(body) => body,
-        Err(_) => {
+        Ok(Ok(body)) => body,
+        Ok(Err(_)) => {
             return (StatusCode::PAYLOAD_TOO_LARGE, "Request body exceeds limit").into_response()
         }
+        Err(_) => return (StatusCode::REQUEST_TIMEOUT, "Request body timed out").into_response(),
     };
     let Ok(text) = std::str::from_utf8(&body) else {
         return (
@@ -182,11 +194,116 @@ pub async fn run_server(app_state: AppState) -> anyhow::Result<()> {
         registry,
     };
 
-    let router = build_router(server_state, max_body);
+    let router = build_router(server_state.clone(), max_body);
 
     let listener = tokio::net::TcpListener::bind(bind_addr).await?;
     info!(addr = %bind_addr, "listening");
 
-    axum::serve(listener, router).await?;
-    Ok(())
+    serve_listener(listener, router, server_state.app.config.limits.clone()).await
+}
+
+async fn serve_listener(
+    listener: tokio::net::TcpListener,
+    router: Router,
+    limits: LimitsConfig,
+) -> anyhow::Result<()> {
+    let connection_limit = Arc::new(Semaphore::new(limits.max_connections));
+    loop {
+        let (stream, peer) = listener.accept().await?;
+        let Ok(permit) = Arc::clone(&connection_limit).try_acquire_owned() else {
+            tracing::warn!(%peer, "HTTP connection limit reached");
+            drop(stream);
+            continue;
+        };
+        let router = router.clone();
+        let header_timeout = Duration::from_secs(limits.http_header_timeout_secs);
+        tokio::spawn(async move {
+            let service = service_fn(move |request: hyper::Request<Incoming>| {
+                let mut router = router.clone();
+                async move { router.call(request.map(Body::new)).await }
+            });
+            let mut builder = Builder::new(TokioExecutor::new());
+            builder
+                .http1()
+                .timer(TokioTimer::new())
+                .header_read_timeout(header_timeout);
+            builder
+                .http2()
+                .enable_connect_protocol()
+                .max_concurrent_streams(16);
+            if let Err(error) = builder
+                .serve_connection_with_upgrades(TokioIo::new(stream), service)
+                .await
+            {
+                tracing::debug!(%peer, %error, "HTTP connection closed");
+            }
+            drop(permit);
+        });
+    }
+}
+
+#[cfg(test)]
+mod slow_client_tests {
+    use super::*;
+    use tokio::{
+        io::{AsyncReadExt, AsyncWriteExt},
+        net::TcpStream,
+        time::timeout,
+    };
+
+    async fn test_server() -> (std::net::SocketAddr, tokio::task::JoinHandle<()>) {
+        let mut config = crate::config::Config::default();
+        config.auth.enabled = true;
+        config.auth.tokens = vec!["test-token-with-at-least-32-characters".to_string()];
+        config.limits.http_header_timeout_secs = 1;
+        config.limits.http_body_timeout_secs = 1;
+        let limits = config.limits.clone();
+        let max_body = limits.max_request_bytes;
+        let state = ServerState {
+            app: Arc::new(AppState::new(config)),
+            registry: Arc::new(crate::mcp::tool_registry::build_registry()),
+        };
+        let router = build_router(state, max_body);
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let task = tokio::spawn(async move {
+            serve_listener(listener, router, limits).await.unwrap();
+        });
+        (addr, task)
+    }
+
+    #[tokio::test]
+    async fn incomplete_headers_cannot_hold_socket_indefinitely() {
+        let (addr, task) = test_server().await;
+        let mut stream = TcpStream::connect(addr).await.unwrap();
+        stream
+            .write_all(b"POST /mcp HTTP/1.1\r\nHost: localhost\r\n")
+            .await
+            .unwrap();
+        let mut response = [0_u8; 128];
+        let read = timeout(Duration::from_secs(3), stream.read(&mut response))
+            .await
+            .expect("partial headers must time out");
+        assert!(
+            read.is_ok(),
+            "connection should close or receive an HTTP timeout"
+        );
+        task.abort();
+    }
+
+    #[tokio::test]
+    async fn incomplete_authorized_body_returns_timeout() {
+        let (addr, task) = test_server().await;
+        let mut stream = TcpStream::connect(addr).await.unwrap();
+        stream.write_all(b"POST /mcp HTTP/1.1\r\nHost: localhost\r\nAuthorization: Bearer test-token-with-at-least-32-characters\r\nContent-Length: 100\r\n\r\nx").await.unwrap();
+        let mut response = [0_u8; 256];
+        let read = timeout(Duration::from_secs(3), stream.read(&mut response))
+            .await
+            .expect("partial body must time out")
+            .unwrap();
+        assert!(std::str::from_utf8(&response[..read])
+            .unwrap()
+            .starts_with("HTTP/1.1 408"));
+        task.abort();
+    }
 }

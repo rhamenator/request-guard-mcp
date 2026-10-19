@@ -33,8 +33,12 @@ All WebSocket connections are authenticated at connection establishment using a 
 - All tool parameters are deserialized into strongly-typed structs via `serde`.
 - Invalid JSON is rejected with a `Parse error` (-32700) response.
 - Batch requests are bounded by `max_batch_size` (default 50).
-- Per-tool timeouts bound tool execution after dispatch. They do not bound HTTP
-  header or body read time; deploy a proxy with connection and read timeouts.
+- HTTP/1.1 header reads have a 10-second deadline by default; authenticated HTTP
+  bodies have a 30-second deadline and a 1 MiB size limit by default. Both
+  deadlines are configurable with `MCP__LIMITS__HTTP_HEADER_TIMEOUT_SECS` and
+  `MCP__LIMITS__HTTP_BODY_TIMEOUT_SECS`. A body timeout returns HTTP 408.
+- Per-tool timeouts separately bound tool execution after dispatch. Deploy a
+  proxy with connection and read limits as another boundary.
 - Caller-supplied JA3/JA4 values are format-validated metadata, not proof of a
   TLS handshake. Only a fresh, context-bound HMAC from a trusted producer sets
   server-derived `tls_fingerprint_verified`; only verified values affect rules
@@ -66,6 +70,10 @@ All WebSocket connections are authenticated at connection establishment using a 
 ## Rate Limiting and Backpressure
 
 - Global semaphore prevents more than `global_concurrency` concurrent in-flight requests.
+- A TCP admission semaphore caps in-progress HTTP connections, including
+  clients that send no complete request headers. Excess sockets are closed at
+  accept time. A separate WebSocket semaphore retains its own cap after an
+  upgrade; the admission permit is released when the HTTP upgrade completes.
 - When tool capacity is saturated, new tool calls receive a
   `RATE_LIMIT_EXCEEDED` error without waiting for a permit. This limit applies
   after HTTP body receipt and authentication; it is not a connection limit.
