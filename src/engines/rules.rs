@@ -132,7 +132,8 @@ impl RuleEngine {
     }
 
     fn eval_path(&self, path: &str, signals: &mut SignalSet) {
-        if SENSITIVE_PATH.is_match(path) {
+        let normalized = normalize_path_for_signals(path);
+        if SENSITIVE_PATH.is_match(&normalized) {
             signals.push(Signal::new(
                 "path_sensitive",
                 1.0,
@@ -143,7 +144,7 @@ impl RuleEngine {
         }
 
         // Bulk / enumeration pattern: many path segments or numeric IDs
-        let segments = path.trim_matches('/').split('/').count();
+        let segments = normalized.trim_matches('/').split('/').count();
         if segments > 8 {
             signals.push(Signal::new(
                 "path_deep",
@@ -243,6 +244,46 @@ impl RuleEngine {
                 "Browser user-agent conflicts with the verified JA4 transport profile",
             ));
         }
+    }
+}
+
+// Inspect common encoded spellings as well as the raw path. Two rounds catch
+// double-encoded reconnaissance without relying on any origin's URL router.
+// The original request is never rewritten or used for enforcement by this tool.
+fn normalize_path_for_signals(path: &str) -> String {
+    let mut bytes = path.as_bytes().to_vec();
+    for _ in 0..2 {
+        let mut decoded = Vec::with_capacity(bytes.len());
+        let mut index = 0;
+        while index < bytes.len() {
+            if bytes[index] == b'%' && index + 2 < bytes.len() {
+                if let (Some(high), Some(low)) =
+                    (hex_digit(bytes[index + 1]), hex_digit(bytes[index + 2]))
+                {
+                    let byte = (high << 4) | low;
+                    decoded.push(if byte == b'\\' { b'/' } else { byte });
+                    index += 3;
+                    continue;
+                }
+            }
+            decoded.push(if bytes[index] == b'\\' {
+                b'/'
+            } else {
+                bytes[index]
+            });
+            index += 1;
+        }
+        bytes = decoded;
+    }
+    String::from_utf8_lossy(&bytes).into_owned()
+}
+
+fn hex_digit(byte: u8) -> Option<u8> {
+    match byte {
+        b'0'..=b'9' => Some(byte - b'0'),
+        b'a'..=b'f' => Some(byte - b'a' + 10),
+        b'A'..=b'F' => Some(byte - b'A' + 10),
+        _ => None,
     }
 }
 
@@ -367,6 +408,32 @@ mod tests {
         }
         let signals = RuleEngine::new().evaluate(&make_req(None, Some("/etc/passwd")));
         assert!(signals
+            .as_slice()
+            .iter()
+            .any(|signal| signal.name == "path_sensitive"));
+    }
+
+    #[test]
+    fn encoded_sensitive_paths_remain_visible_to_rules() {
+        for path in [
+            "/%2eenv",
+            "/%252eenv",
+            "/%61dmin",
+            "/%2fadmin",
+            "\\admin",
+            "/%255cadmin",
+        ] {
+            let signals = RuleEngine::new().evaluate(&make_req(Some("Mozilla/5.0"), Some(path)));
+            assert!(
+                signals
+                    .as_slice()
+                    .iter()
+                    .any(|signal| signal.name == "path_sensitive"),
+                "missed {path}"
+            );
+        }
+        let ordinary = RuleEngine::new().evaluate(&make_req(Some("Mozilla/5.0"), Some("/welcome")));
+        assert!(!ordinary
             .as_slice()
             .iter()
             .any(|signal| signal.name == "path_sensitive"));

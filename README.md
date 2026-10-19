@@ -12,6 +12,7 @@ To package the skill for a directory listing, run `python3 scripts/package_skill
 ## Features
 
 - **23 implemented MCP tool contracts** with truthful, backend-aware availability in `model_info`
+- **Path reconnaissance signals** inspect raw, percent-encoded, and double-encoded spellings without rewriting the original request
 - **WebSocket and HTTP POST transports** with JSON-RPC 2.0 protocol
 - **Token-based authentication** (Bearer scheme) before HTTP POST body buffering and at WebSocket connection establishment
 - **Global concurrency control** with fail-fast tool rejection when capacity is full
