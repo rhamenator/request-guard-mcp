@@ -48,6 +48,7 @@ def main():
     port = unused_loopback_port()
     token = secrets.token_urlsafe(48)
     environment = os.environ.copy()
+    environment.pop("MCP__REDIS__URL", None)
     environment.update(
         {
             "AUTH_TOKENS": token,
@@ -120,6 +121,19 @@ def main():
                 env=environment,
                 check=True,
                 timeout=90,
+            )
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts/adversarial_backend_probe.py"),
+                    "--url",
+                    f"http://127.0.0.1:{port}",
+                ],
+                input=token + "\n",
+                text=True,
+                env=environment,
+                check=True,
+                timeout=30,
             )
             subprocess.run(
                 [
