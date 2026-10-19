@@ -113,16 +113,21 @@ pub(crate) async fn process_message(
 
     match req.method.as_str() {
         "initialize" => {
-            let protocol_version = req
+            const SUPPORTED_PROTOCOL_VERSION: &str = "2025-06-18";
+            let Some(_requested_version) = req
                 .params
                 .as_ref()
                 .and_then(|params| params.get("protocolVersion"))
                 .and_then(Value::as_str)
-                .unwrap_or("2025-06-18");
+            else {
+                return invalid_params(id, "initialize requires a protocolVersion string");
+            };
+            // For a different requested revision, the 2025-06-18 lifecycle
+            // requires a supported counter-offer in the initialize result.
             return Some(serialize_message(&McpMessage::success(
                 id,
                 serde_json::json!({
-                    "protocolVersion": protocol_version,
+                    "protocolVersion": SUPPORTED_PROTOCOL_VERSION,
                     "capabilities": { "tools": { "listChanged": false } },
                     "serverInfo": {
                         "name": "request-guard-mcp",
@@ -324,6 +329,36 @@ mod tests {
             .unwrap()
             .iter()
             .any(|tool| tool["name"] == "classify"));
+    }
+
+    #[tokio::test]
+    async fn initialize_counteroffers_supported_protocol_version() {
+        let (state, registry) = test_context();
+        let response = process_message(
+            r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05"}}"#,
+            &state,
+            &registry,
+            "test-caller",
+        )
+        .await
+        .expect("initialize response");
+        let response: Value = serde_json::from_str(&response).unwrap();
+        assert_eq!(response["result"]["protocolVersion"], "2025-06-18");
+        assert!(response.get("error").is_none());
+    }
+
+    #[tokio::test]
+    async fn initialize_requires_string_protocol_version() {
+        let (state, registry) = test_context();
+        for params in [r#"{}"#, r#"{"protocolVersion":42}"#] {
+            let request =
+                format!(r#"{{"jsonrpc":"2.0","id":1,"method":"initialize","params":{params}}}"#);
+            let response = process_message(&request, &state, &registry, "test-caller")
+                .await
+                .expect("initialize response");
+            let response: Value = serde_json::from_str(&response).unwrap();
+            assert_eq!(response["error"]["code"], -32602);
+        }
     }
 
     #[tokio::test]

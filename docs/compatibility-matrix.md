@@ -8,6 +8,12 @@ JSON-RPC. The server implements the standard `initialize`, `ping`,
 compatibility. Clients that use `MODEL_URI` routing can use the following
 environment variables:
 
+The current handshake revision is `2025-06-18`. If a client offers another
+revision, `initialize` counter-offers `2025-06-18`; the client must decide
+whether it supports that revision. The server does not yet implement the
+`2026-07-28` discovery lifecycle. Full transport and client conformance remain
+part of the adversarial release gate.
+
 ### `rhamenator/ai-scraping-defense` (Python/Django)
 
 ```dotenv
