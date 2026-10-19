@@ -9,6 +9,8 @@ The stdlib-only `scripts/adversarial_probe.py` is a first HTTP smoke subset. Sta
 ```bash
 python3 scripts/adversarial_probe.py --url http://LAB_HOST:8085 --token "$LAB_TOKEN" \
   --max-request-bytes 1048576
+printf '%s\n' "$LAB_TOKEN" | python3 scripts/adversarial_ws_probe.py \
+  --host LAB_HOST --port 8085
 ```
 
-Set `--max-request-bytes` to the server's configured `MCP__LIMITS__MAX_REQUEST_BYTES`. The probe refuses to follow redirects, so the bearer token stays scoped to the explicitly named lab endpoint. Do not put the token in committed files or published logs. The probe prints no token. This subset does not validate WebSocket framing, sustained exhaustion, backend failures, or complete MCP interoperability; those cases need separate evidence before release.
+Set `--max-request-bytes` to the server's configured `MCP__LIMITS__MAX_REQUEST_BYTES`. The HTTP probe refuses to follow redirects, so the bearer token stays scoped to the explicitly named lab endpoint. The WebSocket probe reads the token from stdin and tests bounded handshake and frame cases. Do not put the token in committed files or published logs. Neither probe prints the token. This subset does not validate sustained exhaustion, backend failures, oversized WebSocket frames, or complete MCP interoperability; those cases need separate evidence before release.
