@@ -9,6 +9,8 @@ use std::time::Instant;
 use tokio::{sync::OwnedSemaphorePermit, time::timeout};
 use tracing::{error, info, warn, Instrument};
 
+const UNKNOWN_TOOL_METRIC_LABEL: &str = "__unknown__";
+
 /// Handle a single WebSocket connection lifecycle.
 pub async fn handle_ws_connection(
     mut socket: WebSocket,
@@ -179,6 +181,31 @@ pub(crate) async fn process_message(
             return Some(serialize_message(&err));
         }
     };
+
+    // Reject before Redis bookkeeping and label creation. A caller can choose
+    // arbitrary method names, but Prometheus and Redis key cardinality must
+    // remain bounded by the registered tool set.
+    if registry.get(&tool_name).is_none() {
+        let app_error = AppError::ToolNotFound(tool_name);
+        state
+            .metrics
+            .requests_total
+            .with_label_values(&[UNKNOWN_TOOL_METRIC_LABEL, "error"])
+            .inc();
+        state
+            .metrics
+            .tool_errors_total
+            .with_label_values(&[UNKNOWN_TOOL_METRIC_LABEL, app_error.code()])
+            .inc();
+        state
+            .metrics
+            .request_duration_seconds
+            .with_label_values(&[UNKNOWN_TOOL_METRIC_LABEL])
+            .observe(start.elapsed().as_secs_f64());
+        return Some(serialize_message(&McpMessage::error_from_app(
+            id, &app_error,
+        )));
+    }
 
     let tool_timeout = if tool_name == "classify" {
         state.config.classify_timeout()
@@ -391,6 +418,7 @@ mod tests {
     }
 
     #[tokio::test]
+<<<<<<< HEAD
     async fn saturated_tool_capacity_rejects_without_waiting() {
         let mut config = Config::default();
         config.limits.global_concurrency = 1;
@@ -415,6 +443,24 @@ mod tests {
             .expect("capacity recovered");
         let response: Value = serde_json::from_str(&response).unwrap();
         assert!(response.get("result").is_some());
+=======
+    async fn unknown_tool_names_use_one_metric_label() {
+        let (state, registry) = test_context();
+        for name in ["probe_random_001", "probe_random_002"] {
+            let request = format!(
+                r#"{{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{{"name":"{name}","arguments":{{}}}}}}"#
+            );
+            let response = process_message(&request, &state, &registry, "test-caller")
+                .await
+                .expect("unknown-tool response");
+            let response: Value = serde_json::from_str(&response).unwrap();
+            assert_eq!(response["error"]["message"], "TOOL_NOT_FOUND");
+        }
+        let metrics = crate::telemetry::gather_metrics();
+        assert!(metrics.contains("tool=\"__unknown__\""));
+        assert!(!metrics.contains("probe_random_001"));
+        assert!(!metrics.contains("probe_random_002"));
+>>>>>>> 9ea119c (Bound metrics and Redis keys for unknown MCP tools)
     }
 
     #[test]
