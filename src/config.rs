@@ -55,6 +55,10 @@ pub struct LimitsConfig {
     pub global_concurrency: usize,
     #[serde(default = "defaults::max_connections")]
     pub max_connections: usize,
+    #[serde(default = "defaults::http_header_timeout_secs")]
+    pub http_header_timeout_secs: u64,
+    #[serde(default = "defaults::http_body_timeout_secs")]
+    pub http_body_timeout_secs: u64,
     #[serde(default = "defaults::websocket_idle_timeout_secs")]
     pub websocket_idle_timeout_secs: u64,
     #[serde(default = "defaults::per_tool_timeout_secs")]
@@ -314,6 +318,8 @@ impl Config {
             || self.limits.max_batch_size == 0
             || self.limits.global_concurrency == 0
             || self.limits.max_connections == 0
+            || self.limits.http_header_timeout_secs == 0
+            || self.limits.http_body_timeout_secs == 0
             || self.limits.websocket_idle_timeout_secs == 0
             || self.limits.per_tool_timeout_secs == 0
             || self.limits.classify_timeout_secs == 0
@@ -404,6 +410,12 @@ mod defaults {
     pub fn max_connections() -> usize {
         256
     }
+    pub fn http_header_timeout_secs() -> u64 {
+        10
+    }
+    pub fn http_body_timeout_secs() -> u64 {
+        30
+    }
     pub fn websocket_idle_timeout_secs() -> u64 {
         60
     }
@@ -468,6 +480,8 @@ impl Default for LimitsConfig {
             max_batch_size: defaults::max_batch_size(),
             global_concurrency: defaults::global_concurrency(),
             max_connections: defaults::max_connections(),
+            http_header_timeout_secs: defaults::http_header_timeout_secs(),
+            http_body_timeout_secs: defaults::http_body_timeout_secs(),
             websocket_idle_timeout_secs: defaults::websocket_idle_timeout_secs(),
             per_tool_timeout_secs: defaults::per_tool_timeout_secs(),
             classify_timeout_secs: defaults::classify_timeout_secs(),

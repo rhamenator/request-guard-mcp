@@ -15,7 +15,7 @@ To package the skill for a directory listing, run `python3 scripts/package_skill
 - **WebSocket and HTTP POST transports** with JSON-RPC 2.0 protocol
 - **Token-based authentication** (Bearer scheme) before HTTP POST body buffering and at WebSocket connection establishment
 - **Global concurrency control** with fail-fast tool rejection when capacity is full
-- **Per-tool execution timeouts** after dispatch; deploy proxy read and connection timeouts
+- **HTTP header and body read deadlines**, a whole-connection cap, and per-tool execution timeouts; deploy proxy read and connection timeouts as an additional boundary
 - **Prometheus metrics** at `/metrics` with p50/p95/p99 histograms
 - **Two-level classification cache** (in-process Moka + shared Redis)
 - **Structured JSON logging** via `tracing`
