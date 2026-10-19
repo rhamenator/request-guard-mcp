@@ -44,6 +44,13 @@ synthetic request marker, then confirms expected log events occurred without
 either value appearing in a bounded capture. This checks direct log leakage
 for those calls, not every tool, proxy, collector, or encoding. See
 `adversarial-evidence-logs-2026-10-19.md`.
+CI also sends 128 deterministic malformed JSON-RPC envelopes, verifies each
+gets a structured error, and confirms a healthy authenticated ping afterward.
+On a two-slot listener it sheds 128 bounded excess TCP connections and then
+checks recovery. These probes cap their counts at 256, avoid sustained load,
+and run without additional Python dependencies. The expanded Kali-to-Ubuntu
+evidence, including a live Redis outage and cache-scope observation, is in
+`adversarial-evidence-expanded-2026-10-19.md`.
 
 The stdlib-only `scripts/adversarial_probe.py` is a first HTTP smoke subset. Start a lab server with a temporary token of at least 32 characters, then run:
 
