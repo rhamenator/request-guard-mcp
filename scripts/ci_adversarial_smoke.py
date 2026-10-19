@@ -16,6 +16,7 @@ import urllib.request
 
 
 ROOT = Path(__file__).resolve().parents[1]
+LAB_MAX_REQUEST_BYTES = 4096
 
 
 def unused_loopback_port():
@@ -53,6 +54,9 @@ def main():
             "MCP__AUTH__ENABLED": "true",
             "MCP__HOST": "127.0.0.1",
             "MCP__PORT": str(port),
+            "MCP__LIMITS__MAX_REQUEST_BYTES": str(LAB_MAX_REQUEST_BYTES),
+            "MCP__LIMITS__HTTP_HEADER_TIMEOUT_SECS": "1",
+            "MCP__LIMITS__HTTP_BODY_TIMEOUT_SECS": "1",
             "NO_PROXY": "127.0.0.1,localhost",
             "no_proxy": "127.0.0.1,localhost",
         }
@@ -78,6 +82,8 @@ def main():
                     str(ROOT / "scripts/adversarial_probe.py"),
                     "--url",
                     f"http://127.0.0.1:{port}",
+                    "--max-request-bytes",
+                    str(LAB_MAX_REQUEST_BYTES),
                 ],
                 input=token + "\n",
                 text=True,
@@ -112,6 +118,23 @@ def main():
                 env=environment,
                 check=True,
                 timeout=90,
+            )
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts/adversarial_slow_client_probe.py"),
+                    "--host",
+                    "127.0.0.1",
+                    "--port",
+                    str(port),
+                    "--max-request-bytes",
+                    str(LAB_MAX_REQUEST_BYTES),
+                ],
+                input=token + "\n",
+                text=True,
+                env=environment,
+                check=True,
+                timeout=30,
             )
         finally:
             process.terminate()
