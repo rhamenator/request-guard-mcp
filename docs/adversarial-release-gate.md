@@ -22,9 +22,9 @@ afterward. The slow-client probe is bounded to four connections and a
 30-second subprocess cap; it does not simulate sustained exhaustion.
 With that same 4096-byte cap, the WebSocket probe checks one oversized frame,
 a fragmented message whose combined size exceeds the cap, and a fresh
-connection afterward. The current server hard-closes oversized WebSocket
-connections without a close frame; this is recorded as a protocol-quality
-limit, not treated as a successful tool response.
+connection afterward. The server must send WebSocket close code 1009 for
+oversized frames and completed fragmented messages; a hard TCP close fails
+the probe. See `adversarial-evidence-ws-close-2026-10-19.md` for the fix.
 
 The stdlib-only `scripts/adversarial_probe.py` is a first HTTP smoke subset. Start a lab server with a temporary token of at least 32 characters, then run:
 

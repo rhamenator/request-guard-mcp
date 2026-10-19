@@ -2595,6 +2595,7 @@ dependencies = [
  "tracing",
  "tracing-opentelemetry",
  "tracing-subscriber",
+ "tungstenite",
  "uuid",
  "validator",
  "woothee",

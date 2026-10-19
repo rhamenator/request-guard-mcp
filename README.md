@@ -35,6 +35,10 @@ in `opentelemetry-otlp` is used only to export telemetry to an OTLP collector.
 Use a JSON-RPC `2.0` envelope and a string or numeric request ID (or `null`).
 Source builds after v0.1.1 return `-32600` for invalid envelope shapes and
 `-32700` for malformed JSON. Client notifications receive no response.
+Source builds that include the WebSocket size-limit fix send close code 1009
+when a frame or fragmented message exceeds `MCP__LIMITS__MAX_REQUEST_BYTES`.
+The published v0.1.1 release can instead close the connection without a
+WebSocket close frame.
 
 ## Quickstart
 
