@@ -70,11 +70,13 @@ def main():
         try:
             wait_for_health(process, port)
             rss_before = rss_kib(process.pid)
+            peak_rss = rss_before
             for cycle in range(CYCLES):
                 held = []
                 shed = 0
                 errors = 0
                 max_latency = 0.0
+                cycle_peak_rss = rss_kib(process.pid)
                 try:
                     for _ in range(2):
                         connection = socket.create_connection(("127.0.0.1", port), timeout=2)
@@ -94,6 +96,7 @@ def main():
                         except OSError:
                             errors += 1
                         max_latency = max(max_latency, time.monotonic() - then)
+                        cycle_peak_rss = max(cycle_peak_rss, rss_kib(process.pid))
                         time.sleep(HOLD_SECONDS / ATTEMPTS_PER_CYCLE)
                 finally:
                     for connection in held:
@@ -112,8 +115,10 @@ def main():
                                 "errors": errors, "recovered": recovered,
                                 "max_latency_ms": round(max_latency * 1000, 2),
                                 "rss_kib": rss_kib(process.pid),
+                                "peak_rss_kib": cycle_peak_rss,
                                 "io_psi_some_avg10": io_psi(),
                                 "host_load_1m": host_load_1m()})
+                peak_rss = max(peak_rss, cycle_peak_rss)
             rss_after = rss_kib(process.pid)
         finally:
             process.terminate()
@@ -124,10 +129,11 @@ def main():
                 process.wait(timeout=5)
     passed = all(r["shed"] == ATTEMPTS_PER_CYCLE and r["errors"] == 0
                  and r["recovered"] and r["max_latency_ms"] < 2000
-                 for r in results) and rss_after - rss_before < 16384
+                 for r in results) and peak_rss - rss_before < 16384
     print(json.dumps({"case": "sustained_slow_header_saturation", "pass": passed,
                       "binary_sha256": digest, "elapsed_seconds": round(time.monotonic() - started, 2),
                       "rss_before_kib": rss_before, "rss_after_kib": rss_after,
+                      "peak_rss_kib": peak_rss,
                       "io_psi_some_avg10_before": psi_before,
                       "io_psi_some_avg10_after": io_psi(), "cycles": results}), flush=True)
     raise SystemExit(0 if passed else 1)

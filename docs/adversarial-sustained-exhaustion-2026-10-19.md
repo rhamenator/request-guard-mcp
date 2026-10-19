@@ -9,8 +9,10 @@ fresh server on loopback with a synthetic bearer token, `MAX_CONNECTIONS=2`,
 and a ten-second header deadline. For each of 12 cycles, it held two incomplete
 HTTP headers for about five seconds, attempted 32 excess connections at a
 bounded rate, released the held sockets, and required an authenticated `ping`
-to recover. It sampled server RSS, host one-minute load, and host I/O pressure
-after every cycle. The server and synthetic token were removed at completion.
+to recover. It sampled server RSS during every saturation batch, retained the
+peak for the memory pass condition, and sampled host one-minute load and I/O
+pressure after every cycle. The server and synthetic token were removed at
+completion.
 
 Command:
 
@@ -24,11 +26,12 @@ loopback test. The rule was removed and the firewall reloaded afterward.
 
 ## Observed result
 
-The 63.37-second run passed. All 384 excess connections were shed without
-connection errors, and all 12 recovery pings succeeded. The highest observed
-excess-connection latency was 3.22 ms. Server RSS rose from 14,916 to
-15,488 KiB (572 KiB) and plateaued during later cycles. Sampled host
-one-minute load ranged from 0.86 to 1.41; sampled `io.some` ten-second
+The repeated 63.46-second run passed. All 384 excess connections were shed
+without connection errors, and all 12 recovery pings succeeded. The highest
+observed excess-connection latency was 1.91 ms. Server RSS began at 14,784
+KiB and peaked at 15,412 KiB (628 KiB above baseline) during the monitored
+run; final RSS equaled that peak. Sampled host one-minute load ranged from
+0.59 to 1.00; sampled `io.some` ten-second
 pressure remained `avg10=0.00`. The probe emits a machine-readable JSON result
 that can be captured for each run; the local run output is not part of a
 release asset.
