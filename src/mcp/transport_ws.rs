@@ -122,6 +122,12 @@ pub(crate) async fn process_message(
         {
             return invalid_request(Value::Null);
         }
+        if envelope
+            .get("params")
+            .is_some_and(|params| !params.is_object() && !params.is_array())
+        {
+            return invalid_request(Value::Null);
+        }
     } else if !envelope.contains_key("id")
         || envelope.contains_key("result") == envelope.contains_key("error")
     {
