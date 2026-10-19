@@ -247,12 +247,12 @@ impl RuleEngine {
     }
 }
 
-// Inspect common encoded spellings as well as the raw path. Two rounds catch
-// double-encoded reconnaissance without relying on any origin's URL router.
+// Inspect common encoded spellings as well as the raw path. Four bounded rounds
+// catch repeated percent-encoding without relying on any origin's URL router.
 // The original request is never rewritten or used for enforcement by this tool.
 fn normalize_path_for_signals(path: &str) -> String {
     let mut bytes = path.as_bytes().to_vec();
-    for _ in 0..2 {
+    for _ in 0..4 {
         let mut decoded = Vec::with_capacity(bytes.len());
         let mut index = 0;
         while index < bytes.len() {
@@ -418,6 +418,8 @@ mod tests {
         for path in [
             "/%2eenv",
             "/%252eenv",
+            "/%25252eenv",
+            "/%2525252eenv",
             "/%61dmin",
             "/%2fadmin",
             "\\admin",
