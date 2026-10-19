@@ -99,6 +99,8 @@ def main():
                     "127.0.0.1",
                     "--port",
                     str(port),
+                    "--max-request-bytes",
+                    str(LAB_MAX_REQUEST_BYTES),
                 ],
                 input=token + "\n",
                 text=True,

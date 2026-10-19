@@ -20,6 +20,11 @@ one-second header/body timeouts to test incomplete headers, a stalled
 authenticated body, a chunked body over the limit, and a healthy request
 afterward. The slow-client probe is bounded to four connections and a
 30-second subprocess cap; it does not simulate sustained exhaustion.
+With that same 4096-byte cap, the WebSocket probe checks one oversized frame,
+a fragmented message whose combined size exceeds the cap, and a fresh
+connection afterward. The current server hard-closes oversized WebSocket
+connections without a close frame; this is recorded as a protocol-quality
+limit, not treated as a successful tool response.
 
 The stdlib-only `scripts/adversarial_probe.py` is a first HTTP smoke subset. Start a lab server with a temporary token of at least 32 characters, then run:
 
@@ -32,7 +37,13 @@ printf '%s\n' "$LAB_TOKEN" | python3 scripts/adversarial_classifier_probe.py \
   --url http://LAB_HOST:8085
 ```
 
-Set `--max-request-bytes` to the server's configured `MCP__LIMITS__MAX_REQUEST_BYTES`. The HTTP probes refuse to follow redirects, so the bearer token stays scoped to the explicitly named lab endpoint. All probes can read a token from stdin; omit the first HTTP probe's `--token` argument to do so. The WebSocket probe tests bounded handshake and frame cases. Do not put the token in committed files or published logs. None of the probes prints the token. This subset does not validate sustained exhaustion, backend failures, unknown user-agent evasions, oversized WebSocket frames, or complete MCP interoperability; those cases need separate evidence before release.
+Set `--max-request-bytes` to the server's configured `MCP__LIMITS__MAX_REQUEST_BYTES`. The HTTP probes refuse to follow redirects, so the bearer token stays scoped to the explicitly named lab endpoint. All probes can read a token from stdin; omit the first HTTP probe's `--token` argument to do so. The WebSocket probe tests bounded handshake and frame cases. Do not put the token in committed files or published logs. None of the probes prints the token. This subset does not validate sustained exhaustion, backend failures, unknown user-agent evasions, or complete MCP interoperability; those cases need separate evidence before release.
+
+To test WebSocket size limits manually, use a lab server configured with
+`MCP__LIMITS__MAX_REQUEST_BYTES=4096` and add
+`--max-request-bytes 4096` to the WebSocket probe command. The probe caps
+its test size at 65536 bytes; omitting the option keeps the original
+handshake/protocol subset.
 
 For the slow-client subset, start a separate lab server with
 `MCP__LIMITS__MAX_REQUEST_BYTES=4096`,
