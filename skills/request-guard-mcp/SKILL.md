@@ -19,3 +19,4 @@ Install a server build with standard MCP `initialize`, `tools/list`, and `tools/
 - Incomplete or slow HTTP requests can receive HTTP 408, and new sockets can be closed when the server's connection cap is full. Treat either as an availability signal, not an allow verdict.
 
 Record the returned request ID, verdict, confidence, and contributing signals. TLS fingerprints supplied by an ordinary caller are unverified without the server's attestation path; never invent that provenance. The result supports a site owner's policy decision. A website must explicitly send requests to the classifier and enforce its own response; this skill cannot route live traffic or block a visitor by itself.
+Sensitive-path checks account for common percent encoding and backslash spellings, but a verdict does not replace the website's own URL normalization or authorization rules.

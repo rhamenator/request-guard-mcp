@@ -31,6 +31,9 @@ All WebSocket connections are authenticated at connection establishment using a 
 
 - All request bodies are size-limited (`max_request_bytes`, default 1 MiB).
 - All tool parameters are deserialized into strongly-typed structs via `serde`.
+- Sensitive-path signals inspect up to two rounds of percent decoding and
+  backslash separators. This is a heuristic; the deploying origin must still
+  enforce its own URL normalization and access controls.
 - Invalid JSON is rejected with a `Parse error` (-32700) response.
 - Batch requests are bounded by `max_batch_size` (default 50).
 - HTTP/1.1 header reads have a 10-second deadline by default; authenticated HTTP
