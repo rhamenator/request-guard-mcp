@@ -11,7 +11,7 @@ Install a server build with standard MCP `initialize`, `tools/list`, and `tools/
 
 ## When and how
 
-- For an observed inbound website or API request that needs a risk assessment, call `classify` with only relevant metadata, such as `ip`, `user_agent`, `method`, `path`, and selected headers. Avoid sending request bodies, cookies, authorization headers, and personal data unless the task requires them and the user has authorized that transfer.
+- For an observed inbound website or API request that needs a risk assessment, call `classify` with only relevant metadata, such as `ip`, `user_agent`, `method`, `path`, and selected headers. Configure the MCP client's bearer token; unauthenticated HTTP POST requests are rejected before their body is read. Avoid sending request bodies, cookies, authorization headers, and personal data unless the task requires them and the user has authorized that transfer.
 - For a batch of observed requests, call `batch_classify` if available. To explain a specific result, retain the original request metadata passed to `classify` and pass that same metadata to `explain`; do not pass the classification response as input. Use `model_info` and `health` to check capability and service status before relying on an optional backend tool.
 - Use enrichment, reputation, canary, replay, drift, or calibration tools only when the corresponding backend is configured and the user's task calls for that evidence. Report an unavailable backend as unavailable, not as a clean signal.
 - If a tool call returns `RATE_LIMIT_EXCEEDED`, treat it as temporary capacity pressure; retry later with bounded backoff rather than assuming the request is safe or sending a burst of retries.
