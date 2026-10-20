@@ -269,7 +269,7 @@ fn accepts_json(headers: &HeaderMap) -> bool {
                         return false;
                     };
                     quality = parsed;
-                } else if !saw_q {
+                } else {
                     // A media parameter not carried by our JSON response does
                     // not match. It must not invalidate a later wildcard.
                     if !name.trim().eq_ignore_ascii_case("charset")
@@ -279,8 +279,6 @@ fn accepts_json(headers: &HeaderMap) -> bool {
                         continue 'range;
                     }
                     matched_parameters = 1;
-                } else {
-                    // Accept extensions after q do not constrain the media type.
                 }
             }
             if best.is_none_or(|(prior, params, _)| {
@@ -372,7 +370,7 @@ mod protocol_version_tests {
             "application/json;q=0.5, application/*;q=0",
             "Application/JSON; Q=1",
             "application/json;foo=bar, */*",
-            "application/json;q=1;version=1",
+            "application/json;q=1;version=1, */*",
             "application/*;q=0, application/json",
         ] {
             let mut headers = HeaderMap::new();
@@ -388,6 +386,7 @@ mod protocol_version_tests {
             "application/json;q=1.1",
             "application/json;q=bogus",
             "application/json;charset=utf-8;q=0, application/json",
+            "application/json;q=0;charset=utf-8, application/json;q=1",
             "application/json;q=0.0001",
         ] {
             let mut headers = HeaderMap::new();
