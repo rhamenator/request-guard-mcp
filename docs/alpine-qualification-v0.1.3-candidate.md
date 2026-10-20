@@ -153,3 +153,28 @@ Alpine trust store, and the dedicated guest was shut down. The owner's guest
 login credential remains in the GNOME Login keyring for future testing. No
 test certificate, private key, token, guest disk, candidate archive, or npm
 tarball was committed to this repository. This is not a public release.
+
+## Final candidate cross-VM rerun
+
+Private workflow [39359018607](https://github.com/rhamenator/request-guard-mcp/actions/runs/39359018607)
+completed all five platform builds from `a1758c0`. All five downloaded
+archive sidecars verified. The final musl archive SHA-256 is
+`8cd707d572ddc2b1e471f30e58ceabd600daacfc46bd02af4fff97f33bff5c16`;
+its extracted binary SHA-256 is the same `0f72f6d704488ce763dc9021b8b3eef82e0e8aee20844b213479212af5a85c3b`
+used for the integration and TLS tests above.
+
+With the final archive running in the dedicated Alpine VM and the probes in
+the separate Kali VM, the authenticated HTTP matrix passed 10/10, WebSocket
+8/8, classifier controls/evasions 19/19, malformed envelopes 128/128 with
+recovery, and slow-client/body limits 4/4. A two-slot listener shed 128/128
+additional connections with zero probe exceptions and recovered; maximum
+observed close latency was 2.81 ms. The host's sampled I/O PSI avg10 was
+0.00 and load average was below 2 during this bounded run. The five-archive
+npm candidate clean-installed in Alpine and selected a musl binary with the
+same SHA-256. The installed npm launcher passed all five official Inspector
+checks: missing-token rejection, initialize, tools/list, classify, and
+explain.
+
+This is release-candidate evidence from authorized local guests. It is not
+proof of resistance to unbounded resource exhaustion or all classifier
+evasions.
