@@ -71,7 +71,7 @@ Fallback is triggered when:
 |---------|-----------|-----------|
 | 2025-06-18 | WebSocket JSON-RPC (custom client transport) | Implemented; client interoperability gate open |
 | 2025-06-18 | HTTP POST JSON-RPC | Inspector 2.5.0 smoke passed; full conformance gate open |
-| 2025-06-18 | stdio, SSE GET, gRPC | Not implemented |
+| 2025-06-18 | stdio, SSE GET, gRPC | Not implemented; development main returns 405 for authorized, non-upgrade GET `/mcp` requests |
 
 Accepted HTTP POST notifications and client responses have no response body.
 Development main returns HTTP 202; the published v0.1.3 server returns 204.
