@@ -200,7 +200,11 @@ fn is_one_way_candidate(text: &str) -> bool {
         .and_then(|value| {
             value.as_object().map(|object| {
                 let has_method = object.contains_key("method");
-                !has_method || !object.contains_key("id")
+                (has_method && !object.contains_key("id"))
+                    || (!has_method
+                        && ["id", "result", "error"]
+                            .iter()
+                            .any(|key| object.contains_key(*key)))
             })
         })
         .unwrap_or(false)

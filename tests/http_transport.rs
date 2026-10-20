@@ -516,6 +516,8 @@ async fn post_mcp_rejects_invalid_json_rpc_envelopes() {
         json!({"jsonrpc": "2.0", "id": 1, "method": "ping", "params": 42}),
         json!({"jsonrpc": "2.0", "id": 1, "method": "ping", "params": null}),
         json!({"jsonrpc": "2.0", "id": 1, "method": "ping", "params": []}),
+        json!({"jsonrpc": "2.0"}),
+        json!({}),
         json!([]),
     ] {
         let response = server.post("/mcp").json(&payload).await;
