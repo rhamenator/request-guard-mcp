@@ -526,6 +526,14 @@ mod tests {
         )
         .await
         .is_none());
+        assert!(process_message(
+            r#"{"jsonrpc":"2.0","id":null,"error":{"code":-32600,"message":"Invalid Request"}}"#,
+            &state,
+            &registry,
+            "test-caller"
+        )
+        .await
+        .is_none());
     }
 
     #[tokio::test]
