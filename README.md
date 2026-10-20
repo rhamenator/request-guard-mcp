@@ -48,6 +48,13 @@ HTTP 400 before reading a POST body. The header may be omitted for older
 clients; this does not imply support for an older protocol revision. Published
 v0.1.3 does not enforce the header. The custom WebSocket upgrade does not
 use this Streamable HTTP header.
+Development main returns HTTP 415 before reading an MCP POST body if an
+explicit `Content-Type` is not `application/json` or
+`application/json; charset=utf-8` (case-insensitive). A missing header remains
+accepted for older direct clients. Published v0.1.3 does not enforce this
+media-type policy. MCP 2025-06-18 clients should send
+`Accept: application/json, text/event-stream`; this server returns JSON for
+requests and does not yet validate `Accept`.
 Use a JSON-RPC `2.0` envelope and a string or numeric request ID (or `null`).
 v0.1.2 and newer builds return `-32600` for invalid envelope shapes and
 `-32700` for malformed JSON. Client notifications receive no JSON-RPC response;
@@ -93,6 +100,7 @@ curl http://localhost:8085/health
 
 # HTTP JSON-RPC classify
 curl -H "Authorization: Bearer $YOUR_TOKEN" -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
   --data '{"jsonrpc":"2.0","id":1,"method":"classify","params":{"user_agent":"GPTBot/1.0","path":"/"}}' \
   http://localhost:8085/mcp
 

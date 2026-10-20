@@ -24,6 +24,14 @@ clients without a session header. This is a compatibility allowance, not a
 claim that the server implements the older protocol revision. Published
 v0.1.3 does not enforce this header. The custom WebSocket upgrade does not
 use this Streamable HTTP header.
+Development main returns HTTP 415 before reading an MCP POST body when its
+explicit `Content-Type` is not `application/json` or the same media type with
+`charset=utf-8` (case-insensitive). Missing `Content-Type` remains accepted
+for older clients; published v0.1.3 does not enforce this policy. The pinned
+transport requires clients to send an `Accept` header advertising both
+`application/json` and `text/event-stream`. This server returns JSON for
+requests and does not yet validate `Accept`, so a client that advertises only
+SSE may receive JSON.
 
 ### `rhamenator/ai-scraping-defense` (Python/Django)
 

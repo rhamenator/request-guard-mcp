@@ -8,7 +8,9 @@ use axum::{
     body::{to_bytes, Body},
     extract::{ws::WebSocketUpgrade, FromRequestParts, Request, State},
     http::{
-        header::{ALLOW, CONNECTION, CONTENT_LENGTH, UPGRADE, X_CONTENT_TYPE_OPTIONS},
+        header::{
+            ALLOW, CONNECTION, CONTENT_LENGTH, CONTENT_TYPE, UPGRADE, X_CONTENT_TYPE_OPTIONS,
+        },
         HeaderMap, HeaderValue, Method, StatusCode,
     },
     middleware::map_response,
@@ -124,6 +126,13 @@ fn header_has_token(
 }
 
 async fn http_mcp_handler(state: ServerState, request: Request, caller_scope: String) -> Response {
+    if !json_content_type(request.headers()) {
+        return (
+            StatusCode::UNSUPPORTED_MEDIA_TYPE,
+            "MCP POST Content-Type must be application/json with UTF-8 charset",
+        )
+            .into_response();
+    }
     if request
         .headers()
         .get(CONTENT_LENGTH)
@@ -169,6 +178,48 @@ async fn http_mcp_handler(state: ServerState, request: Request, caller_scope: St
     }
 }
 
+fn json_content_type(headers: &HeaderMap) -> bool {
+    let mut values = headers.get_all(CONTENT_TYPE).iter();
+    let Some(value) = values.next() else {
+        // Older direct clients can omit Content-Type; the JSON parser still
+        // validates the bounded UTF-8 body.
+        return true;
+    };
+    if values.next().is_some() {
+        return false;
+    }
+    let Ok(value) = value.to_str() else {
+        return false;
+    };
+    let mut parts = value.split(';');
+    if !parts
+        .next()
+        .is_some_and(|media| media.trim().eq_ignore_ascii_case("application/json"))
+    {
+        return false;
+    }
+    let mut saw_charset = false;
+    for part in parts {
+        let Some((name, value)) = part.trim().split_once('=') else {
+            return false;
+        };
+        if !name.trim().eq_ignore_ascii_case("charset") || saw_charset {
+            return false;
+        }
+        saw_charset = true;
+        let value = value.trim();
+        let value = if value.starts_with('"') && value.ends_with('"') && value.len() >= 2 {
+            &value[1..value.len() - 1]
+        } else {
+            value
+        };
+        if !value.eq_ignore_ascii_case("utf-8") {
+            return false;
+        }
+    }
+    true
+}
+
 fn valid_protocol_version(headers: &HeaderMap) -> bool {
     let mut values = headers.get_all("mcp-protocol-version").iter();
     match values.next() {
@@ -205,6 +256,14 @@ mod protocol_version_tests {
             HeaderValue::from_static("2025-06-18"),
         );
         assert!(!valid_protocol_version(&headers));
+    }
+
+    #[test]
+    fn duplicate_content_type_headers_are_rejected() {
+        let mut headers = HeaderMap::new();
+        headers.append(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        headers.append(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        assert!(!json_content_type(&headers));
     }
 }
 
