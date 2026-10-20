@@ -172,7 +172,10 @@ kubectl get hpa -n request-guard
 
 ## Upgrading
 
-1. Update the image tag in `deployment.yaml`.
+1. Verify the new release's published multiarch image digest and platform
+   manifests, then replace the `@sha256:...` image reference in
+   `deploy/k8s/deployment.yaml`. Update both `version` labels to the same
+   release version; do not substitute a mutable tag for the digest.
 2. Apply: `kubectl apply -f deploy/k8s/deployment.yaml`.
 3. Monitor: `kubectl rollout status deployment/request-guard-mcp -n request-guard`.
 4. Rollback if needed: `kubectl rollout undo deployment/request-guard-mcp -n request-guard`.
