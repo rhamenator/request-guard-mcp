@@ -6,7 +6,7 @@
 
 A **Rust MCP (Model Context Protocol) server** for request risk classification, enrichment, and abuse-signal analysis. The official MCP Inspector can call its tools over HTTP POST; custom WebSocket clients can use the JSON-RPC endpoint. Client support depends on transport and authentication compatibility. The `ai-scraping-defense` projects are optional clients. Stable release readiness is subject to the [adversarial release gate](docs/adversarial-release-gate.md).
 
-Install the experimental [npm release](https://www.npmjs.com/package/request-guard-mcp/v/0.1.1) with `npm install -g request-guard-mcp@0.1.1`, configure `AUTH_TOKENS`, then run `request-guard-mcp`. The package includes native binaries for Linux x64 (glibc), Windows x64, macOS Intel, and macOS Apple Silicon. Follow the [npm setup guide](docs/npm-release.md#install-and-connect) for environment and MCP client steps; [INSTALL.md](INSTALL.md) applies to downloaded native bundles.
+Install the experimental [npm release](https://www.npmjs.com/package/request-guard-mcp/v/0.1.2) with `npm install -g request-guard-mcp@0.1.2`, configure `AUTH_TOKENS`, then run `request-guard-mcp`. The package includes native binaries for Linux x64 (glibc), Windows x64, macOS Intel, and macOS Apple Silicon. Follow the [npm setup guide](docs/npm-release.md#install-and-connect) for environment and MCP client steps; [INSTALL.md](INSTALL.md) applies to downloaded native bundles.
 
 The [companion skill](skills/request-guard-mcp/SKILL.md) tells a connected agent when and how to use this server’s classification tools. It does not deploy or replace the separate AI Scraping Defense products.
 
@@ -37,9 +37,9 @@ this server. A gRPC listener is intentionally out of scope because the project
 does not define a separate protobuf service contract; the `grpc-tonic` feature
 in `opentelemetry-otlp` is used only to export telemetry to an OTLP collector.
 Use a JSON-RPC `2.0` envelope and a string or numeric request ID (or `null`).
-Source builds after v0.1.1 return `-32600` for invalid envelope shapes and
+v0.1.2 and newer builds return `-32600` for invalid envelope shapes and
 `-32700` for malformed JSON. Client notifications receive no response.
-Source builds that include the WebSocket size-limit fix send close code 1009
+v0.1.2 and newer builds send WebSocket close code 1009
 when a frame or fragmented message exceeds `MCP__LIMITS__MAX_REQUEST_BYTES`.
 The published v0.1.1 release can instead close the connection without a
 WebSocket close frame.
@@ -110,7 +110,7 @@ companion skill locally with `python3 scripts/package_skill.py` if you need a
 directory listing ZIP; GitHub releases do not include that ZIP.
 
 The [`request-guard-mcp` npm package](https://www.npmjs.com/package/request-guard-mcp)
-is a separate native installation option. A fresh registry install of 0.1.1
+is a separate native installation option. A fresh registry install of 0.1.2
 passed official MCP Inspector initialization, tool listing, `classify`, and
 `explain`. See the [npm release guide](docs/npm-release.md) for package details.
 

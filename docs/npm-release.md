@@ -2,7 +2,7 @@
 
 The GitHub Packages entry for `request-guard-mcp` is a container image. The npm
 package is a separate installation option for the official native release.
-The experimental [0.1.1 package](https://www.npmjs.com/package/request-guard-mcp/v/0.1.1)
+The experimental [0.1.2 package](https://www.npmjs.com/package/request-guard-mcp/v/0.1.2)
 is published. A fresh registry install with an empty npm cache
 passed Inspector authentication, initialization, listing 23 tools,
 `classify`, and `explain` on Linux x64. This is an experimental release;
@@ -10,7 +10,7 @@ the adversarial production-readiness gate remains open.
 
 ## Install and connect
 
-Run `npm install -g request-guard-mcp@0.1.1`. Set a unique random
+Run `npm install -g request-guard-mcp@0.1.2`. Set a unique random
 `AUTH_TOKENS` bearer token of at least 32 characters and bind locally before
 starting the globally installed command. On Linux/macOS:
 
