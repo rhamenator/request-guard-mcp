@@ -146,9 +146,12 @@ jobs:
           expected = set(os.environ['EXPECTED_PLATFORMS'].split(','))
           with tarfile.open('/tmp/request-guard-cold.oci.tar', 'r') as archive:
               def read_json(path):
-                  entry = archive.extractfile(path)
-                  if entry is None or entry.size > 2_000_000:
+                  member = archive.getmember(path)
+                  if member.size > 2_000_000:
                       raise SystemExit(f'OCI metadata missing or oversized: {path}')
+                  entry = archive.extractfile(member)
+                  if entry is None:
+                      raise SystemExit(f'OCI metadata missing: {path}')
                   return json.load(entry)
 
               def blob(digest):
