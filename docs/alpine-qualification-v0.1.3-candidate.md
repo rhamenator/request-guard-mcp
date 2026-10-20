@@ -135,6 +135,17 @@ This proves configured HTTPS OTLP export with Alpine system trust roots and
 rejection of an untrusted lab CA for this candidate. It does not prove every
 public collector, certificate configuration, or network failure mode.
 
+The release workflow now repeats this TLS boundary against the verified musl
+archive inside its pinned Alpine container. It creates two short-lived local
+certificate authorities, installs only the trusted CA in the container trust
+store, invokes `classify` over authenticated MCP WebSocket, requires a nonempty
+gRPC OTLP trace export at the trusted collector, and requires zero exports plus
+an `UnknownIssuer` error for the untrusted collector. Synthetic bearer, cache
+scope key, and request marker are checked against bounded private server logs.
+The collector uses Alpine's test-only `py3-grpcio` package; no server runtime
+dependency is added. This CI check does not cover arbitrary remote collector
+policies or every TLS failure mode.
+
 The private workflow completed successfully on all five targets with no
 GitHub release. All five archive sidecars verified after download. The musl
 binary is a static PIE with no ELF interpreter; the updated lockfile includes
