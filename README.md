@@ -6,9 +6,9 @@
 
 A **Rust MCP (Model Context Protocol) server** for request risk classification, enrichment, and abuse-signal analysis. The official MCP Inspector can call its tools over HTTP POST; custom WebSocket clients can use the JSON-RPC endpoint. Client support depends on transport and authentication compatibility. The `ai-scraping-defense` projects are optional clients. Stable release readiness is subject to the [adversarial release gate](docs/adversarial-release-gate.md).
 
-For the upcoming experimental v0.1.4 release, install the matching [npm package](https://www.npmjs.com/package/request-guard-mcp) with `npm install -g request-guard-mcp@0.1.4` after it appears on npm, configure `AUTH_TOKENS`, then run `request-guard-mcp`. Until then, v0.1.3 is the published package. The package includes native binaries for Linux x64 (glibc and musl/Alpine), Windows x64, macOS Intel, and macOS Apple Silicon. Follow the [npm setup guide](docs/npm-release.md#install-and-connect) for environment and MCP client steps; [INSTALL.md](INSTALL.md) applies to downloaded native bundles.
+The experimental [v0.1.4 native release](https://github.com/rhamenator/request-guard-mcp/releases/tag/v0.1.4) includes checksum-protected binaries for Linux x64 (glibc and musl/Alpine), Windows x64, macOS Intel, and macOS Apple Silicon. The matching [npm package](https://www.npmjs.com/package/request-guard-mcp/v/0.1.4) passed a fresh public-registry install and MCP client test. Follow [INSTALL.md](INSTALL.md) for native setup or the [npm guide](docs/npm-release.md#install-and-connect) for npm setup.
 
-The current [v0.1.3 native release](https://github.com/rhamenator/request-guard-mcp/releases/tag/v0.1.3) has a Linux x64 musl archive for Alpine. The v0.1.4 candidate retains that platform and adds the [packaged PostgreSQL TLS qualification](docs/releases/v0.1.4-postgres-tls-evidence.md). Choose `linux-x64-musl` on Alpine and `linux-x64` on glibc hosts.
+The v0.1.4 release retains the Linux x64 musl archive for Alpine and passed [packaged PostgreSQL TLS qualification](docs/releases/v0.1.4-postgres-tls-evidence.md). Choose `linux-x64-musl` on Alpine and `linux-x64` on glibc hosts.
 
 The [companion skill](skills/request-guard-mcp/SKILL.md) tells a connected agent when and how to use this server’s classification tools. It does not deploy or replace the separate AI Scraping Defense products.
 
@@ -70,7 +70,7 @@ outside browsers and never replaces authentication. The check does not cover
 
 v0.1.2 and newer builds send WebSocket close code 1009 for an oversized frame
 or fragmented message; v0.1.1 may instead close without a close frame.
-The published v0.1.3 release predates the v0.1.4 HTTP and Origin rules above;
+The earlier v0.1.3 release predates the v0.1.4 HTTP and Origin rules above;
 use its [tagged documentation](https://github.com/rhamenator/request-guard-mcp/tree/v0.1.3)
 when operating that version.
 
@@ -131,7 +131,7 @@ tested results and current protocol limits.
 
 ## Ready-to-run releases
 
-The v0.1.3 GitHub release includes checksum-protected native bundles for Linux x64 glibc and musl,
+The v0.1.4 GitHub release includes checksum-protected native bundles for Linux x64 glibc and musl,
 Windows x64, macOS Intel, and macOS Apple Silicon. Download the archive for your
 platform and follow the bundled [INSTALL.md](INSTALL.md) for checksum verification,
 token setup, startup, and MCP client connection. A container
@@ -141,7 +141,7 @@ companion skill locally with `python3 scripts/package_skill.py` if you need a
 directory listing ZIP; GitHub releases do not include that ZIP.
 
 The [`request-guard-mcp` npm package](https://www.npmjs.com/package/request-guard-mcp)
-is a separate native installation option. A fresh registry install of 0.1.3
+is a separate native installation option. A fresh registry install of 0.1.4
 passed official MCP Inspector initialization, tool listing, `classify`, and
 `explain`. See the [npm release guide](docs/npm-release.md) for package details.
 
@@ -167,10 +167,9 @@ kubectl apply -f deploy/k8s/secret.yaml
 make k8s-apply
 ```
 
-The Kubernetes example pins the currently published v0.1.3 image and matching
-version labels. Update all three together after the v0.1.4 container tag and
-digest are verified; v0.1.3 does not implement the v0.1.4 transport and CA
-behavior described above.
+The Kubernetes example pins the published v0.1.4 image and matching version
+labels. The verified multiarch image index is
+`sha256:a553eb4f25ee7eebdf67ad4d7df5be1c0d9b337e78274eb93565137134df90f7`.
 
 The application, Redis, and PostgreSQL intentionally refuse to start with the
 example credentials. Do not commit `deploy/k8s/secret.yaml`.

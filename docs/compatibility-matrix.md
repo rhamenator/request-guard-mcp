@@ -10,7 +10,7 @@ different revision, `initialize` counter-offers that version and the client
 must decide whether it can continue. The server does not implement the
 `2026-07-28` discovery lifecycle, stdio, OAuth discovery, SSE GET, resources,
 or prompts. MCP Inspector 2.5.0 smoke passed in the
-[five-platform v0.1.4 release candidate](releases/v0.1.4-postgres-tls-evidence.md),
+[five-platform v0.1.4 release evidence](releases/v0.1.4-postgres-tls-evidence.md),
 including the packaged Alpine binary; see also the
 [interoperability evidence](inspector-interoperability.md). Full transport
 conformance remains open in issue #59.
@@ -36,7 +36,7 @@ notifications or client responses get 400 with no body; accepted ones get 202
 with no body. The custom WebSocket transport reports malformed messages as
 JSON-RPC errors.
 
-The published v0.1.3 release predates these v0.1.4 HTTP/envelope checks. Use
+The earlier v0.1.3 release predates these v0.1.4 HTTP/envelope checks. Use
 its [tagged documentation](https://github.com/rhamenator/request-guard-mcp/tree/v0.1.3)
 when operating that version.
 

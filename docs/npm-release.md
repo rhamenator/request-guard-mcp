@@ -2,19 +2,19 @@
 
 The GitHub Packages entry for `request-guard-mcp` is a container image. The npm
 package is a separate installation option for the official native release.
-The experimental [0.1.3 package](https://www.npmjs.com/package/request-guard-mcp/v/0.1.3)
+The experimental [0.1.4 package](https://www.npmjs.com/package/request-guard-mcp/v/0.1.4)
 is published. A fresh registry install with an empty npm cache
 passed Inspector authentication, initialization, listing 23 tools,
 `classify`, and `explain` on Linux x64. This is an experimental release;
 the adversarial production-readiness gate remains open.
-The v0.1.4 package must be assembled only from the final v0.1.4 native
-release archives and checksum sidecars, then pass a clean install and MCP
-Inspector smoke before publication. Until npm confirms that version is live,
-use the published 0.1.3 command below.
+The v0.1.4 package was assembled from all five final public native release
+archives and their checksum sidecars. Both a clean local tarball install and a
+fresh public-registry install passed MCP Inspector authentication,
+initialization, tool listing, `classify`, and `explain`.
 
 ## Install and connect
 
-Run `npm install -g request-guard-mcp@0.1.3`. Set a unique random
+Run `npm install -g request-guard-mcp@0.1.4`. Set a unique random
 `AUTH_TOKENS` bearer token of at least 32 characters and bind locally before
 starting the globally installed command. On Linux/macOS:
 
@@ -40,12 +40,12 @@ npm package does not include `.env.example`; [INSTALL.md](../INSTALL.md)
 describes the separate native release bundle. For remote access, put a
 trusted TLS endpoint in front of the server and restrict who can reach it.
 
-The published v0.1.3 package was built from five native release archives and
+The published v0.1.4 package was built from five native release archives and
 their SHA-256 sidecars, including Linux x64 musl. It verifies every checksum and extracts only the
 expected binary from each archive. Installation does not run a `postinstall` script
 or download executable code. The small Node launcher selects the bundled
 binary and forwards arguments, environment, stdio, and termination signals.
-The published 0.1.3 launcher selects the musl binary on Alpine and the glibc
+The published 0.1.4 launcher selects the musl binary on Alpine and the glibc
 binary on glibc Linux hosts. A clean install on Alpine and on glibc Linux passed
 the official five-check MCP Inspector smoke test.
 
@@ -68,7 +68,7 @@ For v0.1.4, the release smoke also checks PostgreSQL TLS trust on the packaged
 Alpine binary with `sslmode=verify-full`: an explicit trusted CA and an
 installed OS CA work; an unknown issuer or hostname mismatch prevents startup
 when PostgreSQL is configured in that mode.
-See [the candidate evidence](releases/v0.1.4-postgres-tls-evidence.md).
+See [the release evidence](releases/v0.1.4-postgres-tls-evidence.md).
 
 The generated package contains the GPL-3.0-or-later license, a short npm setup
 guide, the launcher, and the five binaries. It contains no credentials, `.env`,

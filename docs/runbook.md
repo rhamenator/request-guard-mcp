@@ -112,11 +112,10 @@ curl -fsS http://localhost:8085/mcp \
   --data '{"jsonrpc":"2.0","id":1,"method":"classify","params":{"user_agent":"GPTBot/1.0","path":"/"}}'
 ```
 
-On development main, accepted JSON-RPC notifications and client responses
-return HTTP 202 with no body, as required by MCP 2025-06-18. Published v0.1.3
-returns HTTP 204 with no body; use the 202 behavior after the next verified
-experimental release. JSON-RPC
-tool errors use an HTTP 200 response with a JSON-RPC `error` object.
+In published v0.1.4, accepted JSON-RPC notifications and client responses
+return HTTP 202 with no body, as required by MCP 2025-06-18. The earlier
+v0.1.3 release returns HTTP 204 with no body. JSON-RPC tool errors use an
+HTTP 200 response with a JSON-RPC `error` object.
 
 ## Loading reputation and canary data
 
@@ -173,7 +172,12 @@ kubectl get hpa -n request-guard
 
 ## Upgrading
 
-1. Update the image tag in `deployment.yaml`.
+1. Verify the new release's published multiarch image digest and platform
+   manifests, then replace the `@sha256:...` image reference in
+   `deploy/k8s/deployment.yaml`. Update both `version` labels to the same
+   release version; do not substitute a mutable tag for the digest.
 2. Apply: `kubectl apply -f deploy/k8s/deployment.yaml`.
 3. Monitor: `kubectl rollout status deployment/request-guard-mcp -n request-guard`.
-4. Rollback if needed: `kubectl rollout undo deployment/request-guard-mcp -n request-guard`.
+4. To roll back, reapply the previous verified deployment manifest, including
+   its image digest and both `version` labels, then monitor the rollout again.
+   `kubectl rollout undo` alone does not restore the Deployment's metadata label.

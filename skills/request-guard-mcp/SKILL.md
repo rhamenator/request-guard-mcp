@@ -12,8 +12,8 @@ policy, or guard the agent's outbound fetches. Stable release readiness still
 depends on the repository's adversarial release gate.
 
 For v0.1.4, install the matching native release bundle and follow its bundled
-`INSTALL.md`, or use `npm install -g request-guard-mcp@0.1.4` once that package
-is available on npm. Linux x64 has separate glibc and musl/Alpine bundles;
+`INSTALL.md`, or install the published npm package with
+`npm install -g request-guard-mcp@0.1.4`. Linux x64 has separate glibc and musl/Alpine bundles;
 Windows x64, macOS Intel, and macOS Apple Silicon are also packaged. Verify
 native archive checksums. The skill ZIP contains instructions only. Configure
 a unique `AUTH_TOKENS` bearer token of at least 32 characters, start the
@@ -22,7 +22,7 @@ server, and connect an HTTP POST MCP client to `/mcp` with that token. Confirm
 CI runs official MCP Inspector 2.5.0 against the native bundles; check your
 chosen client separately. Redis, PostgreSQL, and MaxMind data are optional for
 core tools but required by some additional tools and may incur costs.
-Until v0.1.4 is published, v0.1.3 remains the current release. It supports
+The earlier v0.1.3 release supports
 standard MCP initialization and tool calls but predates the v0.1.4 Origin,
 HTTP status/header, JSON-RPC envelope, and PostgreSQL native CA changes below.
 Use its [tagged installation instructions](https://github.com/rhamenator/request-guard-mcp/tree/v0.1.3)
