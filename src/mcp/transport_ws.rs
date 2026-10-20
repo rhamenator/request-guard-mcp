@@ -148,7 +148,7 @@ pub(crate) async fn process_message(
             .get("params")
             .is_some_and(|params| !params.is_object())
         {
-            return invalid_request(Value::Null);
+            return invalid_request(envelope.get("id").cloned().unwrap_or(Value::Null));
         }
     } else if !envelope.contains_key("id")
         || envelope.contains_key("result") == envelope.contains_key("error")
@@ -603,17 +603,26 @@ mod tests {
     #[tokio::test]
     async fn mcp_params_must_be_objects_when_present() {
         let (state, registry) = test_context();
-        for message in [
-            r#"{"jsonrpc":"2.0","id":1,"method":"ping","params":[]}"#,
-            r#"{"jsonrpc":"2.0","method":"notifications/initialized","params":[]}"#,
-            r#"{"jsonrpc":"2.0","id":1,"method":"ping","params":null}"#,
+        for (message, expected_id) in [
+            (
+                r#"{"jsonrpc":"2.0","id":1,"method":"ping","params":[]}"#,
+                Value::from(1),
+            ),
+            (
+                r#"{"jsonrpc":"2.0","method":"notifications/initialized","params":[]}"#,
+                Value::Null,
+            ),
+            (
+                r#"{"jsonrpc":"2.0","id":1,"method":"ping","params":null}"#,
+                Value::from(1),
+            ),
         ] {
             let response = process_message(message, &state, &registry, "test-caller")
                 .await
                 .expect("invalid request response");
             let response: Value = serde_json::from_str(&response).unwrap();
             assert_eq!(response["error"]["code"], -32600, "{message}");
-            assert!(response["id"].is_null(), "{message}");
+            assert_eq!(response["id"], expected_id, "{message}");
         }
         for message in [
             r#"{"jsonrpc":"2.0","id":1,"method":"ping"}"#,
