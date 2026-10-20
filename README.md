@@ -67,9 +67,9 @@ Development main also requires `params` to be an object when present on a
 request or notification; arrays and `null` receive JSON-RPC `-32600` on HTTP
 POST requests and WebSocket messages. Omitted `params` remains valid. Published v0.1.3 may
 accept array parameters on methods that do not inspect them.
-On development main, an invalid ID-less notification over HTTP gets 400 with
-an empty body; an accepted notification gets 202 with an empty body. The
-custom WebSocket transport reports malformed messages as JSON-RPC errors.
+On development main, an invalid ID-less notification or client response over
+HTTP gets 400 with an empty body; an accepted one gets 202 with an empty body.
+The custom WebSocket transport reports malformed messages as JSON-RPC errors.
 v0.1.2 and newer builds return `-32600` for invalid envelope shapes and
 `-32700` for malformed JSON. Client notifications receive no JSON-RPC response;
 development main acknowledges accepted HTTP notifications and client responses

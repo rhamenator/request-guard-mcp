@@ -175,10 +175,9 @@ async fn http_mcp_handler(state: ServerState, request: Request, caller_scope: St
     };
     match process_message(text, &state.app, &state.registry, &caller_scope).await {
         Some(response) => {
-            // An ID-less method is a notification attempt. A rejected one
-            // needs an HTTP error status, not a JSON-RPC response to a
-            // notification (MCP 2025-06-18 Streamable HTTP).
-            if is_notification_candidate(text) {
+            // Rejected notifications and client responses need an HTTP error
+            // status, not an in-band JSON-RPC response (MCP Streamable HTTP).
+            if is_one_way_candidate(text) {
                 StatusCode::BAD_REQUEST.into_response()
             } else {
                 (
@@ -195,13 +194,18 @@ async fn http_mcp_handler(state: ServerState, request: Request, caller_scope: St
     }
 }
 
-fn is_notification_candidate(text: &str) -> bool {
+fn is_one_way_candidate(text: &str) -> bool {
     serde_json::from_str::<serde_json::Value>(text)
         .ok()
         .and_then(|value| {
-            value
-                .as_object()
-                .map(|object| object.contains_key("method") && !object.contains_key("id"))
+            value.as_object().map(|object| {
+                let has_method = object.contains_key("method");
+                (has_method && !object.contains_key("id"))
+                    || (!has_method
+                        && ["id", "result", "error"]
+                            .iter()
+                            .any(|key| object.contains_key(*key)))
+            })
         })
         .unwrap_or(false)
 }
