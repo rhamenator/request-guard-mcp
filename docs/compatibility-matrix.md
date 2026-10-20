@@ -89,7 +89,9 @@ not a replacement for a token: non-browser callers can forge that header.
 The development check covers MCP POST and WebSocket upgrades. Health,
 readiness, and metrics endpoints remain outside it. Cross-origin browser
 clients need CORS preflight and response handling at a trusted proxy; the
-allowlist does not add CORS to the server.
+allowlist does not add CORS to the server. Browser WebSocket clients cannot
+set this server's Authorization bearer header and need a trusted authenticating
+proxy to supply upstream credentials.
 
 ## Tool Availability by Feature Flag
 

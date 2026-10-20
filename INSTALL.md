@@ -38,6 +38,8 @@ when using a reverse proxy, including a nondefault port. Do not use wildcards,
 paths, default ports (`:80`/`:443`), uppercase hosts, or the literal `null`.
 For a cross-origin browser client, the trusted proxy must handle CORS preflights
 and response headers; the server allowlist alone does not enable CORS.
+Browser WebSocket clients also need a trusted proxy to authenticate the browser
+and set the upstream bearer header, which the browser WebSocket API cannot set.
 Requests without `Origin` remain available to
 non-browser clients under the configured authentication policy. Published v0.1.3 does not
 include this check; enforce browser-origin restrictions at the proxy for it.

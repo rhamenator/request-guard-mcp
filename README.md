@@ -50,7 +50,9 @@ allowed by default; non-browser clients that omit `Origin` still use the
 configured authentication policy. For a browser client behind a reverse proxy, list its
 trusted public origin explicitly. This server does not answer CORS preflights:
 cross-origin browser clients also need a trusted proxy to handle CORS, while
-same-origin browser traffic does not. Use lowercase hosts and omit default
+same-origin browser traffic does not. Browser WebSocket APIs cannot set the
+server's bearer Authorization header; a trusted proxy must authenticate the
+browser and supply upstream credentials for that path. Use lowercase hosts and omit default
 ports (`:80` for HTTP and `:443` for HTTPS) in the allowlist. The check applies
 to the MCP endpoint, not `/health`, `/ready`, or `/metrics`; restrict those
 endpoints at the proxy if browser access is a concern. The published v0.1.3 binary does not yet
