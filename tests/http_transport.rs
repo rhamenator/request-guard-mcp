@@ -380,6 +380,49 @@ async fn explicit_post_content_type_must_be_utf8_json() {
     unauthenticated.assert_status(StatusCode::UNAUTHORIZED);
 }
 
+#[tokio::test]
+async fn explicit_accept_must_allow_json() {
+    let payload =
+        serde_json::to_vec(&json!({"jsonrpc": "2.0", "id": 3, "method": "ping"})).unwrap();
+    for accept in [
+        "application/json, text/event-stream",
+        "application/*",
+        "*/*",
+        "application/json;q=0.5",
+    ] {
+        server(false)
+            .post("/mcp")
+            .add_header("accept", HeaderValue::from_str(accept).unwrap())
+            .bytes(payload.clone().into())
+            .await
+            .assert_status_ok();
+    }
+    server(false)
+        .post("/mcp")
+        .bytes(payload.clone().into())
+        .await
+        .assert_status_ok();
+    for accept in [
+        "text/event-stream",
+        "application/json;q=0, */*;q=1",
+        "*/*;q=0",
+        "application/json;q=bogus",
+    ] {
+        let response = server(false)
+            .post("/mcp")
+            .add_header("accept", HeaderValue::from_str(accept).unwrap())
+            .bytes(payload.clone().into())
+            .await;
+        response.assert_status(StatusCode::NOT_ACCEPTABLE);
+    }
+    server(true)
+        .post("/mcp")
+        .add_header("accept", HeaderValue::from_static("text/event-stream"))
+        .bytes(payload.into())
+        .await
+        .assert_status(StatusCode::UNAUTHORIZED);
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn unsupported_media_type_rejects_incomplete_body() {
     let mut config = Config::default();
@@ -416,6 +459,43 @@ async fn unsupported_media_type_rejects_incomplete_body() {
     assert!(std::str::from_utf8(&status_line)
         .unwrap()
         .starts_with("HTTP/1.1 415 "));
+    server_task.abort();
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn unacceptable_response_type_rejects_incomplete_body() {
+    let mut config = Config::default();
+    config.auth.enabled = false;
+    let max_body = config.limits.max_request_bytes;
+    let state = ServerState {
+        app: Arc::new(AppState::new(config)),
+        registry: Arc::new(build_registry()),
+    };
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let server_task = tokio::spawn(async move {
+        axum::serve(listener, build_router(state, max_body))
+            .await
+            .unwrap();
+    });
+    let mut stream = TcpStream::connect(address).await.unwrap();
+    stream.write_all(b"POST /mcp HTTP/1.1\r\nHost: localhost\r\nContent-Type: application/json\r\nAccept: text/event-stream\r\nContent-Length: 1000000\r\n\r\nx")
+        .await.unwrap();
+    let status_line = timeout(Duration::from_secs(5), async {
+        let mut line = Vec::new();
+        while !line.ends_with(b"\r\n") {
+            assert!(line.len() < 256);
+            let mut byte = [0_u8; 1];
+            assert_eq!(stream.read(&mut byte).await.unwrap(), 1);
+            line.push(byte[0]);
+        }
+        line
+    })
+    .await
+    .expect("Accept rejection must not wait for the incomplete body");
+    assert!(std::str::from_utf8(&status_line)
+        .unwrap()
+        .starts_with("HTTP/1.1 406 "));
     server_task.abort();
 }
 

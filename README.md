@@ -54,7 +54,10 @@ explicit `Content-Type` is not `application/json` or
 accepted for older direct clients. Published v0.1.3 does not enforce this
 media-type policy. MCP 2025-06-18 clients should send
 `Accept: application/json, text/event-stream`; this server returns JSON for
-requests and does not yet validate `Accept`.
+requests. Development main rejects an explicit `Accept` that rules out JSON
+with HTTP 406 before reading the body, including `application/json;q=0` even
+when a less specific wildcard allows other types. A missing `Accept` remains
+accepted for older clients. Published v0.1.3 does not enforce this rule.
 Use a JSON-RPC `2.0` envelope and a string or numeric request ID (or `null`).
 v0.1.2 and newer builds return `-32600` for invalid envelope shapes and
 `-32700` for malformed JSON. Client notifications receive no JSON-RPC response;
