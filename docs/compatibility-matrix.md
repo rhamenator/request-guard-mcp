@@ -73,6 +73,12 @@ Fallback is triggered when:
 | 2025-06-18 | HTTP POST JSON-RPC | Inspector 2.5.0 smoke passed; full conformance gate open |
 | 2025-06-18 | stdio, SSE GET, gRPC | Not implemented |
 
+Accepted HTTP POST notifications and client responses have no response body.
+Development main returns HTTP 202; the published v0.1.3 server returns 204.
+The [pinned MCP transport revision](https://modelcontextprotocol.io/specification/2025-06-18/basic/transports#sending-messages-to-the-server)
+specifies 202 for accepted notifications and responses. Full Streamable HTTP
+conformance remains open in issue #59.
+
 ## Tool Availability by Feature Flag
 
 | Tool | Feature Flag | Default |

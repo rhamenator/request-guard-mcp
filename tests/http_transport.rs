@@ -134,12 +134,20 @@ async fn unauthenticated_post_is_rejected_before_body_arrives() {
 }
 
 #[tokio::test]
-async fn post_mcp_notifications_return_no_content() {
+async fn post_mcp_notifications_and_client_responses_return_accepted() {
     let response = server(false)
         .post("/mcp")
         .json(&json!({"jsonrpc": "2.0", "method": "warmup", "params": {}}))
         .await;
-    response.assert_status(StatusCode::NO_CONTENT);
+    response.assert_status(StatusCode::ACCEPTED);
+    assert!(response.as_bytes().is_empty());
+
+    let response = server(false)
+        .post("/mcp")
+        .json(&json!({"jsonrpc": "2.0", "id": 9, "result": {}}))
+        .await;
+    response.assert_status(StatusCode::ACCEPTED);
+    assert!(response.as_bytes().is_empty());
 }
 
 #[tokio::test]
