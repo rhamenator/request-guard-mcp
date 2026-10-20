@@ -43,7 +43,7 @@ because it does not offer an SSE stream; a WebSocket upgrade on that path still
 uses the custom WebSocket transport. Published v0.1.3 does not guarantee this
 405 response.
 Development main also requires any explicit `MCP-Protocol-Version` header on
-Streamable HTTP POST or ordinary GET `/mcp` to equal `2025-06-18`, rejecting malformed or unsupported values with
+a non-WebSocket `/mcp` HTTP request to equal `2025-06-18`, rejecting malformed or unsupported values with
 HTTP 400 before reading a POST body. The header may be omitted for older
 clients; this does not imply support for an older protocol revision. Published
 v0.1.3 does not enforce the header. The custom WebSocket upgrade does not
