@@ -27,7 +27,8 @@ class NativeNpmPackageTests(unittest.TestCase):
             prefix = f"request-guard-mcp-v0.1.1-{platform}"
             archive = self.assets / f"{prefix}.{extension}"
             name = f"{prefix}/{binary_name}"
-            binary = b"#!/bin/sh\nprintf 'native:%s\\n' \"$1\"\n" if platform == "linux-x64" else b"test binary"
+            binary = (f"#!/bin/sh\nprintf 'native:{platform}:%s\\n' \"$1\"\n".encode()
+                      if platform.startswith("linux-") else b"test binary")
             if extension == "zip":
                 with zipfile.ZipFile(archive, "w") as package:
                     package.writestr(name, binary)
@@ -64,20 +65,21 @@ class NativeNpmPackageTests(unittest.TestCase):
             ["node", str(output / "bin/request-guard-mcp.js"), "probe"],
             text=True, capture_output=True, check=True,
         )
-        self.assertEqual(launched.stdout, "native:probe\n")
+        self.assertEqual(launched.stdout, "native:linux-x64:probe\n")
         musl = subprocess.run(
             ["node", "-e", "process.report.getReport = () => ({header: {}}); "
-             "require(process.argv[1])", str(output / "bin/request-guard-mcp.js")],
+             "require(process.argv[1])", str(output / "bin/request-guard-mcp.js"), "probe"],
             text=True, capture_output=True,
         )
-        self.assertNotEqual(musl.returncode, 0)
-        self.assertIn("requires glibc", musl.stderr)
+        self.assertEqual(musl.returncode, 0, musl.stderr)
+        self.assertEqual(musl.stdout, "native:linux-x64-musl:probe\n")
         packed = subprocess.run(
             ["npm", "pack", "--dry-run", "--json"], cwd=output,
             text=True, capture_output=True, check=True,
         )
         filenames = {item["path"] for item in json.loads(packed.stdout)[0]["files"]}
         self.assertIn("vendor/linux-x64/request-guard-mcp", filenames)
+        self.assertIn("vendor/linux-x64-musl/request-guard-mcp", filenames)
         self.assertIn("vendor/windows-x64/request-guard-mcp.exe", filenames)
 
     def test_tampered_archive_cannot_create_package(self) -> None:

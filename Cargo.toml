@@ -1,6 +1,6 @@
 [package]
 name = "request-guard-mcp"
-version = "0.1.2"
+version = "0.1.3"
 edition = "2021"
 rust-version = "1.89"
 description = "Rust MCP server for request risk classification and enrichment"
