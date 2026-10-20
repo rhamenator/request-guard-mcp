@@ -23,6 +23,8 @@ jobs:
             runner: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
       - name: Verify native runner architecture
         run: |
           set -euo pipefail
@@ -58,4 +60,23 @@ jobs:
             echo "- BuildKit layer cache: disabled (no-cache: true)"
             echo "- Loaded image architecture: ${image_arch}"
             echo "- Commit: ${{ github.sha }}"
+            echo "- Run attempt: ${{ github.run_attempt }}"
           } >> "$GITHUB_STEP_SUMMARY"
+      - name: Smoke test the native image
+        run: |
+          set -euo pipefail
+          name="request-guard-cold-${{ matrix.arch }}"
+          trap 'docker rm -f "$name" >/dev/null 2>&1 || true' EXIT
+          docker run -d --name "$name" --network bridge \
+            -e AUTH_TOKENS=0123456789abcdef0123456789abcdef \
+            request-guard-mcp:cold-${{ matrix.arch }} >/dev/null
+          for attempt in $(seq 1 30); do
+            if docker exec "$name" curl -fsS --max-time 2 \
+                http://127.0.0.1:8085/health >/dev/null 2>&1; then
+              echo "Native image health smoke: passed" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Native image health smoke failed" >&2
+          exit 1
