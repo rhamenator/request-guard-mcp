@@ -51,3 +51,13 @@ assembly job, with digest and client checks before the next tag. GitHub lists
 Docker documents the distributed build pattern:
 [GitHub runner reference](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax),
 [Docker multi-platform CI guide](https://docs.docker.com/build/ci/github-actions/multi-platform/).
+
+The same manual workflow also runs a controlled three-way OCI export at one
+commit: native amd64, native arm64, and the combined amd64+arm64 build on
+amd64. All three use `no-cache: true`, the same Dockerfile, and the same OCI
+archive exporter. The job checks the archive index for exactly the expected
+platforms. It publishes and uploads nothing. Compare the combined elapsed
+time against `max(native amd64, native arm64)`; that approximates the build
+portion of a split release, while manifest assembly, registry push, and
+attestations still need a separate end-to-end check. The earlier native
+build-and-load jobs remain for image health smoke and historical comparison.
