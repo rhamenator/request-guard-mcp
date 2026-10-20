@@ -2,7 +2,7 @@
 
 The GitHub Packages entry for `request-guard-mcp` is a container image. The npm
 package is a separate installation option for the official native release.
-The experimental [0.1.2 package](https://www.npmjs.com/package/request-guard-mcp/v/0.1.2)
+The experimental [0.1.3 package](https://www.npmjs.com/package/request-guard-mcp/v/0.1.3)
 is published. A fresh registry install with an empty npm cache
 passed Inspector authentication, initialization, listing 23 tools,
 `classify`, and `explain` on Linux x64. This is an experimental release;
@@ -10,7 +10,7 @@ the adversarial production-readiness gate remains open.
 
 ## Install and connect
 
-Run `npm install -g request-guard-mcp@0.1.2`. Set a unique random
+Run `npm install -g request-guard-mcp@0.1.3`. Set a unique random
 `AUTH_TOKENS` bearer token of at least 32 characters and bind locally before
 starting the globally installed command. On Linux/macOS:
 
@@ -36,15 +36,14 @@ npm package does not include `.env.example`; [INSTALL.md](../INSTALL.md)
 describes the separate native release bundle. For remote access, put a
 trusted TLS endpoint in front of the server and restrict who can reach it.
 
-The published v0.1.2 package was built from four native release archives and
-their SHA-256 sidecars. The private 0.1.3 builder requires five archives,
-including Linux x64 musl. It verifies every checksum and extracts only the
+The published v0.1.3 package was built from five native release archives and
+their SHA-256 sidecars, including Linux x64 musl. It verifies every checksum and extracts only the
 expected binary from each archive. Installation does not run a `postinstall` script
 or download executable code. The small Node launcher selects the bundled
 binary and forwards arguments, environment, stdio, and termination signals.
-The published 0.1.2 Linux x64 binary requires glibc; musl-based distributions
-such as Alpine are rejected with an explicit launcher error. A private 0.1.3
-candidate is being qualified separately; its npm package is not published.
+The published 0.1.3 launcher selects the musl binary on Alpine and the glibc
+binary on glibc Linux hosts. A clean install on Alpine and on glibc Linux passed
+the official five-check MCP Inspector smoke test.
 
 For a future approved npm release, after its native assets are published:
 
