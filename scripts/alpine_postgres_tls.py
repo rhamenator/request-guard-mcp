@@ -62,7 +62,8 @@ def create_certificates() -> tuple[Path, Path]:
 
 
 def run_case(binary: Path, expected_version: str, token: str, cache_key: str,
-             name: str, *, host: str, root_cert: Path | None, should_start: bool) -> None:
+             name: str, *, host: str, root_cert: Path | None, should_start: bool,
+             expected_error: bytes | None = None) -> None:
     query = "sslmode=verify-full"
     if root_cert is not None:
         query += f"&sslrootcert={root_cert}"
@@ -118,8 +119,8 @@ def run_case(binary: Path, expected_version: str, token: str, cache_key: str,
                 for secret in (token, cache_key):
                     if secret.encode() in captured:
                         raise RuntimeError(f"{name}: synthetic secret appeared in server log")
-                if not should_start and b"certificate" not in captured.lower():
-                    raise RuntimeError(f"{name}: failure was not attributable to TLS certificate verification")
+                if expected_error is not None and expected_error not in captured:
+                    raise RuntimeError(f"{name}: expected TLS rejection cause missing from server log")
 
 
 def main() -> None:
@@ -136,11 +137,14 @@ def main() -> None:
         run_case(binary, expected_version, token, cache_key, "explicit trusted CA",
                  host="pgci.test", root_cert=trusted_ca, should_start=True)
         run_case(binary, expected_version, token, cache_key, "untrusted CA",
-                 host="pgci.test", root_cert=untrusted_ca, should_start=False)
+                 host="pgci.test", root_cert=untrusted_ca, should_start=False,
+                 expected_error=b"invalid peer certificate: UnknownIssuer")
         run_case(binary, expected_version, token, cache_key, "hostname mismatch",
-                 host="127.0.0.1", root_cert=trusted_ca, should_start=False)
+                 host="127.0.0.1", root_cert=trusted_ca, should_start=False,
+                 expected_error=b'certificate not valid for name "127.0.0.1"')
         run_case(binary, expected_version, token, cache_key, "OS store before CA installation",
-                 host="pgci.test", root_cert=None, should_start=False)
+                 host="pgci.test", root_cert=None, should_start=False,
+                 expected_error=b"invalid peer certificate: UnknownIssuer")
         destination = Path("/usr/local/share/ca-certificates/request-guard-ci.crt")
         shutil.copyfile(trusted_ca, destination)
         subprocess.run(["update-ca-certificates"], check=True, capture_output=True, timeout=30)
