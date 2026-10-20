@@ -65,8 +65,9 @@ For a future approved npm release, after its native assets are published:
    and command from a fresh registry install. Do not publish an RC as `latest`.
 
 For v0.1.4, the release smoke also checks PostgreSQL TLS trust on the packaged
-Alpine binary: an explicit trusted CA and an installed OS CA work; an unknown
-issuer or hostname mismatch prevents startup when PostgreSQL is configured.
+Alpine binary with `sslmode=verify-full`: an explicit trusted CA and an
+installed OS CA work; an unknown issuer or hostname mismatch prevents startup
+when PostgreSQL is configured in that mode.
 See [the candidate evidence](releases/v0.1.4-postgres-tls-evidence.md).
 
 The generated package contains the GPL-3.0-or-later license, a short npm setup

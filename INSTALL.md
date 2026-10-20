@@ -43,9 +43,9 @@ store. For a private database CA, install it in that store or set
 `sslmode=verify-full` to verify both the certificate chain and hostname;
 `sslmode=require` encrypts the connection but does not verify either. Minimal
 container and Alpine hosts need a populated CA store unless `sslrootcert`
-supplies the private CA. A configured PostgreSQL connection with an untrusted
-certificate or mismatched hostname prevents server startup; the core tools do
-not become available in that configuration. Published v0.1.3 predates the
+supplies the private CA. With `sslmode=verify-full`, an untrusted certificate
+or mismatched hostname prevents server startup; the core tools do not become
+available in that configuration. Published v0.1.3 predates the
 native-root change.
 Starting with v0.1.4, MCP HTTP POST and WebSocket requests carrying `Origin`
 must match an exact entry in `MCP_ALLOWED_ORIGINS`; for example,
