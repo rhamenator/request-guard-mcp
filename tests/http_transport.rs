@@ -407,6 +407,7 @@ async fn explicit_accept_must_allow_json() {
         "application/json;q=0, */*;q=1",
         "*/*;q=0",
         "application/json;q=bogus",
+        "multipart/form-data;boundary=\"x,application/json,y\"",
     ] {
         let response = server(false)
             .post("/mcp")

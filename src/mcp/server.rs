@@ -241,8 +241,14 @@ fn accepts_json(headers: &HeaderMap) -> bool {
         let Ok(value) = value.to_str() else {
             return false;
         };
-        'range: for range in value.split(',') {
-            let mut parts = range.trim().split(';');
+        let Some(ranges) = split_unquoted(value, ',') else {
+            return false;
+        };
+        'range: for range in ranges {
+            let Some(parameters) = split_unquoted(range.trim(), ';') else {
+                return false;
+            };
+            let mut parts = parameters.into_iter();
             let media = parts.next().unwrap_or("").trim();
             let specificity = if media.eq_ignore_ascii_case("application/json") {
                 2
@@ -293,6 +299,30 @@ fn accepts_json(headers: &HeaderMap) -> bool {
         }
     }
     best.is_some_and(|(_, _, quality)| quality > 0)
+}
+
+fn split_unquoted(value: &str, separator: char) -> Option<Vec<&str>> {
+    let mut parts = Vec::new();
+    let mut start = 0;
+    let mut quoted = false;
+    let mut escaped = false;
+    for (index, character) in value.char_indices() {
+        if escaped {
+            escaped = false;
+        } else if quoted && character == '\\' {
+            escaped = true;
+        } else if character == '"' {
+            quoted = !quoted;
+        } else if !quoted && character == separator {
+            parts.push(&value[start..index]);
+            start = index + character.len_utf8();
+        }
+    }
+    if quoted || escaped {
+        return None;
+    }
+    parts.push(&value[start..]);
+    Some(parts)
 }
 
 fn parse_quality(value: &str) -> Option<u16> {
@@ -371,6 +401,7 @@ mod protocol_version_tests {
             "Application/JSON; Q=1",
             "application/json;foo=bar, */*",
             "application/json;q=1;version=1, */*",
+            "multipart/form-data;boundary=\"x,application/json,y\", application/json",
             "application/*;q=0, application/json",
         ] {
             let mut headers = HeaderMap::new();
@@ -388,6 +419,7 @@ mod protocol_version_tests {
             "application/json;charset=utf-8;q=0, application/json",
             "application/json;q=0;charset=utf-8, application/json;q=1",
             "application/json;q=0.0001",
+            "multipart/form-data;boundary=\"x,application/json,y\"",
         ] {
             let mut headers = HeaderMap::new();
             headers.insert(ACCEPT, HeaderValue::from_str(value).unwrap());
