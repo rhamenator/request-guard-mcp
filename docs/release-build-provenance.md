@@ -31,6 +31,12 @@ smoke checks that a nonempty, bounded server log does not expose a synthetic
 bearer token or classification request marker; the log is not emitted to CI
 output. The probe does not cover optional backend or TLS collector failure
 logs yet.
+The release lane also runs a Redis lookup probe inside disposable Alpine:
+seeded lookup, backend stop with a deterministic `-502` error, core classify
+during outage, and lookup recovery after restart. Both services use container
+loopback ports only; no test credentials or integration logs are published.
+Python and Redis are installed in that disposable test image from Alpine's
+versioned 3.24 repositories; those test package revisions are not pinned.
 Private branch candidates run the same build and verification steps without
 creating a GitHub release.
 
