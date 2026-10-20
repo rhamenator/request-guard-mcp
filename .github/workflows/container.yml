@@ -8,6 +8,12 @@ on:
   pull_request:
     branches: ["main"]
 
+# Only a newer head of the same PR supersedes its previous container check.
+# Main, manual, and release-tag runs must finish once started.
+concurrency:
+  group: container-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: rhamenator/request-guard-mcp
