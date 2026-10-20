@@ -516,6 +516,7 @@ async fn post_mcp_rejects_invalid_json_rpc_envelopes() {
         json!({"jsonrpc": "2.0", "id": 1, "method": "ping", "result": {}}),
         json!({"jsonrpc": "2.0", "id": 1, "method": "ping", "params": 42}),
         json!({"jsonrpc": "2.0", "id": 1, "method": "ping", "params": null}),
+        json!({"jsonrpc": "2.0", "id": 1, "method": "ping", "params": []}),
         json!({"jsonrpc": "2.0", "id": 1, "result": {}, "error": {}}),
         json!([]),
     ] {
@@ -526,6 +527,16 @@ async fn post_mcp_rejects_invalid_json_rpc_envelopes() {
         assert_eq!(body["id"], Value::Null);
         assert!(body.get("result").is_none());
     }
+}
+
+#[tokio::test]
+async fn rejected_notification_returns_http_error_without_json_rpc_body() {
+    let response = server(false)
+        .post("/mcp")
+        .json(&json!({"jsonrpc": "2.0", "method": "notifications/initialized", "params": []}))
+        .await;
+    response.assert_status(StatusCode::BAD_REQUEST);
+    assert!(response.as_bytes().is_empty());
 }
 
 #[tokio::test]
