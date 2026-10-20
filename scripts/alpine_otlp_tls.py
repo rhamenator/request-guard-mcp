@@ -90,7 +90,10 @@ def ws_call(token: str, marker: str, expected_version: str) -> None:
         sock.sendall(("\r\n".join(headers) + "\r\n\r\n").encode())
         handshake = b""
         while b"\r\n\r\n" not in handshake and len(handshake) < 8192:
-            handshake += sock.recv(4096)
+            chunk = sock.recv(4096)
+            if not chunk:
+                raise RuntimeError("WebSocket closed during upgrade")
+            handshake += chunk
         if b" 101 " not in handshake.split(b"\r\n", 1)[0]:
             raise RuntimeError("authenticated WebSocket upgrade failed")
 
@@ -164,6 +167,7 @@ def run_case(binary: Path, expected_version: str, token: str, cache_key: str,
                 # bounded log for the certificate error.
                 time.sleep(7)
         finally:
+            pending_failure = sys.exc_info()[0] is not None
             if server is not None and server.poll() is None:
                 server.terminate()
                 try:
@@ -172,15 +176,16 @@ def run_case(binary: Path, expected_version: str, token: str, cache_key: str,
                     server.kill()
                     server.wait(timeout=5)
                     raise RuntimeError("packaged musl server failed to stop")
-            log_file.seek(0)
-            captured = log_file.read(MAX_LOG_BYTES + 1)
-            if len(captured) > MAX_LOG_BYTES or not captured:
-                raise RuntimeError("Alpine OTLP MCP log was empty or exceeded 64 KiB")
-            for secret in (token, cache_key, marker):
-                if secret.encode() in captured:
-                    raise RuntimeError("Alpine OTLP MCP log disclosed a synthetic secret")
-            if not trusted and b"UnknownIssuer" not in captured:
-                raise RuntimeError("untrusted collector did not yield a TLS trust failure")
+            if not pending_failure:
+                log_file.seek(0)
+                captured = log_file.read(MAX_LOG_BYTES + 1)
+                if len(captured) > MAX_LOG_BYTES or not captured:
+                    raise RuntimeError("Alpine OTLP MCP log was empty or exceeded 64 KiB")
+                for secret in (token, cache_key, marker):
+                    if secret.encode() in captured:
+                        raise RuntimeError("Alpine OTLP MCP log disclosed a synthetic secret")
+                if not trusted and b"UnknownIssuer" not in captured:
+                    raise RuntimeError("untrusted collector did not yield a TLS trust failure")
 
 
 def main() -> None:
@@ -202,8 +207,9 @@ def main() -> None:
             run_case(binary, expected_version, token, cache_key,
                      f"otlp-{secrets.token_hex(8)}", port, trusted, received)
             # No retry loop can turn zero exports into a passing trusted case.
-            if trusted and (not received or any(not payload for payload in received)):
-                raise RuntimeError("trusted collector received no nonempty trace export")
+            if trusted and not any(b"mcp.tool" in payload and b"classify" in payload
+                                   for payload in received):
+                raise RuntimeError("trusted collector received no classify tool span")
             if not trusted and received:
                 raise RuntimeError("untrusted collector received a trace export")
         finally:

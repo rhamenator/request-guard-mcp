@@ -138,8 +138,8 @@ public collector, certificate configuration, or network failure mode.
 The release workflow now repeats this TLS boundary against the verified musl
 archive inside its pinned Alpine container. It creates two short-lived local
 certificate authorities, installs only the trusted CA in the container trust
-store, invokes `classify` over authenticated MCP WebSocket, requires a nonempty
-gRPC OTLP trace export at the trusted collector, and requires zero exports plus
+store, invokes `classify` over authenticated MCP WebSocket, requires an exported
+`mcp.tool` span for `classify` at the trusted collector, and requires zero exports plus
 an `UnknownIssuer` error for the untrusted collector. Synthetic bearer, cache
 scope key, and request marker are checked against bounded private server logs.
 The collector uses Alpine's test-only `py3-grpcio` package; no server runtime
