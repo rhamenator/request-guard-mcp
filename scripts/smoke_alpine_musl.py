@@ -86,7 +86,7 @@ def main() -> None:
             raise RuntimeError("classify omitted a structured verdict")
         print("PASS Alpine musl: health, authentication, initialize, tools/list, classify")
     finally:
-        subprocess.run(["docker", "stop", name], check=False,
+        subprocess.run(["docker", "stop", "--time", "2", name], check=False,
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10)
         try:
             server.wait(timeout=5)
