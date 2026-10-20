@@ -41,7 +41,11 @@ def main() -> None:
         "--read-only", "--tmpfs", "/tmp", "--mount",
         f"type=bind,src={binary},dst=/usr/local/bin/request-guard-mcp,readonly",
         "-e", f"AUTH_TOKENS={token}", "-e", "MCP__HOST=127.0.0.1",
-        "-e", f"MCP__PORT={args.port}", image,
+        "-e", f"MCP__PORT={args.port}",
+        # Exporter initialization must accept HTTPS even without a collector
+        # in this bounded container smoke. The VM integration test exercises
+        # certificate trust and a receiving collector separately.
+        "-e", "MCP__TELEMETRY__OTLP_ENDPOINT=https://localhost:4318", image,
         "/usr/local/bin/request-guard-mcp",
     ]
     server = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
