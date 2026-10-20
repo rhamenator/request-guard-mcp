@@ -182,13 +182,14 @@ jobs:
           done <<< "$TAGS"
           (( ${#tags[@]} > 0 ))
           docker buildx imagetools create --metadata-file manifest.json "${tags[@]}" "${sources[@]}"
-          manifest_digest="$(jq -r '."containerimage.digest"' manifest.json)"
+          manifest_digest="$(jq -r '."containerimage.descriptor".digest' manifest.json)"
           [[ "$manifest_digest" =~ ^sha256:[0-9a-f]{64}$ ]]
-          docker buildx imagetools inspect --raw "$image@$manifest_digest" | jq -e \
-            '[.manifests[] | select(.platform.os == "linux") | .platform.architecture] | sort == ["amd64", "arm64"]' >/dev/null
+          docker buildx imagetools inspect --raw "$image@$manifest_digest" | jq -e '
+            [.manifests[] | select(.platform.os == "linux") | .platform.architecture] | sort == ["amd64", "arm64"]
+          ' >/dev/null
           for tag in "${tags[@]}"; do
             if [[ "$tag" == --tag ]]; then continue; fi
-            actual="$(docker buildx imagetools inspect "$tag" --format '{{.Manifest.Digest}}')"
+            actual="$(docker buildx imagetools inspect "$tag" --format '{{json .Manifest}}' | jq -r '.digest')"
             [[ "$actual" == "$manifest_digest" ]]
           done
           printf 'Published %s@%s with linux/amd64 and linux/arm64\n' "$image" "$manifest_digest" >> "$GITHUB_STEP_SUMMARY"
