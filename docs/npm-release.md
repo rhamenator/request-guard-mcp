@@ -70,7 +70,7 @@ For v0.1.4, the release smoke also checks PostgreSQL TLS trust on the packaged
 Alpine binary with `sslmode=verify-full`: an explicit trusted CA and an
 installed OS CA work; an unknown issuer or hostname mismatch prevents startup
 when PostgreSQL is configured in that mode.
-See [the candidate evidence](releases/v0.1.4-postgres-tls-evidence.md).
+See [the release evidence](releases/v0.1.4-postgres-tls-evidence.md).
 
 The generated package contains the GPL-3.0-or-later license, a short npm setup
 guide, the launcher, and the five binaries. It contains no credentials, `.env`,
