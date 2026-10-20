@@ -2,57 +2,43 @@
 
 ## MCP Client Configuration
 
-Clients with compatible HTTP POST JSON-RPC behavior can connect to `/mcp`.
-Custom WebSocket clients can also use that path with bearer authentication.
-The server implements the standard `initialize`, `ping`,
-`tools/list`, and `tools/call` methods while retaining direct tool-method
-compatibility. Clients that use `MODEL_URI` routing can use the following
-environment variables:
+Compatible clients connect to `/mcp` with authenticated HTTP POST JSON-RPC;
+custom WebSocket clients can use the same path. The server implements
+`initialize`, `ping`, `tools/list`, and `tools/call` while retaining direct
+tool methods. The handshake revision is `2025-06-18`; if a client offers a
+different revision, `initialize` counter-offers that version and the client
+must decide whether it can continue. The server does not implement the
+`2026-07-28` discovery lifecycle, stdio, OAuth discovery, SSE GET, resources,
+or prompts. MCP Inspector 2.5.0 smoke passed in the
+[five-platform v0.1.4 release candidate](releases/v0.1.4-postgres-tls-evidence.md),
+including the packaged Alpine binary; see also the
+[interoperability evidence](inspector-interoperability.md). Full transport
+conformance remains open in issue #59.
 
-The current handshake revision is `2025-06-18`. If a client offers another
-revision, `initialize` counter-offers `2025-06-18`; the client must decide
-whether it supports that revision. The server does not yet implement the
-`2026-07-28` discovery lifecycle. It does not expose stdio, OAuth discovery,
-SSE GET streams, resources, or prompts. HTTP support has been smoke tested with
-MCP Inspector 2.5.0, but full transport and client conformance remain part of
-the adversarial release gate. See [the client evidence](inspector-interoperability.md).
-On development main, an explicit `MCP-Protocol-Version` header on a
-non-WebSocket `/mcp` HTTP request must
-be exactly `2025-06-18`; invalid, duplicate, and unsupported values receive
-HTTP 400 before the POST body is read. A missing header is accepted for older
-clients without a session header. This is a compatibility allowance, not a
-claim that the server implements the older protocol revision. Published
-v0.1.3 does not enforce this header. The custom WebSocket upgrade does not
-use this Streamable HTTP header.
-Development main returns HTTP 415 before reading an MCP POST body when its
-explicit `Content-Type` is not `application/json` or the same media type with
-`charset=utf-8` (case-insensitive). Missing `Content-Type` remains accepted
-for older clients; published v0.1.3 does not enforce this policy. The pinned
-transport requires clients to send an `Accept` header advertising both
-`application/json` and `text/event-stream`. This server returns JSON for
-requests. Development main rejects an explicit `Accept` excluding JSON with
-HTTP 406 before reading the body, honoring quality values and media-range
-specificity. Missing `Accept` remains accepted for older clients. Published
-v0.1.3 does not enforce this rule, so a client advertising only SSE may receive
-JSON from that release.
-For JSON-RPC requests, MCP 2025-06-18 requires a string or integer ID and
-forbids `null`. Development main returns `-32600` with error ID `null` for
-`null`, fractional, or other invalid request IDs on HTTP POST and WebSocket.
-Published v0.1.3 does not yet enforce the `null` and fractional restriction.
-Development main rejects fractional client-response IDs and a `null` success-
-response ID; a `null` error-response ID is accepted for parse or invalid-request
-errors when the original request ID cannot be recovered. Published
-v0.1.3 does not enforce this response-ID restriction.
-Development main requires a client success-response `result` to be an object;
-published v0.1.3 may acknowledge primitive, `null`, or array results.
-MCP 2025-06-18 also requires request and notification `params` to be an
-object when supplied. Development main rejects arrays and `null` with
-JSON-RPC `-32600` for HTTP POST requests and WebSocket messages, echoing a valid
-request ID in the error; omission is accepted. Published
-v0.1.3 may accept arrays for methods that ignore parameters.
-On development main, a rejected ID-less HTTP notification or client response
-receives 400 with no body; an accepted one receives 202 with no body. The
-custom WebSocket transport uses JSON-RPC errors for malformed messages.
+For v0.1.4 HTTP POST, send `Content-Type: application/json` and
+`Accept: application/json, text/event-stream`. The server returns JSON for
+requests and rejects an explicit unsupported content type with 415 or an
+explicit `Accept` excluding JSON with 406. After initialization, send
+`MCP-Protocol-Version: 2025-06-18`; an explicit invalid, duplicate, or
+unsupported version gets 400 before the body is read. Missing headers remain
+accepted for older direct clients, without implying support for older
+protocol revisions. The custom WebSocket upgrade does not use the HTTP
+version header.
+
+Use JSON-RPC `2.0` with a string or integer request ID. v0.1.4 rejects
+`null`, fractional, or other invalid request IDs with `-32600` and an error
+ID of `null`. It rejects fractional client-response IDs and a `null` success-
+response ID; `null` remains valid for a parse or invalid-request error when
+the original ID cannot be recovered. Client success-response `result` and
+request/notification `params`, when present, must be JSON objects. A valid
+request ID is echoed for invalid `params`. Rejected ID-less HTTP
+notifications or client responses get 400 with no body; accepted ones get 202
+with no body. The custom WebSocket transport reports malformed messages as
+JSON-RPC errors.
+
+The published v0.1.3 release predates these v0.1.4 HTTP/envelope checks. Use
+its [tagged documentation](https://github.com/rhamenator/request-guard-mcp/tree/v0.1.3)
+when operating that version.
 
 ### `rhamenator/ai-scraping-defense` (Python/Django)
 
@@ -108,27 +94,22 @@ Fallback is triggered when:
 |---------|-----------|-----------|
 | 2025-06-18 | WebSocket JSON-RPC (custom client transport) | Implemented; client interoperability gate open |
 | 2025-06-18 | HTTP POST JSON-RPC | Inspector 2.5.0 smoke passed; full conformance gate open |
-| 2025-06-18 | stdio, SSE GET, gRPC | Not implemented; development main returns 405 for authorized, non-upgrade GET `/mcp` requests |
+| 2025-06-18 | stdio, SSE GET, gRPC | Not implemented; v0.1.4 returns 405 for authenticated, ordinary GET `/mcp` |
 
-Accepted HTTP POST notifications and client responses have no response body.
-Development main returns HTTP 202; the published v0.1.3 server returns 204.
 The [pinned MCP transport revision](https://modelcontextprotocol.io/specification/2025-06-18/basic/transports#sending-messages-to-the-server)
-specifies 202 for accepted notifications and responses. Full Streamable HTTP
-conformance remains open in issue #59.
-On development main, browser-originated HTTP POST and WebSocket MCP requests
-require an exact configured `MCP_ALLOWED_ORIGINS` entry. The default empty
-allowlist denies requests carrying `Origin`, while non-browser requests without
-it still use the configured authentication policy. This follows the
-[MCP transport DNS-rebinding guidance](https://modelcontextprotocol.io/specification/2025-06-18/basic/transports#security-warning).
-Published v0.1.3 has no server-side Origin check, so its reverse proxy must
-enforce the intended browser-origin boundary. Origin is a browser protection,
-not a replacement for a token: non-browser callers can forge that header.
-The development check covers MCP POST and WebSocket upgrades. Health,
-readiness, and metrics endpoints remain outside it. Cross-origin browser
-clients need CORS preflight and response handling at a trusted proxy; the
-allowlist does not add CORS to the server. Browser WebSocket clients cannot
-set this server's Authorization bearer header and need a trusted authenticating
-proxy to supply upstream credentials.
+requires 202 with no body for accepted client notifications and responses;
+v0.1.4 does so. Full Streamable HTTP conformance remains open in issue #59.
+Browser-originated HTTP POST and WebSocket MCP requests require an exact
+`MCP_ALLOWED_ORIGINS` entry in addition to bearer authentication. The default
+empty allowlist denies requests carrying `Origin`; clients without `Origin`
+remain subject to the configured authentication policy. This follows the
+[MCP DNS-rebinding guidance](https://modelcontextprotocol.io/specification/2025-06-18/basic/transports#security-warning).
+Origin is spoofable outside a browser. The check covers MCP POST and WebSocket
+upgrades, not health, readiness, or metrics. Cross-origin browser clients need
+a trusted proxy for CORS preflight and response handling. Browser WebSocket
+clients need that proxy to authenticate and supply the upstream bearer header.
+Published v0.1.3 lacks the server-side Origin check; its proxy must enforce
+that boundary.
 
 ## Tool Availability by Feature Flag
 
