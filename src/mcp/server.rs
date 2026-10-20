@@ -118,7 +118,9 @@ async fn http_mcp_handler(State(state): State<ServerState>, request: Request) ->
             response,
         )
             .into_response(),
-        None => StatusCode::NO_CONTENT.into_response(),
+        // MCP 2025-06-18 Streamable HTTP acknowledges accepted client
+        // notifications and responses with 202 and no response body.
+        None => StatusCode::ACCEPTED.into_response(),
     }
 }
 

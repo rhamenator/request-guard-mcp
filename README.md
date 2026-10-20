@@ -40,7 +40,9 @@ does not define a separate protobuf service contract; the `grpc-tonic` feature
 in `opentelemetry-otlp` is used only to export telemetry to an OTLP collector.
 Use a JSON-RPC `2.0` envelope and a string or numeric request ID (or `null`).
 v0.1.2 and newer builds return `-32600` for invalid envelope shapes and
-`-32700` for malformed JSON. Client notifications receive no response.
+`-32700` for malformed JSON. Client notifications receive no JSON-RPC response;
+development main acknowledges accepted HTTP notifications and client responses
+with 202 and an empty body. Published v0.1.3 uses 204 and an empty body.
 v0.1.2 and newer builds send WebSocket close code 1009
 when a frame or fragmented message exceeds `MCP__LIMITS__MAX_REQUEST_BYTES`.
 The published v0.1.1 release can instead close the connection without a
