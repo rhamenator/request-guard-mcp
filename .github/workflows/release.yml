@@ -151,4 +151,4 @@ jobs:
             artifacts/*-macos-arm64.tar.gz.sha256
           generate_release_notes: true
           draft: false
-          prerelease: ${{ contains(github.ref_name, '-') }}
+          prerelease: ${{ startsWith(github.ref_name, 'v0.') || contains(github.ref_name, '-') }}
