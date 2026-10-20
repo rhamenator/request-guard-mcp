@@ -61,3 +61,25 @@ time against `max(native amd64, native arm64)`; that approximates the build
 portion of a split release, while manifest assembly, registry push, and
 attestations still need a separate end-to-end check. The earlier native
 build-and-load jobs remain for image health smoke and historical comparison.
+
+At commit `67e4ed4`, [run 39397571246](https://github.com/rhamenator/request-guard-mcp/actions/runs/39397571246)
+passed the three no-cache OCI exports: native amd64 205 seconds, native arm64
+184 seconds, and combined QEMU amd64+arm64 1,812 seconds. Each archive's
+platform set was checked. This single sample motivates splitting publication;
+it does not include GHCR pushes, digest assembly, or attestations and is not
+an end-to-end release-time measurement.
+
+## Split publication verification
+
+The publication workflow builds each platform on its matching hosted runner
+and pushes it by immutable digest. It uploads only one validated digest per
+architecture to the workflow artifact store. The final job reads and verifies
+both source manifests, assembles the multiarch index from those exact digests,
+checks that the index contains linux/amd64 and linux/arm64 with a provenance
+attestation linked to each platform digest, and checks that
+every release tag resolves to the same index digest. PRs retain the existing
+`Build and Push Container` required check on amd64, without publishing.
+Platform-specific cache scopes prevent the two native jobs from overwriting
+one another's cache. A main-branch run and the next experimental tag must
+prove the complete path before issue #88 can close; compare whole-job elapsed
+time with the earlier release runs, including push and manifest assembly.
