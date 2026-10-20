@@ -31,6 +31,18 @@ MaxMind data are not needed for the core `classify` and `explain` tools.
 For a remote client, use a trusted TLS endpoint in front of the server and
 restrict who can reach it. Do not send the bearer token over plain HTTP across
 an untrusted network. The server does not offer stdio or SSE GET transport.
+On development main, MCP HTTP POST and WebSocket requests carrying `Origin`
+must match an exact entry in `MCP_ALLOWED_ORIGINS`; for example,
+`MCP_ALLOWED_ORIGINS=https://console.example`. List the public browser origin
+when using a reverse proxy, including a nondefault port. Do not use wildcards,
+paths, default ports (`:80`/`:443`), uppercase hosts, or the literal `null`.
+For a cross-origin browser client, the trusted proxy must handle CORS preflights
+and response headers; the server allowlist alone does not enable CORS.
+Browser WebSocket clients also need a trusted proxy to authenticate the browser
+and set the upstream bearer header, which the browser WebSocket API cannot set.
+Requests without `Origin` remain available to
+non-browser clients under the configured authentication policy. Published v0.1.3 does not
+include this check; enforce browser-origin restrictions at the proxy for it.
 
 The companion Agensi skill is installed separately. It provides agent
 instructions, not the server binary or credentials, and is not a GitHub release

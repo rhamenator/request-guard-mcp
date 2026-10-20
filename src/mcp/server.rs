@@ -1,4 +1,5 @@
 use crate::config::LimitsConfig;
+use crate::mcp::origin::check_origin;
 use crate::mcp::tool_registry::ToolRegistry;
 use crate::mcp::transport_ws::{handle_ws_connection, process_message};
 use crate::state::AppState;
@@ -57,6 +58,9 @@ async fn ws_handler(
         Ok(scope) => scope,
         Err(error) => return error_response(&error),
     };
+    if let Err(status) = check_origin(&headers, &state.app.config.auth.allowed_origins) {
+        return status.into_response();
+    }
 
     let Ok(connection_permit) = Arc::clone(&state.app.connection_semaphore).try_acquire_owned()
     else {
@@ -88,6 +92,9 @@ async fn http_mcp_handler(State(state): State<ServerState>, request: Request) ->
         Ok(scope) => scope,
         Err(error) => return error_response(&error),
     };
+    if let Err(status) = check_origin(request.headers(), &state.app.config.auth.allowed_origins) {
+        return status.into_response();
+    }
     let body = match tokio::time::timeout(
         Duration::from_secs(state.app.config.limits.http_body_timeout_secs),
         to_bytes(

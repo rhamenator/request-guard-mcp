@@ -43,6 +43,21 @@ v0.1.2 and newer builds return `-32600` for invalid envelope shapes and
 `-32700` for malformed JSON. Client notifications receive no JSON-RPC response;
 development main acknowledges accepted HTTP notifications and client responses
 with 202 and an empty body. Published v0.1.3 uses 204 and an empty body.
+Development main rejects MCP HTTP POST and WebSocket requests that carry an
+`Origin` header unless that exact origin is in `MCP_ALLOWED_ORIGINS` (a
+comma-separated list of full `http://` or `https://` origins). No origins are
+allowed by default; non-browser clients that omit `Origin` still use the
+configured authentication policy. For a browser client behind a reverse proxy, list its
+trusted public origin explicitly. This server does not answer CORS preflights:
+cross-origin browser clients also need a trusted proxy to handle CORS, while
+same-origin browser traffic does not. Browser WebSocket APIs cannot set the
+server's bearer Authorization header; a trusted proxy must authenticate the
+browser and supply upstream credentials for that path. Use lowercase hosts and omit default
+ports (`:80` for HTTP and `:443` for HTTPS) in the allowlist. The check applies
+to the MCP endpoint, not `/health`, `/ready`, or `/metrics`; restrict those
+endpoints at the proxy if browser access is a concern. The published v0.1.3 binary does not yet
+enforce this Origin check; protect that release at the TLS proxy. An Origin
+header is spoofable outside a browser and never replaces authentication.
 v0.1.2 and newer builds send WebSocket close code 1009
 when a frame or fragmented message exceeds `MCP__LIMITS__MAX_REQUEST_BYTES`.
 The published v0.1.1 release can instead close the connection without a
