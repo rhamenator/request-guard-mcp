@@ -1,6 +1,8 @@
 use anyhow::{Context, Result};
 use opentelemetry::trace::TracerProvider as _;
-use opentelemetry_otlp::WithExportConfig;
+use opentelemetry_otlp::{
+    tonic_types::transport::ClientTlsConfig, WithExportConfig, WithTonicConfig,
+};
 use opentelemetry_sdk::{trace::SdkTracerProvider, Resource};
 use tracing::info;
 use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
@@ -14,9 +16,13 @@ pub fn init_tracing(
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(log_level));
 
     let provider = if let Some(endpoint) = otlp_endpoint {
-        let exporter = opentelemetry_otlp::SpanExporter::builder()
+        let mut builder = opentelemetry_otlp::SpanExporter::builder()
             .with_tonic()
-            .with_endpoint(endpoint)
+            .with_endpoint(endpoint);
+        if endpoint.starts_with("https://") {
+            builder = builder.with_tls_config(ClientTlsConfig::new().with_enabled_roots());
+        }
+        let exporter = builder
             .build()
             .context("failed to build configured OTLP trace exporter")?;
         let provider = SdkTracerProvider::builder()

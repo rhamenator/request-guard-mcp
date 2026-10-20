@@ -1,5 +1,10 @@
 # Install Request Guard MCP from a release bundle
 
+For Linux x64, use the `linux-x64` archive on glibc systems and a separately
+labeled `linux-x64-musl` archive on Alpine/musl. The v0.1.2 release has only
+the glibc archive; do not use it on Alpine. If the selected release has no
+musl archive, that release does not support Alpine.
+
 Download the archive for your operating system and CPU from the GitHub release,
 along with its matching `.sha256` file. Verify the archive before extracting it:
 
