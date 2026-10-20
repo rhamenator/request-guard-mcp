@@ -22,9 +22,13 @@ image fails the build rather than silently substituting a newer input.
 The workflow verifies each archive's SHA-256 sidecar, extracts into a new
 directory, and compares the extracted executable with the staging binary.
 MCP Inspector and the Alpine smoke run that extracted executable. The musl
-lane also requires an ELF PIE with no interpreter or shared-library `NEEDED`
-entry. Private branch candidates run the same build and verification steps
-without creating a GitHub release.
+lane additionally runs the pinned official MCP Inspector inside the pinned
+Alpine image against the extracted executable. This checks Alpine's Node,
+Python, musl, and HTTP client path as part of private candidates and tags;
+it installs test tools in a disposable container only. The musl lane also
+requires an ELF PIE with no interpreter or shared-library `NEEDED` entry.
+Private branch candidates run the same build and verification steps without
+creating a GitHub release.
 
 This pins the main musl-specific inputs; hosted runner images, the Ubuntu apt
 repository, and the remaining platform toolchains can still change. Review
