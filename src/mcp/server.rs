@@ -1,19 +1,19 @@
 use crate::config::LimitsConfig;
 use crate::mcp::origin::check_origin;
 use crate::mcp::tool_registry::ToolRegistry;
-use crate::mcp::transport_ws::{handle_ws_connection, process_message};
+use crate::mcp::transport_ws::{handle_ws_connection, process_message, SUPPORTED_PROTOCOL_VERSION};
 use crate::state::AppState;
 use crate::telemetry::gather_metrics;
 use axum::{
     body::{to_bytes, Body},
     extract::{ws::WebSocketUpgrade, FromRequestParts, Request, State},
     http::{
-        header::{ALLOW, CONNECTION, UPGRADE, X_CONTENT_TYPE_OPTIONS},
-        HeaderMap, HeaderValue, StatusCode,
+        header::{ALLOW, CONNECTION, CONTENT_LENGTH, UPGRADE, X_CONTENT_TYPE_OPTIONS},
+        HeaderMap, HeaderValue, Method, StatusCode,
     },
     middleware::map_response,
     response::{IntoResponse, Response},
-    routing::get,
+    routing::{any, get},
     Router,
 };
 use hyper::{body::Incoming, service::service_fn};
@@ -35,13 +35,15 @@ pub struct ServerState {
 
 pub fn build_router(state: ServerState, max_body: usize) -> Router {
     let metrics_path = state.app.config.telemetry.metrics_path.clone();
-    Router::new()
-        .route("/mcp", get(ws_handler).post(http_mcp_handler))
+    let utility_routes = Router::new()
         .route("/health", get(http_health_handler))
         .route(&metrics_path, get(metrics_handler))
         .route("/ready", get(readiness_handler))
+        .layer(RequestBodyLimitLayer::new(max_body));
+    Router::new()
+        .route("/mcp", any(mcp_handler))
+        .merge(utility_routes)
         .layer(map_response(add_security_headers))
-        .layer(RequestBodyLimitLayer::new(max_body))
         .with_state(state)
 }
 
@@ -52,7 +54,7 @@ async fn add_security_headers(mut response: Response) -> Response {
     response
 }
 
-async fn ws_handler(State(state): State<ServerState>, request: Request) -> Response {
+async fn mcp_handler(State(state): State<ServerState>, request: Request) -> Response {
     let caller_scope = match authorize(request.headers(), &state.app) {
         Ok(scope) => scope,
         Err(error) => return error_response(&error),
@@ -60,14 +62,23 @@ async fn ws_handler(State(state): State<ServerState>, request: Request) -> Respo
     if let Err(status) = check_origin(request.headers(), &state.app.config.auth.allowed_origins) {
         return status.into_response();
     }
-
-    // The custom WebSocket transport shares this path with Streamable HTTP.
-    // This server does not offer a server-initiated SSE GET stream.
-    if !header_has_token(request.headers(), UPGRADE, "websocket")
-        || !header_has_token(request.headers(), CONNECTION, "upgrade")
-    {
-        return (StatusCode::METHOD_NOT_ALLOWED, [(ALLOW, "POST, GET")]).into_response();
+    let websocket_upgrade = request.method() == Method::GET
+        && header_has_token(request.headers(), UPGRADE, "websocket")
+        && header_has_token(request.headers(), CONNECTION, "upgrade");
+    // WebSocket is a custom transport and does not use the Streamable HTTP
+    // version header. Check every other MCP HTTP method before dispatch.
+    if !websocket_upgrade && !valid_protocol_version(request.headers()) {
+        return invalid_protocol_version_response();
     }
+
+    match *request.method() {
+        Method::POST => http_mcp_handler(state, request, caller_scope).await,
+        Method::GET if websocket_upgrade => ws_handler(state, request, caller_scope).await,
+        _ => (StatusCode::METHOD_NOT_ALLOWED, [(ALLOW, "POST, GET")]).into_response(),
+    }
+}
+
+async fn ws_handler(state: ServerState, request: Request, caller_scope: String) -> Response {
     let (mut parts, _) = request.into_parts();
     let mut ws = match WebSocketUpgrade::from_request_parts(&mut parts, &state).await {
         Ok(ws) => ws,
@@ -112,13 +123,15 @@ fn header_has_token(
     })
 }
 
-async fn http_mcp_handler(State(state): State<ServerState>, request: Request) -> Response {
-    let caller_scope = match authorize(request.headers(), &state.app) {
-        Ok(scope) => scope,
-        Err(error) => return error_response(&error),
-    };
-    if let Err(status) = check_origin(request.headers(), &state.app.config.auth.allowed_origins) {
-        return status.into_response();
+async fn http_mcp_handler(state: ServerState, request: Request, caller_scope: String) -> Response {
+    if request
+        .headers()
+        .get(CONTENT_LENGTH)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.parse::<u64>().ok())
+        .is_some_and(|length| length > state.app.config.limits.max_request_bytes as u64)
+    {
+        return (StatusCode::PAYLOAD_TOO_LARGE, "Request body exceeds limit").into_response();
     }
     let body = match tokio::time::timeout(
         Duration::from_secs(state.app.config.limits.http_body_timeout_secs),
@@ -153,6 +166,45 @@ async fn http_mcp_handler(State(state): State<ServerState>, request: Request) ->
         // MCP 2025-06-18 Streamable HTTP acknowledges accepted client
         // notifications and responses with 202 and no response body.
         None => StatusCode::ACCEPTED.into_response(),
+    }
+}
+
+fn valid_protocol_version(headers: &HeaderMap) -> bool {
+    let mut values = headers.get_all("mcp-protocol-version").iter();
+    match values.next() {
+        // No header is retained for older clients, which have no session state
+        // from which to recover a negotiated version.
+        None => true,
+        Some(value) => {
+            value.as_bytes() == SUPPORTED_PROTOCOL_VERSION.as_bytes() && values.next().is_none()
+        }
+    }
+}
+
+fn invalid_protocol_version_response() -> Response {
+    (
+        StatusCode::BAD_REQUEST,
+        "Invalid or unsupported MCP-Protocol-Version",
+    )
+        .into_response()
+}
+
+#[cfg(test)]
+mod protocol_version_tests {
+    use super::*;
+
+    #[test]
+    fn duplicate_version_headers_are_rejected() {
+        let mut headers = HeaderMap::new();
+        headers.append(
+            "mcp-protocol-version",
+            HeaderValue::from_static("2025-06-18"),
+        );
+        headers.append(
+            "mcp-protocol-version",
+            HeaderValue::from_static("2025-06-18"),
+        );
+        assert!(!valid_protocol_version(&headers));
     }
 }
 

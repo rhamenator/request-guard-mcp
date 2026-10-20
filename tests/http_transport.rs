@@ -67,6 +67,163 @@ async fn plain_mcp_get_reports_no_sse_stream_after_auth_and_origin_checks() {
 }
 
 #[tokio::test]
+async fn explicit_mcp_protocol_version_is_checked_before_post_body() {
+    let request = json!({"jsonrpc": "2.0", "id": 1, "method": "ping"});
+    let accepted = server(false)
+        .post("/mcp")
+        .add_header(
+            "MCP-Protocol-Version",
+            HeaderValue::from_static("2025-06-18"),
+        )
+        .json(&request)
+        .await;
+    accepted.assert_status_ok();
+
+    // Missing remains accepted for older clients without a session header.
+    server(false)
+        .post("/mcp")
+        .json(&request)
+        .await
+        .assert_status_ok();
+
+    for version in [
+        "2025-03-26",
+        "2026-07-28",
+        "2025-06-18, 2025-06-18",
+        "",
+        "garbage",
+    ] {
+        let rejected = server(false)
+            .post("/mcp")
+            .add_header(
+                "MCP-Protocol-Version",
+                HeaderValue::from_str(version).unwrap(),
+            )
+            .json(&request)
+            .await;
+        rejected.assert_status(StatusCode::BAD_REQUEST);
+        assert_eq!(
+            rejected.text(),
+            "Invalid or unsupported MCP-Protocol-Version"
+        );
+    }
+
+    let invalid_get = server(false)
+        .get("/mcp")
+        .add_header(
+            "MCP-Protocol-Version",
+            HeaderValue::from_static("2026-07-28"),
+        )
+        .await;
+    invalid_get.assert_status(StatusCode::BAD_REQUEST);
+
+    let invalid_delete = server(false)
+        .delete("/mcp")
+        .add_header(
+            "MCP-Protocol-Version",
+            HeaderValue::from_static("2026-07-28"),
+        )
+        .await;
+    invalid_delete.assert_status(StatusCode::BAD_REQUEST);
+
+    let valid_delete = server(false)
+        .delete("/mcp")
+        .add_header(
+            "MCP-Protocol-Version",
+            HeaderValue::from_static("2025-06-18"),
+        )
+        .await;
+    valid_delete.assert_status(StatusCode::METHOD_NOT_ALLOWED);
+
+    let unauthenticated = server(true)
+        .post("/mcp")
+        .add_header("MCP-Protocol-Version", HeaderValue::from_static("garbage"))
+        .json(&request)
+        .await;
+    unauthenticated.assert_status(StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn invalid_protocol_version_rejects_incomplete_post_body() {
+    let mut config = Config::default();
+    config.auth.enabled = false;
+    let max_body = config.limits.max_request_bytes;
+    let state = ServerState {
+        app: Arc::new(AppState::new(config)),
+        registry: Arc::new(build_registry()),
+    };
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let server_task = tokio::spawn(async move {
+        axum::serve(listener, build_router(state, max_body))
+            .await
+            .unwrap();
+    });
+    let mut stream = TcpStream::connect(address).await.unwrap();
+    stream
+        .write_all(b"POST /mcp HTTP/1.1\r\nHost: localhost\r\nMCP-Protocol-Version: 2026-07-28\r\nContent-Length: 2000000\r\n\r\nx")
+        .await
+        .unwrap();
+    let status_line = timeout(Duration::from_secs(5), async {
+        let mut line = Vec::new();
+        while !line.ends_with(b"\r\n") {
+            assert!(line.len() < 256, "HTTP status line is too long");
+            let mut byte = [0_u8; 1];
+            assert_eq!(stream.read(&mut byte).await.unwrap(), 1);
+            line.push(byte[0]);
+        }
+        line
+    })
+    .await
+    .expect("version rejection must not wait for the incomplete body");
+    assert!(std::str::from_utf8(&status_line)
+        .unwrap()
+        .starts_with("HTTP/1.1 400 "));
+
+    let mut stream = TcpStream::connect(address).await.unwrap();
+    stream
+        .write_all(b"POST /mcp HTTP/1.1\r\nHost: localhost\r\nMCP-Protocol-Version: 2025-06-18\r\nContent-Length: 2000000\r\n\r\nx")
+        .await
+        .unwrap();
+    let status_line = timeout(Duration::from_secs(5), async {
+        let mut line = Vec::new();
+        while !line.ends_with(b"\r\n") {
+            assert!(line.len() < 256, "HTTP status line is too long");
+            let mut byte = [0_u8; 1];
+            assert_eq!(stream.read(&mut byte).await.unwrap(), 1);
+            line.push(byte[0]);
+        }
+        line
+    })
+    .await
+    .expect("large valid-version request must be rejected before its body completes");
+    assert!(std::str::from_utf8(&status_line)
+        .unwrap()
+        .starts_with("HTTP/1.1 413 "));
+    server_task.abort();
+}
+
+#[tokio::test]
+async fn post_body_limit_still_applies_after_version_validation() {
+    let mut config = Config::default();
+    config.auth.enabled = false;
+    config.limits.max_request_bytes = 128;
+    let state = ServerState {
+        app: Arc::new(AppState::new(config)),
+        registry: Arc::new(build_registry()),
+    };
+    let response = TestServer::new(build_router(state, 128))
+        .post("/mcp")
+        .add_header(
+            "MCP-Protocol-Version",
+            HeaderValue::from_static("2025-06-18"),
+        )
+        .json(&json!({"jsonrpc": "2.0", "id": 1, "method": "ping", "padding": "x".repeat(256)}))
+        .await;
+    response.assert_status(StatusCode::PAYLOAD_TOO_LARGE);
+}
+
+#[tokio::test]
 async fn mcp_post_requires_explicit_browser_origin_allowlist() {
     let request = json!({"jsonrpc": "2.0", "id": 1, "method": "ping"});
     let rejected = server(false)
@@ -112,6 +269,10 @@ async fn websocket_upgrade_requires_explicit_browser_origin_allowlist() {
 
     for (origin_lines, expected) in [
         ("Origin: https://console.example\r\n", 101),
+        (
+            "Origin: https://console.example\r\nMCP-Protocol-Version: 2026-07-28\r\n",
+            101,
+        ),
         ("Origin: https://evil.example\r\n", 403),
         (
             "Origin: https://console.example\r\nOrigin: https://console.example\r\n",
