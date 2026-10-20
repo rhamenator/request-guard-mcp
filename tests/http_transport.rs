@@ -204,6 +204,26 @@ async fn invalid_protocol_version_rejects_incomplete_post_body() {
 }
 
 #[tokio::test]
+async fn post_body_limit_still_applies_after_version_validation() {
+    let mut config = Config::default();
+    config.auth.enabled = false;
+    config.limits.max_request_bytes = 128;
+    let state = ServerState {
+        app: Arc::new(AppState::new(config)),
+        registry: Arc::new(build_registry()),
+    };
+    let response = TestServer::new(build_router(state, 128))
+        .post("/mcp")
+        .add_header(
+            "MCP-Protocol-Version",
+            HeaderValue::from_static("2025-06-18"),
+        )
+        .json(&json!({"jsonrpc": "2.0", "id": 1, "method": "ping", "padding": "x".repeat(256)}))
+        .await;
+    response.assert_status(StatusCode::PAYLOAD_TOO_LARGE);
+}
+
+#[tokio::test]
 async fn mcp_post_requires_explicit_browser_origin_allowlist() {
     let request = json!({"jsonrpc": "2.0", "id": 1, "method": "ping"});
     let rejected = server(false)
