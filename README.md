@@ -28,6 +28,7 @@ To package the skill for a directory listing, run `python3 scripts/package_skill
 - **Structured JSON logging** via `tracing`
 - **Redis-backed** threat reputation, canary registry, queue telemetry, and distributed cache
 - **Caller-isolated PostgreSQL** decision replay, feedback, drift, and calibration reports with automatic schema setup; configure a stable `CACHE_SCOPE_HMAC_KEY` when PostgreSQL is enabled
+- **PostgreSQL TLS trust on development main** uses the host operating system's CA store. With `sslmode=verify-full`, a private database CA can instead be supplied through `sslrootcert` in `MCP__POSTGRES__URL`; published v0.1.3 has not adopted the native-root change.
 - **HMAC-attested JA3/JA4 rules** with known-bad sets, UA/TLS mismatch detection, and verified cache partitioning
 - **MaxMind City/ASN/Anonymous-IP enrichment**, optionally combined with Redis reputation scores
 - **Docker + Kubernetes** ready with HPA, NetworkPolicy, health probes

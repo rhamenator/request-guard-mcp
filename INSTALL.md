@@ -31,6 +31,13 @@ MaxMind data are not needed for the core `classify` and `explain` tools.
 For a remote client, use a trusted TLS endpoint in front of the server and
 restrict who can reach it. Do not send the bearer token over plain HTTP across
 an untrusted network. The server does not offer stdio or SSE GET transport.
+On development main, PostgreSQL TLS verification uses the operating system CA
+store. For a private database CA, install it in that store or set
+`sslrootcert=/path/to/ca.pem` in `MCP__POSTGRES__URL`. Use
+`sslmode=verify-full` to verify both the certificate chain and hostname;
+`sslmode=require` encrypts the connection but does not verify either. Minimal
+container and Alpine hosts need a populated CA store unless `sslrootcert`
+supplies the private CA. Published v0.1.3 does not include the native-root change.
 On development main, MCP HTTP POST and WebSocket requests carrying `Origin`
 must match an exact entry in `MCP_ALLOWED_ORIGINS`; for example,
 `MCP_ALLOWED_ORIGINS=https://console.example`. List the public browser origin
