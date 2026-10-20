@@ -73,7 +73,10 @@ object; primitive, `null`, and array results are rejected. Published v0.1.3 may
 acknowledge those malformed responses.
 Development main also requires `params` to be an object when present on a
 request or notification; arrays and `null` receive JSON-RPC `-32600` on HTTP
-POST requests and WebSocket messages. Omitted `params` remains valid. Published v0.1.3 may
+POST requests and WebSocket messages. For a request with a valid ID, development
+main echoes that ID in the error; a rejected notification gets HTTP 400 with no
+body, or a `null`-ID JSON-RPC error over WebSocket.
+Omitted `params` remains valid. Published v0.1.3 may
 accept array parameters on methods that do not inspect them.
 On development main, an invalid ID-less notification or client response over
 HTTP gets 400 with an empty body; an accepted one gets 202 with an empty body.

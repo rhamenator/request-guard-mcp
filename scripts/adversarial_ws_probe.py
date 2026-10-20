@@ -74,13 +74,13 @@ if status==101:
     send_text(sock,'{broken')
     op,payload=recv_frame(sock);value=json.loads(payload)
     check('ws_malformed_json',op==1 and value.get('error',{}).get('code')==-32700,{'opcode':op,'code':value.get('error',{}).get('code')})
-    for name,envelope in [
-        ('ws_wrong_jsonrpc_version',{'jsonrpc':'1.0','id':2,'method':'ping'}),
-        ('ws_scalar_params',{'jsonrpc':'2.0','id':2,'method':'ping','params':42}),
+    for name,envelope,expected_id in [
+        ('ws_wrong_jsonrpc_version',{'jsonrpc':'1.0','id':2,'method':'ping'},None),
+        ('ws_scalar_params',{'jsonrpc':'2.0','id':2,'method':'ping','params':42},2),
     ]:
         send_text(sock,json.dumps(envelope))
         op,payload=recv_frame(sock);value=json.loads(payload)
-        check(name,op==1 and value.get('error',{}).get('code')==-32600 and value.get('id') is None,{'opcode':op,'code':value.get('error',{}).get('code')})
+        check(name,op==1 and value.get('error',{}).get('code')==-32600 and value.get('id')==expected_id,{'opcode':op,'code':value.get('error',{}).get('code')})
     send_text(sock,json.dumps({'jsonrpc':'2.0','id':3,'method':'tools/list'}))
     op,payload=recv_frame(sock);value=json.loads(payload)
     names={tool['name'] for tool in value.get('result',{}).get('tools',[])}
