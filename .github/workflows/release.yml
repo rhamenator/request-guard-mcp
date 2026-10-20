@@ -165,6 +165,14 @@ jobs:
           python scripts/smoke_alpine_redis.py \
             --binary "verified-release/request-guard-mcp-${RELEASE_VERSION}-linux-x64-musl/request-guard-mcp" \
             --expected-version "$(python -c 'import tomllib; print(tomllib.load(open("Cargo.toml", "rb"))["package"]["version"])')"
+      - name: Check PostgreSQL outage and recovery inside Alpine
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        timeout-minutes: 6
+        shell: bash
+        run: |
+          python scripts/smoke_alpine_postgres.py \
+            --binary "verified-release/request-guard-mcp-${RELEASE_VERSION}-linux-x64-musl/request-guard-mcp" \
+            --expected-version "$(python -c 'import tomllib; print(tomllib.load(open("Cargo.toml", "rb"))["package"]["version"])')"
       - name: Verify standard MCP calls with official Inspector
         shell: bash
         run: |

@@ -37,6 +37,13 @@ during outage, and lookup recovery after restart. Both services use container
 loopback ports only; no test credentials or integration logs are published.
 Python and Redis are installed in that disposable test image from Alpine's
 versioned 3.24 repositories; those test package revisions are not pinned.
+Another disposable Alpine probe starts PostgreSQL on container loopback,
+checks persisted classification and replay before/after an immediate backend
+stop, requires deterministic `-502` responses during outage, checks the
+decision row survived the database restart, and confirms core MCP ping
+remains available. It inspects the bounded private MCP server log for
+synthetic tokens and cache-scope keys. PostgreSQL and Python test package
+revisions come from the versioned Alpine repository and are not pinned.
 Private branch candidates run the same build and verification steps without
 creating a GitHub release.
 
