@@ -178,4 +178,6 @@ kubectl get hpa -n request-guard
    release version; do not substitute a mutable tag for the digest.
 2. Apply: `kubectl apply -f deploy/k8s/deployment.yaml`.
 3. Monitor: `kubectl rollout status deployment/request-guard-mcp -n request-guard`.
-4. Rollback if needed: `kubectl rollout undo deployment/request-guard-mcp -n request-guard`.
+4. To roll back, reapply the previous verified deployment manifest, including
+   its image digest and both `version` labels, then monitor the rollout again.
+   `kubectl rollout undo` alone does not restore the Deployment's metadata label.
