@@ -43,6 +43,8 @@ Development main rejects fractional client-response IDs and a `null` success-
 response ID; a `null` error-response ID is accepted for parse or invalid-request
 errors when the original request ID cannot be recovered. Published
 v0.1.3 does not enforce this response-ID restriction.
+Development main requires a client success-response `result` to be an object;
+published v0.1.3 may acknowledge primitive, `null`, or array results.
 MCP 2025-06-18 also requires request and notification `params` to be an
 object when supplied. Development main rejects arrays and `null` with
 JSON-RPC `-32600` for HTTP POST requests and WebSocket messages; omission is accepted. Published

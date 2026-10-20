@@ -553,6 +553,8 @@ async fn rejected_client_responses_return_http_error_without_json_rpc_body() {
         json!({"jsonrpc": "2.0", "id": 1.5, "result": {}}),
         json!({"jsonrpc": "2.0", "id": null, "result": {}}),
         json!({"jsonrpc": "2.0", "id": null, "error": {"code": -32603, "message": "Internal error"}}),
+        json!({"jsonrpc": "2.0", "id": 1, "result": null}),
+        json!({"jsonrpc": "2.0", "id": 1, "result": []}),
     ] {
         let response = server.post("/mcp").json(&payload).await;
         response.assert_status(StatusCode::BAD_REQUEST);

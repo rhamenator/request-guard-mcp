@@ -68,6 +68,9 @@ success-response ID. A `null` error-response ID remains valid for parse or
 invalid-request errors when the original request ID cannot be recovered;
 published v0.1.3 does not enforce
 the client-response ID restriction.
+Development main also requires a client success-response `result` to be a JSON
+object; primitive, `null`, and array results are rejected. Published v0.1.3 may
+acknowledge those malformed responses.
 Development main also requires `params` to be an object when present on a
 request or notification; arrays and `null` receive JSON-RPC `-32600` on HTTP
 POST requests and WebSocket messages. Omitted `params` remains valid. Published v0.1.3 may
