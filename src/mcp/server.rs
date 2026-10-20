@@ -236,12 +236,12 @@ fn accepts_json(headers: &HeaderMap) -> bool {
     if values.peek().is_none() {
         return true; // Legacy direct clients omit Accept.
     }
-    let mut best: Option<(u8, u16)> = None;
+    let mut best: Option<(u8, u8, u16)> = None;
     for value in values {
         let Ok(value) = value.to_str() else {
             return false;
         };
-        for range in value.split(',') {
+        'range: for range in value.split(',') {
             let mut parts = range.trim().split(';');
             let media = parts.next().unwrap_or("").trim();
             let specificity = if media.eq_ignore_ascii_case("application/json") {
@@ -255,9 +255,10 @@ fn accepts_json(headers: &HeaderMap) -> bool {
             };
             let mut quality = 1000;
             let mut saw_q = false;
+            let mut matched_parameters = 0;
             for parameter in parts {
                 let Some((name, value)) = parameter.trim().split_once('=') else {
-                    return false;
+                    continue 'range;
                 };
                 if name.trim().eq_ignore_ascii_case("q") {
                     if saw_q {
@@ -268,23 +269,32 @@ fn accepts_json(headers: &HeaderMap) -> bool {
                         return false;
                     };
                     quality = parsed;
-                } else if !name.trim().eq_ignore_ascii_case("charset")
-                    || !value.trim().eq_ignore_ascii_case("utf-8")
-                    || specificity != 2
-                {
-                    return false;
+                } else if !saw_q {
+                    // A media parameter not carried by our JSON response does
+                    // not match. It must not invalidate a later wildcard.
+                    if !name.trim().eq_ignore_ascii_case("charset")
+                        || !value.trim().trim_matches('"').eq_ignore_ascii_case("utf-8")
+                        || specificity != 2
+                    {
+                        continue 'range;
+                    }
+                    matched_parameters = 1;
+                } else {
+                    // Accept extensions after q do not constrain the media type.
                 }
             }
-            if best.is_none_or(|(prior, _)| specificity > prior) {
-                best = Some((specificity, quality));
-            } else if let Some((prior, prior_quality)) = best {
-                if specificity == prior && quality > prior_quality {
-                    best = Some((specificity, quality));
+            if best.is_none_or(|(prior, params, _)| {
+                (specificity, matched_parameters) > (prior, params)
+            }) {
+                best = Some((specificity, matched_parameters, quality));
+            } else if let Some((prior, params, prior_quality)) = best {
+                if (specificity, matched_parameters) == (prior, params) && quality > prior_quality {
+                    best = Some((specificity, matched_parameters, quality));
                 }
             }
         }
     }
-    best.is_some_and(|(_, quality)| quality > 0)
+    best.is_some_and(|(_, _, quality)| quality > 0)
 }
 
 fn parse_quality(value: &str) -> Option<u16> {
@@ -360,6 +370,10 @@ mod protocol_version_tests {
             "application/json;q=1.000",
             "application/json;q=0.5, text/event-stream",
             "application/json;q=0.5, application/*;q=0",
+            "Application/JSON; Q=1",
+            "application/json;foo=bar, */*",
+            "application/json;q=1;version=1",
+            "application/*;q=0, application/json",
         ] {
             let mut headers = HeaderMap::new();
             headers.insert(ACCEPT, HeaderValue::from_str(value).unwrap());
@@ -373,11 +387,17 @@ mod protocol_version_tests {
             "*/*;q=0",
             "application/json;q=1.1",
             "application/json;q=bogus",
+            "application/json;charset=utf-8;q=0, application/json",
+            "application/json;q=0.0001",
         ] {
             let mut headers = HeaderMap::new();
             headers.insert(ACCEPT, HeaderValue::from_str(value).unwrap());
             assert!(!accepts_json(&headers), "{value}");
         }
+        let mut headers = HeaderMap::new();
+        headers.append(ACCEPT, HeaderValue::from_static("text/event-stream"));
+        headers.append(ACCEPT, HeaderValue::from_static("application/json"));
+        assert!(accepts_json(&headers));
     }
 }
 
