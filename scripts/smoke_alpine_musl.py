@@ -53,13 +53,16 @@ def main() -> None:
     try:
         for _ in range(200):
             if server.poll() is not None:
-                raise RuntimeError("musl binary exited inside Alpine before health became ready")
+                raise RuntimeError(
+                    f"musl binary exited inside Alpine before health became ready: {server.returncode}"
+                )
             try:
                 with urllib.request.urlopen(f"http://127.0.0.1:{args.port}/health", timeout=1) as response:
                     if response.status == 200:
                         break
             except (OSError, TimeoutError):
-                time.sleep(0.1)
+                pass
+            time.sleep(0.1)
         else:
             raise RuntimeError("musl binary in Alpine did not become healthy")
 

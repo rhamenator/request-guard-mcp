@@ -36,10 +36,10 @@ npm package does not include `.env.example`; [INSTALL.md](../INSTALL.md)
 describes the separate native release bundle. For remote access, put a
 trusted TLS endpoint in front of the server and restrict who can reach it.
 
-The package builder uses only the four native release archives and their
-SHA-256 sidecars. It verifies every checksum, extracts only the expected
-binary from each archive, and produces one dependency-free npm package with
-all four supported platforms. Installation does not run a `postinstall` script
+The published v0.1.2 package was built from four native release archives and
+their SHA-256 sidecars. The private 0.1.3 builder requires five archives,
+including Linux x64 musl. It verifies every checksum and extracts only the
+expected binary from each archive. Installation does not run a `postinstall` script
 or download executable code. The small Node launcher selects the bundled
 binary and forwards arguments, environment, stdio, and termination signals.
 The published 0.1.2 Linux x64 binary requires glibc; musl-based distributions

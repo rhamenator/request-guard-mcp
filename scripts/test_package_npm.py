@@ -67,12 +67,22 @@ class NativeNpmPackageTests(unittest.TestCase):
         )
         self.assertEqual(launched.stdout, "native:linux-x64:probe\n")
         musl = subprocess.run(
-            ["node", "-e", "process.report.getReport = () => ({header: {}}); "
+            ["node", "-e", "const fs = require('node:fs'); "
+             "const original = fs.existsSync; "
+             "fs.existsSync = path => path === '/lib/ld-musl-x86_64.so.1' || original(path); "
+             "process.report.getReport = () => ({header: {}}); "
              "require(process.argv[1])", str(output / "bin/request-guard-mcp.js"), "probe"],
             text=True, capture_output=True,
         )
         self.assertEqual(musl.returncode, 0, musl.stderr)
         self.assertEqual(musl.stdout, "native:linux-x64-musl:probe\n")
+        ambiguous = subprocess.run(
+            ["node", "-e", "process.report.getReport = () => { throw Error('disabled'); }; "
+             "require(process.argv[1])", str(output / "bin/request-guard-mcp.js"), "probe"],
+            text=True, capture_output=True,
+        )
+        self.assertEqual(ambiguous.returncode, 0, ambiguous.stderr)
+        self.assertEqual(ambiguous.stdout, "native:linux-x64:probe\n")
         packed = subprocess.run(
             ["npm", "pack", "--dry-run", "--json"], cwd=output,
             text=True, capture_output=True, check=True,

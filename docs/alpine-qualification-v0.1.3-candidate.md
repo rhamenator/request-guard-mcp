@@ -75,12 +75,81 @@ The musl artifact is a static PIE with no ELF interpreter or dynamic OpenSSL
 dependency. The source selects rustls for reqwest and SQLx, and Cargo.lock
 contains no `openssl-sys` or `native-tls` package. These facts reduce libc and
 OpenSSL runtime assumptions for the exercised core path. Alpine's package
-manager and npm resolved and reached their registries, but that does not prove
-the Rust server's optional outbound DNS, TLS certificate trust, Redis,
-PostgreSQL, or OTLP integrations on musl. Those integrations need explicit
-Alpine tests or documented exclusions before a buyer-facing support claim.
+manager and npm resolved and reached their registries. The initial run did not
+exercise the Rust server's optional DNS, TLS certificate trust, Redis,
+PostgreSQL, or OTLP integrations; the follow-up below tests them on later
+private candidates. The server does not implement general outbound fetch.
 This bounded run also does not prove unlimited denial-of-service resistance,
 all classifier evasions, or compatibility with every MCP client.
 
 The Alpine VM was retained for follow-up qualification and is shut down when
 not in use. Private candidate archives and the npm tarball remain local only.
+
+## Optional integration follow-up
+
+On the exact musl binary above, Redis 8.8.0 and PostgreSQL 18.6 installed in
+the Alpine guest both reported healthy. A seeded Redis threat lookup returned
+the expected record; after a Redis service stop it returned JSON-RPC `-502`
+and recovered after restart. PostgreSQL classify, replay, and MCP ping passed
+3/3 while healthy, 3/3 during an outage with deterministic `-502` errors for
+database-backed calls, and 3/3 after restart. A local generic OTLP gRPC
+collector received one trace export through `http://localhost:4317` after a
+WebSocket tool call. This exercised hostname resolution and plaintext OTLP on
+the musl build. The guest services and server were stopped afterward.
+
+The follow-up also exposed an HTTPS OTLP defect: the initial musl candidate
+rejected `https://` collector endpoints at startup because the exporter had no
+TLS feature. A private rebuild from `093a572` enabled rustls and native-root
+support but still rejected the Alpine guest's locally installed test CA with
+`UnknownIssuer`. Commit `7fb371e` explicitly enables native trust roots in
+the exporter configuration. Its private release workflow
+[`39357791203`](https://github.com/rhamenator/request-guard-mcp/actions/runs/39357791203)
+produced a musl archive with SHA-256
+`398234b2e421d2c7b0c8c3ac6b7640d54bfc75e57868cf2b348064ef6779dfaf`.
+The extracted binary SHA-256 is
+`0f72f6d704488ce763dc9021b8b3eef82e0e8aee20844b213479212af5a85c3b`.
+The sidecar verified on the host and inside Alpine. The packaged Alpine CI
+smoke passed with an HTTPS endpoint configured; that smoke proves startup,
+not a successful TLS export.
+
+The **exact extracted binary** then initialized Redis and PostgreSQL in the
+Alpine VM, returned healthy backend status, and passed a fresh official MCP
+Inspector run: missing-token rejection, initialization, 23 tools, classify,
+and explain. PostgreSQL classify/replay/ping passed 3/3 before outage, 3/3
+during outage, and 3/3 after restart. A seeded Redis lookup succeeded, failed
+with deterministic JSON-RPC `-502` while Redis was stopped, and succeeded
+again after restart. A WebSocket probe with a Redis tool call passed 9/9.
+
+For TLS, a local generic OTLP gRPC collector used a one-day test certificate
+signed by a CA installed in Alpine's system trust store. With the exporter
+pointed at `https://localhost:4318`, the collector received one trace export
+after the WebSocket tool call. A second collector on port 4319 used a valid
+server certificate signed by a separate CA **not** installed in the guest.
+The same tool call passed, but that collector received zero exports and the
+server reported `invalid peer certificate: UnknownIssuer`. Eight bounded
+server/collector logs contained neither the synthetic bearer token nor the
+synthetic cache-scope key. Test certificates, private keys, and collector
+scripts remain guest-local and are excluded from all release artifacts.
+
+This proves configured HTTPS OTLP export with Alpine system trust roots and
+rejection of an untrusted lab CA for this candidate. It does not prove every
+public collector, certificate configuration, or network failure mode.
+
+The private workflow completed successfully on all five targets with no
+GitHub release. All five archive sidecars verified after download. The musl
+binary is a static PIE with no ELF interpreter; the updated lockfile includes
+`rustls-native-certs` and `openssl-probe` for certificate discovery but still
+has no `openssl-sys` or `native-tls` package. A dependency-free npm candidate
+was built from those exact five archives. Its tarball SHA-256 is
+`0cab48eebc3a9dc1a6b8a2d4e3c726b1f7fe22cc3703c3d3cdecd9fb2795edda`.
+After a clean local tarball install in Alpine, the selected musl binary hash
+matched `0f72f6d704488ce763dc9021b8b3eef82e0e8aee20844b213479212af5a85c3b`.
+The installed npm launcher passed the same five official Inspector checks.
+The npm candidate was **not** published.
+
+At teardown the lab server and collectors were stopped, Redis and PostgreSQL
+test data and synthetic tokens were removed, the test CA was removed from the
+Alpine trust store, and the dedicated guest was shut down. The owner's guest
+login credential remains in the GNOME Login keyring for future testing. No
+test certificate, private key, token, guest disk, candidate archive, or npm
+tarball was committed to this repository. This is not a public release.
