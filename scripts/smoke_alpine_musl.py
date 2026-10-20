@@ -35,7 +35,9 @@ def main() -> None:
     binary = args.binary.resolve(strict=True)
     token = secrets.token_hex(32)
     name = f"request-guard-musl-smoke-{os.getpid()}"
-    image = "alpine:3.24.2"
+    # Docker Official Image index digest; refresh with:
+    # docker buildx imagetools inspect docker.io/library/alpine:3.24.2
+    image = "docker.io/library/alpine:3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6"
     command = [
         "docker", "run", "--rm", "--name", name, "--network", "host",
         "--read-only", "--tmpfs", "/tmp", "--mount",
