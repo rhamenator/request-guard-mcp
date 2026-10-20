@@ -12,6 +12,7 @@ use tracing::{error, info, warn, Instrument};
 use tungstenite::error::CapacityError;
 
 const UNKNOWN_TOOL_METRIC_LABEL: &str = "__unknown__";
+pub const SUPPORTED_PROTOCOL_VERSION: &str = "2025-06-18";
 
 /// Handle a single WebSocket connection lifecycle.
 pub async fn handle_ws_connection(
@@ -163,7 +164,6 @@ pub(crate) async fn process_message(
 
     match req.method.as_str() {
         "initialize" => {
-            const SUPPORTED_PROTOCOL_VERSION: &str = "2025-06-18";
             let Some(_requested_version) = req
                 .params
                 .as_ref()

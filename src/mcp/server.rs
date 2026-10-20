@@ -1,7 +1,7 @@
 use crate::config::LimitsConfig;
 use crate::mcp::origin::check_origin;
 use crate::mcp::tool_registry::ToolRegistry;
-use crate::mcp::transport_ws::{handle_ws_connection, process_message};
+use crate::mcp::transport_ws::{handle_ws_connection, process_message, SUPPORTED_PROTOCOL_VERSION};
 use crate::state::AppState;
 use crate::telemetry::gather_metrics;
 use axum::{
@@ -59,6 +59,9 @@ async fn ws_handler(State(state): State<ServerState>, request: Request) -> Respo
     };
     if let Err(status) = check_origin(request.headers(), &state.app.config.auth.allowed_origins) {
         return status.into_response();
+    }
+    if !valid_protocol_version(request.headers()) {
+        return invalid_protocol_version_response();
     }
 
     // The custom WebSocket transport shares this path with Streamable HTTP.
@@ -120,6 +123,9 @@ async fn http_mcp_handler(State(state): State<ServerState>, request: Request) ->
     if let Err(status) = check_origin(request.headers(), &state.app.config.auth.allowed_origins) {
         return status.into_response();
     }
+    if !valid_protocol_version(request.headers()) {
+        return invalid_protocol_version_response();
+    }
     let body = match tokio::time::timeout(
         Duration::from_secs(state.app.config.limits.http_body_timeout_secs),
         to_bytes(
@@ -153,6 +159,45 @@ async fn http_mcp_handler(State(state): State<ServerState>, request: Request) ->
         // MCP 2025-06-18 Streamable HTTP acknowledges accepted client
         // notifications and responses with 202 and no response body.
         None => StatusCode::ACCEPTED.into_response(),
+    }
+}
+
+fn valid_protocol_version(headers: &HeaderMap) -> bool {
+    let mut values = headers.get_all("mcp-protocol-version").iter();
+    match values.next() {
+        // No header is retained for older clients, which have no session state
+        // from which to recover a negotiated version.
+        None => true,
+        Some(value) => {
+            value.as_bytes() == SUPPORTED_PROTOCOL_VERSION.as_bytes() && values.next().is_none()
+        }
+    }
+}
+
+fn invalid_protocol_version_response() -> Response {
+    (
+        StatusCode::BAD_REQUEST,
+        "Invalid or unsupported MCP-Protocol-Version",
+    )
+        .into_response()
+}
+
+#[cfg(test)]
+mod protocol_version_tests {
+    use super::*;
+
+    #[test]
+    fn duplicate_version_headers_are_rejected() {
+        let mut headers = HeaderMap::new();
+        headers.append(
+            "mcp-protocol-version",
+            HeaderValue::from_static("2025-06-18"),
+        );
+        headers.append(
+            "mcp-protocol-version",
+            HeaderValue::from_static("2025-06-18"),
+        );
+        assert!(!valid_protocol_version(&headers));
     }
 }
 

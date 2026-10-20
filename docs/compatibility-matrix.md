@@ -16,6 +16,12 @@ whether it supports that revision. The server does not yet implement the
 SSE GET streams, resources, or prompts. HTTP support has been smoke tested with
 MCP Inspector 2.5.0, but full transport and client conformance remain part of
 the adversarial release gate. See [the client evidence](inspector-interoperability.md).
+On development main, an explicit `MCP-Protocol-Version` header on `/mcp` must
+be exactly `2025-06-18`; invalid, duplicate, and unsupported values receive
+HTTP 400 before the POST body is read. A missing header is accepted for older
+clients without a session header. This is a compatibility allowance, not a
+claim that the server implements the older protocol revision. Published
+v0.1.3 does not enforce this header.
 
 ### `rhamenator/ai-scraping-defense` (Python/Django)
 

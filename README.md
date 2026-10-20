@@ -42,6 +42,11 @@ Development main returns HTTP 405 for an authorized ordinary GET to `/mcp`
 because it does not offer an SSE stream; a WebSocket upgrade on that path still
 uses the custom WebSocket transport. Published v0.1.3 does not guarantee this
 405 response.
+Development main also requires any explicit `MCP-Protocol-Version` header on
+`/mcp` to equal `2025-06-18`, rejecting malformed or unsupported values with
+HTTP 400 before reading a POST body. The header may be omitted for older
+clients; this does not imply support for an older protocol revision. Published
+v0.1.3 does not enforce the header.
 Use a JSON-RPC `2.0` envelope and a string or numeric request ID (or `null`).
 v0.1.2 and newer builds return `-32600` for invalid envelope shapes and
 `-32700` for malformed JSON. Client notifications receive no JSON-RPC response;
