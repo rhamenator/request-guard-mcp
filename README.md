@@ -8,6 +8,8 @@ A **Rust MCP (Model Context Protocol) server** for request risk classification, 
 
 Install the experimental [npm release](https://www.npmjs.com/package/request-guard-mcp/v/0.1.2) with `npm install -g request-guard-mcp@0.1.2`, configure `AUTH_TOKENS`, then run `request-guard-mcp`. The package includes native binaries for Linux x64 (glibc), Windows x64, macOS Intel, and macOS Apple Silicon. Follow the [npm setup guide](docs/npm-release.md#install-and-connect) for environment and MCP client steps; [INSTALL.md](INSTALL.md) applies to downloaded native bundles.
 
+Alpine/musl support is being qualified for a later release in [issue #54](https://github.com/rhamenator/request-guard-mcp/issues/54). The [private candidate evidence](docs/alpine-qualification-v0.1.3-candidate.md) does not change the supported platforms of the published v0.1.2 packages.
+
 The [companion skill](skills/request-guard-mcp/SKILL.md) tells a connected agent when and how to use this server’s classification tools. It does not deploy or replace the separate AI Scraping Defense products.
 
 To package the skill for a directory listing, run `python3 scripts/package_skill.py`. The resulting local-only `dist/request-guard-mcp-skill.zip` contains only `request-guard-mcp/SKILL.md`; GitHub releases carry server binaries, not the skill ZIP. Install and configure the server separately. Verify the skill against a connected client before submitting a listing.

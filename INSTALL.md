@@ -3,6 +3,11 @@
 Download the archive for your operating system and CPU from the GitHub release,
 along with its matching `.sha256` file. Verify the archive before extracting it:
 
+The published v0.1.2 Linux x64 archive requires glibc. Alpine/musl support is
+under private qualification for a later release; do not use the glibc archive
+on Alpine. Check the release assets for a separately labeled musl archive only
+after that support is published.
+
 - Linux: `sha256sum -c request-guard-mcp-*.tar.gz.sha256`
 - macOS: `shasum -a 256 -c request-guard-mcp-*.tar.gz.sha256`
 - Windows PowerShell: compare `(Get-FileHash .\request-guard-mcp-*.zip -Algorithm SHA256).Hash`
