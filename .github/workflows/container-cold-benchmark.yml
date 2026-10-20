@@ -80,3 +80,115 @@ jobs:
           done
           echo "Native image health smoke failed" >&2
           exit 1
+
+  controlled-oci-build:
+    name: Controlled OCI ${{ matrix.mode }} image
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    env:
+      DOCKER_BUILD_RECORD_UPLOAD: "false"
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - mode: native-amd64
+            runner: ubuntu-24.04
+            platforms: linux/amd64
+          - mode: native-arm64
+            runner: ubuntu-24.04-arm
+            platforms: linux/arm64
+          - mode: combined
+            runner: ubuntu-24.04
+            platforms: linux/amd64,linux/arm64
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Verify runner architecture
+        run: |
+          set -euo pipefail
+          case '${{ matrix.mode }}:'"$(uname -m)" in
+            native-amd64:x86_64|native-arm64:aarch64|combined:x86_64) ;;
+            *) echo 'Unexpected runner architecture' >&2; exit 1 ;;
+          esac
+      - name: Set up arm64 emulation for the combined baseline
+        if: matrix.mode == 'combined'
+        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0
+        with:
+          platforms: arm64
+      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+      - name: Start controlled build timer
+        id: timer
+        run: echo "start=$(date +%s)" >> "$GITHUB_OUTPUT"
+      - name: Build OCI archive without BuildKit cache
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: docker/Dockerfile
+          platforms: ${{ matrix.platforms }}
+          no-cache: true
+          push: false
+          outputs: type=oci,dest=/tmp/request-guard-cold.oci.tar
+      - name: Stop controlled build timer
+        id: duration
+        run: echo "elapsed=$(( $(date +%s) - ${{ steps.timer.outputs.start }} ))" >> "$GITHUB_OUTPUT"
+      - name: Verify archive platforms and record elapsed time
+        env:
+          EXPECTED_PLATFORMS: ${{ matrix.platforms }}
+          RUN_MODE: ${{ matrix.mode }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          import tarfile
+
+          expected = set(os.environ['EXPECTED_PLATFORMS'].split(','))
+          with tarfile.open('/tmp/request-guard-cold.oci.tar', 'r') as archive:
+              def read_json(path):
+                  member = archive.getmember(path)
+                  if member.size > 2_000_000:
+                      raise SystemExit(f'OCI metadata missing or oversized: {path}')
+                  entry = archive.extractfile(member)
+                  if entry is None:
+                      raise SystemExit(f'OCI metadata missing: {path}')
+                  return json.load(entry)
+
+              def blob(digest):
+                  algorithm, value = digest.split(':', 1)
+                  if algorithm != 'sha256' or len(value) != 64:
+                      raise SystemExit('unsupported OCI blob digest')
+                  return read_json(f'blobs/sha256/{value}')
+
+              actual = set()
+
+              def visit(descriptor, depth=0):
+                  if depth > 4:
+                      raise SystemExit('OCI index nesting is too deep')
+                  media_type = descriptor.get('mediaType', '')
+                  document = blob(descriptor['digest'])
+                  if media_type.endswith('image.index.v1+json') or media_type.endswith('manifest.list.v2+json'):
+                      for child in document.get('manifests', []):
+                          visit(child, depth + 1)
+                  elif media_type.endswith('image.manifest.v1+json') or media_type.endswith('manifest.v2+json'):
+                      platform = descriptor.get('platform', {})
+                      if platform.get('os') != 'linux':
+                          platform = blob(document['config']['digest'])
+                      if platform.get('os') == 'linux':
+                          actual.add(f"{platform['os']}/{platform['architecture']}")
+                  else:
+                      raise SystemExit(f'unsupported OCI media type: {media_type}')
+
+              for descriptor in read_json('index.json').get('manifests', []):
+                  visit(descriptor)
+          if actual != expected:
+              raise SystemExit(f'OCI platforms {sorted(actual)} != {sorted(expected)}')
+          print(f"Verified OCI platforms: {', '.join(sorted(actual))}")
+          PY
+          {
+            echo "### Controlled no-cache OCI $RUN_MODE"
+            echo "- Platforms: $EXPECTED_PLATFORMS"
+            echo "- Build and OCI export elapsed: ${{ steps.duration.outputs.elapsed }} seconds"
+            echo "- Commit: ${{ github.sha }}; attempt: ${{ github.run_attempt }}"
+            echo "- No registry login, push, or artifact upload"
+          } >> "$GITHUB_STEP_SUMMARY"
