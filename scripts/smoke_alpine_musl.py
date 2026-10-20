@@ -9,11 +9,13 @@ import os
 from pathlib import Path
 import secrets
 import subprocess
+import tempfile
 import time
 import urllib.error
 import urllib.request
 
 ALPINE_IMAGE = "docker.io/library/alpine:3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6"
+MAX_LOG_BYTES = 64 * 1024
 
 
 def call(url: str, token: str | None, method: str, params: dict | None = None) -> dict:
@@ -36,6 +38,7 @@ def main() -> None:
     args = parser.parse_args()
     binary = args.binary.resolve(strict=True)
     token = secrets.token_hex(32)
+    marker = f"smoke-{secrets.token_hex(12)}"
     name = f"request-guard-musl-smoke-{os.getpid()}"
     # Docker Official Image index digest; refresh with:
     # docker buildx imagetools inspect docker.io/library/alpine:3.24.2
@@ -52,7 +55,10 @@ def main() -> None:
         "-e", "MCP__TELEMETRY__OTLP_ENDPOINT=https://localhost:4318", image,
         "/usr/local/bin/request-guard-mcp",
     ]
-    server = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    # Keep output private: it may contain the synthetic credentials if a
+    # regression is present. A bounded read below rejects excess output.
+    log_file = tempfile.TemporaryFile()
+    server = subprocess.Popen(command, stdout=log_file, stderr=subprocess.STDOUT)
     url = f"http://127.0.0.1:{args.port}/mcp"
     try:
         for _ in range(200):
@@ -90,20 +96,29 @@ def main() -> None:
         if not {"classify", "explain"} <= {tool["name"] for tool in tools}:
             raise RuntimeError("core tools are missing")
         classified = call(url, token, "tools/call", {"name": "classify", "arguments": {
-            "ip": "192.0.2.1", "user_agent": "GPTBot/1.0", "path": "/"}})["result"]
+            "ip": "192.0.2.1", "user_agent": "GPTBot/1.0", "path": f"/{marker}"}})["result"]
         if classified.get("isError") is not False:
             raise RuntimeError("classify returned an MCP tool error")
         if classified.get("structuredContent", {}).get("verdict") not in {"allow", "challenge", "block"}:
             raise RuntimeError("classify omitted a structured verdict")
-        print("PASS Alpine musl: health, authentication, initialize, tools/list, classify")
     finally:
-        subprocess.run(["docker", "stop", "--time", "2", name], check=False,
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10)
         try:
-            server.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            server.kill()
-            server.wait(timeout=5)
+            subprocess.run(["docker", "stop", "--time", "2", name], check=False,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10)
+            try:
+                server.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                server.kill()
+                server.wait(timeout=5)
+            log_file.seek(0)
+            captured = log_file.read(MAX_LOG_BYTES + 1)
+            if len(captured) > MAX_LOG_BYTES:
+                raise RuntimeError("Alpine server log exceeded the 64 KiB inspection limit")
+            if token.encode() in captured or marker.encode() in captured:
+                raise RuntimeError("Alpine server log disclosed a synthetic bearer or request marker")
+        finally:
+            log_file.close()
+    print("PASS Alpine musl: health, authentication, initialize, tools/list, classify, private logs")
 
 
 if __name__ == "__main__":

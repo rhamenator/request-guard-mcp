@@ -26,6 +26,9 @@ lane additionally runs the pinned official MCP Inspector inside the pinned
 Alpine image against the extracted executable. This checks Alpine's Node,
 Python, musl, and HTTP client path as part of private candidates and tags;
 it installs test tools in a disposable container only. The musl lane also
+checks that its bounded server log does not expose a synthetic bearer token
+or classification request marker; the log is not emitted to CI output. It
+does not cover optional backend or TLS collector failure logs yet. It also
 requires an ELF PIE with no interpreter or shared-library `NEEDED` entry.
 Private branch candidates run the same build and verification steps without
 creating a GitHub release.
