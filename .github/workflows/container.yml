@@ -104,6 +104,7 @@ jobs:
           file: docker/Dockerfile
           platforms: linux/${{ matrix.arch }}
           labels: ${{ steps.meta.outputs.labels }}
+          provenance: mode=min
           outputs: type=image,name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
           cache-from: type=gha,scope=${{ matrix.arch }}
           cache-to: type=gha,scope=${{ matrix.arch }},mode=max
@@ -185,7 +186,10 @@ jobs:
           manifest_digest="$(jq -r '."containerimage.descriptor".digest' manifest.json)"
           [[ "$manifest_digest" =~ ^sha256:[0-9a-f]{64}$ ]]
           docker buildx imagetools inspect --raw "$image@$manifest_digest" | jq -e '
-            [.manifests[] | select(.platform.os == "linux") | .platform.architecture] | sort == ["amd64", "arm64"]
+            . as $index |
+            ([$index.manifests[] | select(.platform.os == "linux") | .platform.architecture] | sort) == ["amd64", "arm64"] and
+            ([$index.manifests[] | select(.annotations."vnd.docker.reference.type" == "attestation-manifest") | .annotations."vnd.docker.reference.digest"] | sort) ==
+            ([$index.manifests[] | select(.platform.os == "linux") | .digest] | sort)
           ' >/dev/null
           for tag in "${tags[@]}"; do
             if [[ "$tag" == --tag ]]; then continue; fi

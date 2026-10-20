@@ -75,7 +75,8 @@ The publication workflow builds each platform on its matching hosted runner
 and pushes it by immutable digest. It uploads only one validated digest per
 architecture to the workflow artifact store. The final job reads and verifies
 both source manifests, assembles the multiarch index from those exact digests,
-checks that the index contains linux/amd64 and linux/arm64, and checks that
+checks that the index contains linux/amd64 and linux/arm64 with a provenance
+attestation linked to each platform digest, and checks that
 every release tag resolves to the same index digest. PRs retain the existing
 `Build and Push Container` required check on amd64, without publishing.
 Platform-specific cache scopes prevent the two native jobs from overwriting
