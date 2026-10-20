@@ -1,5 +1,5 @@
 use axum::http::{
-    header::{ALLOW, AUTHORIZATION, ORIGIN, X_CONTENT_TYPE_OPTIONS},
+    header::{ALLOW, AUTHORIZATION, CONTENT_TYPE, ORIGIN, X_CONTENT_TYPE_OPTIONS},
     HeaderValue, StatusCode,
 };
 use axum_test::TestServer;
@@ -322,6 +322,101 @@ async fn post_mcp_dispatches_json_rpc_request() {
     let value: Value = response.json();
     assert_eq!(value["id"], 7);
     assert!(value["result"]["score"].as_f64().unwrap() > 0.0);
+}
+
+#[tokio::test]
+async fn explicit_post_content_type_must_be_utf8_json() {
+    let payload =
+        serde_json::to_vec(&json!({"jsonrpc": "2.0", "id": 3, "method": "ping"})).unwrap();
+    for content_type in [
+        "application/json",
+        "Application/JSON; charset=UTF-8",
+        "application/json; charset=\"utf-8\"",
+    ] {
+        let response = server(false)
+            .post("/mcp")
+            .add_header(CONTENT_TYPE, HeaderValue::from_str(content_type).unwrap())
+            .add_header(
+                "accept",
+                HeaderValue::from_static("application/json, text/event-stream"),
+            )
+            .bytes(payload.clone().into())
+            .await;
+        response.assert_status_ok();
+    }
+
+    // Missing remains accepted for older direct clients.
+    server(false)
+        .post("/mcp")
+        .bytes(payload.clone().into())
+        .await
+        .assert_status_ok();
+
+    for content_type in [
+        "text/plain",
+        "application/x-www-form-urlencoded",
+        "application/json; charset=iso-8859-1",
+        "application/json; charset=\"utf-8",
+        "application/json; charset=utf-8; charset=utf-8",
+        "application/json, text/plain",
+    ] {
+        let response = server(false)
+            .post("/mcp")
+            .add_header(CONTENT_TYPE, HeaderValue::from_str(content_type).unwrap())
+            .bytes(payload.clone().into())
+            .await;
+        response.assert_status(StatusCode::UNSUPPORTED_MEDIA_TYPE);
+        assert_eq!(
+            response.text(),
+            "MCP POST Content-Type must be application/json with UTF-8 charset"
+        );
+    }
+
+    let unauthenticated = server(true)
+        .post("/mcp")
+        .add_header(CONTENT_TYPE, HeaderValue::from_static("text/plain"))
+        .bytes(payload.into())
+        .await;
+    unauthenticated.assert_status(StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn unsupported_media_type_rejects_incomplete_body() {
+    let mut config = Config::default();
+    config.auth.enabled = false;
+    let max_body = config.limits.max_request_bytes;
+    let state = ServerState {
+        app: Arc::new(AppState::new(config)),
+        registry: Arc::new(build_registry()),
+    };
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let server_task = tokio::spawn(async move {
+        axum::serve(listener, build_router(state, max_body))
+            .await
+            .unwrap();
+    });
+    let mut stream = TcpStream::connect(address).await.unwrap();
+    stream
+        .write_all(b"POST /mcp HTTP/1.1\r\nHost: localhost\r\nContent-Type: text/plain\r\nContent-Length: 1000000\r\n\r\nx")
+        .await
+        .unwrap();
+    let status_line = timeout(Duration::from_secs(5), async {
+        let mut line = Vec::new();
+        while !line.ends_with(b"\r\n") {
+            assert!(line.len() < 256, "HTTP status line is too long");
+            let mut byte = [0_u8; 1];
+            assert_eq!(stream.read(&mut byte).await.unwrap(), 1);
+            line.push(byte[0]);
+        }
+        line
+    })
+    .await
+    .expect("media-type rejection must not wait for the incomplete body");
+    assert!(std::str::from_utf8(&status_line)
+        .unwrap()
+        .starts_with("HTTP/1.1 415 "));
+    server_task.abort();
 }
 
 #[tokio::test]
