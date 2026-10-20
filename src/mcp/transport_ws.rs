@@ -161,7 +161,13 @@ pub(crate) async fn process_message(
                 && !id
                     .as_number()
                     .is_some_and(|number| number.is_i64() || number.is_u64())
-                && !(id.is_null() && envelope.contains_key("error"))
+                && !(id.is_null()
+                    && envelope
+                        .get("error")
+                        .and_then(Value::as_object)
+                        .and_then(|error| error.get("code"))
+                        .and_then(Value::as_i64)
+                        .is_some_and(|code| code == -32700 || code == -32600))
         })
     {
         return invalid_request(Value::Null);
@@ -548,6 +554,13 @@ mod tests {
         )
         .await
         .is_some());
+        let invalid_null_error =
+            r#"{"jsonrpc":"2.0","id":null,"error":{"code":-32603,"message":"Internal error"}}"#;
+        let rejected = process_message(invalid_null_error, &state, &registry, "test-caller")
+            .await
+            .expect("null ID on an internal error must be rejected");
+        let rejected: Value = serde_json::from_str(&rejected).unwrap();
+        assert_eq!(rejected["error"]["code"], -32600);
     }
 
     #[tokio::test]
