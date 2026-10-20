@@ -60,15 +60,14 @@ async fn ws_handler(State(state): State<ServerState>, request: Request) -> Respo
     if let Err(status) = check_origin(request.headers(), &state.app.config.auth.allowed_origins) {
         return status.into_response();
     }
-    if !valid_protocol_version(request.headers()) {
-        return invalid_protocol_version_response();
-    }
-
     // The custom WebSocket transport shares this path with Streamable HTTP.
     // This server does not offer a server-initiated SSE GET stream.
     if !header_has_token(request.headers(), UPGRADE, "websocket")
         || !header_has_token(request.headers(), CONNECTION, "upgrade")
     {
+        if !valid_protocol_version(request.headers()) {
+            return invalid_protocol_version_response();
+        }
         return (StatusCode::METHOD_NOT_ALLOWED, [(ALLOW, "POST, GET")]).into_response();
     }
     let (mut parts, _) = request.into_parts();

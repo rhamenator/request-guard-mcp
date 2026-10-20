@@ -210,6 +210,10 @@ async fn websocket_upgrade_requires_explicit_browser_origin_allowlist() {
 
     for (origin_lines, expected) in [
         ("Origin: https://console.example\r\n", 101),
+        (
+            "Origin: https://console.example\r\nMCP-Protocol-Version: 2026-07-28\r\n",
+            101,
+        ),
         ("Origin: https://evil.example\r\n", 403),
         (
             "Origin: https://console.example\r\nOrigin: https://console.example\r\n",
