@@ -110,8 +110,11 @@ def main() -> None:
             except subprocess.TimeoutExpired:
                 server.kill()
                 server.wait(timeout=5)
+                raise RuntimeError("Alpine Docker log stream did not finish after container stop")
             log_file.seek(0)
             captured = log_file.read(MAX_LOG_BYTES + 1)
+            if not captured:
+                raise RuntimeError("Alpine server emitted no log output to inspect")
             if len(captured) > MAX_LOG_BYTES:
                 raise RuntimeError("Alpine server log exceeded the 64 KiB inspection limit")
             if token.encode() in captured or marker.encode() in captured:
