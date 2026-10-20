@@ -5,21 +5,43 @@ description: Use a connected request-guard-mcp server to classify observed HTTP 
 
 # Request Guard MCP
 
-This companion skill uses the server's implemented inbound request classification tools. It does not include the server binary or the proposed outbound `guarded_fetch` workflow. Stable release readiness still depends on the repository's adversarial release gate.
+This companion skill tells an agent when and how to use the separately
+installed Request Guard MCP server for **inbound** HTTP request classification.
+It does not include the server binary, intercept live traffic, enforce a site
+policy, or guard the agent's outbound fetches. Stable release readiness still
+depends on the repository's adversarial release gate.
 
-The v0.1.3 native release includes separate `linux-x64` (glibc) and `linux-x64-musl` (Alpine) bundles. Verify the matching archive sidecar and follow its bundled `INSTALL.md`. Earlier v0.1.2 Linux and npm packages require glibc.
+For v0.1.4, install the matching native release bundle and follow its bundled
+`INSTALL.md`, or use `npm install -g request-guard-mcp@0.1.4` once that package
+is available on npm. Linux x64 has separate glibc and musl/Alpine bundles;
+Windows x64, macOS Intel, and macOS Apple Silicon are also packaged. Verify
+native archive checksums. The skill ZIP contains instructions only. Configure
+a unique `AUTH_TOKENS` bearer token of at least 32 characters, start the
+server, and connect an HTTP POST MCP client to `/mcp` with that token. Confirm
+`tools/list` includes `classify` and `explain` before using the skill. Release
+CI runs official MCP Inspector 2.5.0 against the native bundles; check your
+chosen client separately. Redis, PostgreSQL, and MaxMind data are optional for
+core tools but required by some additional tools and may incur costs.
 
-Install the separate Request Guard MCP server from the [v0.1.3 native release bundle](https://github.com/rhamenator/request-guard-mcp/releases/tag/v0.1.3) and its `INSTALL.md`, or run `npm install -g request-guard-mcp@0.1.3` on Linux x64 (glibc or Alpine/musl), Windows x64, or macOS (Intel or Apple Silicon). The skill ZIP contains instructions only; it does not install, run, or host the server. Use v0.1.1 or a newer verified release with standard MCP `initialize`, `tools/list`, and `tools/call` support; the published v0.1.0 binary does not have those methods. Configure a unique `AUTH_TOKENS` bearer token of at least 32 characters, start the server, connect an HTTP POST MCP client to its `/mcp` endpoint with that token, and confirm `tools/list` includes `classify` and `explain` before using this skill. Release CI runs official MCP Inspector 2.5.0 against each native bundle; other clients need their own compatibility check. The server does not provide stdio, SSE GET, OAuth discovery, resources, prompts, or outbound egress control. Redis, PostgreSQL, and MaxMind data are optional for the core tools but required for some additional tools; obtaining and operating those services or data may incur costs. The AI Scraping Defense projects may use their own detection logic, this server, another MCP server, or no MCP server; do not change that choice on the user's behalf.
-Send tool requests in a JSON-RPC `2.0` envelope with a string or integer ID; MCP 2025-06-18 forbids `null` request IDs. Development main rejects `null` and fractional request IDs with JSON-RPC `-32600` on HTTP POST and WebSocket. Published v0.1.3 does not yet enforce that restriction. Treat a JSON-RPC protocol error as an invalid call, not a classification verdict.
-For client responses, use the original string or integer request ID. Development main rejects fractional IDs and a `null` success-response ID; `null` remains accepted for a parse or invalid-request error when the original ID cannot be recovered. Published v0.1.3 does not enforce that response-ID restriction.
-Use a JSON object for a client success-response `result`. Development main rejects primitive, `null`, and array results; published v0.1.3 may acknowledge them.
-Send an object for `params` when present, or omit `params`. Development main rejects arrays and `null` with JSON-RPC `-32600` for HTTP POST requests and WebSocket messages, echoing a valid request ID in the error; published v0.1.3 may accept arrays for methods that ignore them.
-On development main, an invalid ID-less HTTP notification or client response receives 400 with no body; an accepted one receives 202 with no body. The custom WebSocket transport reports malformed messages as JSON-RPC errors.
-The published v0.1.3 server acknowledges accepted HTTP notifications with 204 and no body; development main uses 202 and no body. Do not interpret either acknowledgement as a classification result.
-Development main answers an authorized ordinary GET to `/mcp` with 405 because it does not offer an SSE stream; published v0.1.3 does not guarantee that status. Use HTTP POST or the custom WebSocket upgrade instead.
-On development main, send `MCP-Protocol-Version: 2025-06-18` on non-WebSocket `/mcp` HTTP requests after initialization. An explicit different, malformed, or duplicate value receives HTTP 400; a missing header remains accepted for older clients. The custom WebSocket upgrade does not use this header. Published v0.1.3 does not enforce it.
-For MCP HTTP POST, send `Content-Type: application/json` and `Accept: application/json, text/event-stream`. Development main returns HTTP 415 before reading a body with an explicit non-JSON or non-UTF-8 `Content-Type`, and HTTP 406 when an explicit `Accept` rules out JSON; it still accepts missing headers for older clients. Published v0.1.3 does not enforce these media-type rules. The server returns JSON for requests, so do not rely on SSE responses.
-Development main also requires an exact `MCP_ALLOWED_ORIGINS` entry for browser-originated HTTP POST or WebSocket calls; non-browser calls without `Origin` continue under the configured authentication policy. The allowlist does not enable CORS: cross-origin browser clients require preflight and response-header handling at a trusted proxy. Browser WebSocket clients need a trusted proxy to authenticate them and set the upstream bearer header. Published v0.1.3 lacks the server-side Origin check, so its operator must enforce browser-origin restrictions at the proxy. Never treat an Origin header as authentication.
+The server supports HTTP POST JSON-RPC and a custom WebSocket transport. It
+does not offer stdio, SSE GET, OAuth discovery, MCP resources or prompts. For
+HTTP POST, send `Content-Type: application/json` and
+`Accept: application/json, text/event-stream`. After initialization, send
+`MCP-Protocol-Version: 2025-06-18`; an explicit invalid version gets HTTP 400.
+Explicit unsupported content types get 415 and an `Accept` that excludes JSON
+gets 406. Missing headers remain accepted for older direct clients. An
+authenticated ordinary GET to `/mcp` gets 405. Accepted HTTP notifications
+and client responses get 202 with no body; do not treat that as a verdict.
+
+Use JSON-RPC `2.0` with a string or integer request ID, never `null` or a
+fraction. When supplied, request or notification `params` must be an object.
+A client success-response `result` must be an object with a matching valid
+ID. Treat protocol errors as invalid calls, not classification verdicts.
+Browser-originated HTTP POST or WebSocket requests need an exact
+`MCP_ALLOWED_ORIGINS` entry in addition to bearer authentication. The
+allowlist does not enable CORS: cross-origin browser clients require a trusted
+proxy for preflight handling; browser WebSocket clients need that proxy to
+authenticate and set the upstream bearer header. Origin is not authentication.
 
 ## When and how
 
@@ -27,7 +49,7 @@ Development main also requires an exact `MCP_ALLOWED_ORIGINS` entry for browser-
 - For a batch of observed requests, call `batch_classify` if available. To explain a specific result, retain the original request metadata passed to `classify` and pass that same metadata to `explain`; do not pass the classification response as input. Use `model_info` and `health` to check capability and service status before relying on an optional backend tool.
 - Use enrichment, reputation, canary, replay, drift, or calibration tools only when the corresponding backend is configured and the user's task calls for that evidence. Report an unavailable backend as unavailable, not as a clean signal.
 - PostgreSQL replay, feedback, drift, and calibration are limited to the authenticated caller's own decisions. The server operator must configure a stable `CACHE_SCOPE_HMAC_KEY` with PostgreSQL so records remain available after restart.
-- On development main, PostgreSQL TLS verification uses the operating system CA store. For a private database CA, the operator can install it there or set `sslrootcert=/path/to/ca.pem` in `MCP__POSTGRES__URL` and use `sslmode=verify-full` for chain and hostname verification. Minimal container and Alpine hosts need a populated CA store unless that private CA is supplied. `sslmode=require` encrypts without certificate verification. Published v0.1.3 does not include the native-root change.
+- Starting with v0.1.4, PostgreSQL TLS verification uses the operating system CA store. For a private database CA, the operator can install it there or set `sslrootcert=/path/to/ca.pem` in `MCP__POSTGRES__URL` and use `sslmode=verify-full` for chain and hostname verification. Minimal container and Alpine hosts need a populated CA store unless that private CA is supplied. A configured PostgreSQL connection with an untrusted certificate or hostname mismatch prevents server startup. `sslmode=require` encrypts without certificate verification.
 - Configuration snapshots are redacted. Do not request `redact_secrets:false`; the server rejects unredacted snapshots.
 - If a tool call returns `RATE_LIMIT_EXCEEDED`, treat it as temporary capacity pressure; retry later with bounded backoff rather than assuming the request is safe or sending a burst of retries.
 - Incomplete or slow HTTP requests can receive HTTP 408, and new sockets can be closed when the server's connection cap is full. Treat either as an availability signal, not an allow verdict.

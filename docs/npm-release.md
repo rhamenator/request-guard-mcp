@@ -7,6 +7,10 @@ is published. A fresh registry install with an empty npm cache
 passed Inspector authentication, initialization, listing 23 tools,
 `classify`, and `explain` on Linux x64. This is an experimental release;
 the adversarial production-readiness gate remains open.
+The v0.1.4 package must be assembled only from the final v0.1.4 native
+release archives and checksum sidecars, then pass a clean install and MCP
+Inspector smoke before publication. Until npm confirms that version is live,
+use the published 0.1.3 command below.
 
 ## Install and connect
 
@@ -59,6 +63,11 @@ For a future approved npm release, after its native assets are published:
    publishing credentials or trusted publishing, and publish the matching
    version only after its release is approved. Verify the published tarball
    and command from a fresh registry install. Do not publish an RC as `latest`.
+
+For v0.1.4, the release smoke also checks PostgreSQL TLS trust on the packaged
+Alpine binary: an explicit trusted CA and an installed OS CA work; an unknown
+issuer or hostname mismatch prevents startup when PostgreSQL is configured.
+See [the candidate evidence](releases/v0.1.4-postgres-tls-evidence.md).
 
 The generated package contains the GPL-3.0-or-later license, a short npm setup
 guide, the launcher, and the five binaries. It contains no credentials, `.env`,

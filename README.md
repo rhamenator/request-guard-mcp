@@ -6,9 +6,9 @@
 
 A **Rust MCP (Model Context Protocol) server** for request risk classification, enrichment, and abuse-signal analysis. The official MCP Inspector can call its tools over HTTP POST; custom WebSocket clients can use the JSON-RPC endpoint. Client support depends on transport and authentication compatibility. The `ai-scraping-defense` projects are optional clients. Stable release readiness is subject to the [adversarial release gate](docs/adversarial-release-gate.md).
 
-Install the experimental [npm release](https://www.npmjs.com/package/request-guard-mcp/v/0.1.3) with `npm install -g request-guard-mcp@0.1.3`, configure `AUTH_TOKENS`, then run `request-guard-mcp`. The package includes native binaries for Linux x64 (glibc and musl/Alpine), Windows x64, macOS Intel, and macOS Apple Silicon. Follow the [npm setup guide](docs/npm-release.md#install-and-connect) for environment and MCP client steps; [INSTALL.md](INSTALL.md) applies to downloaded native bundles.
+For the upcoming experimental v0.1.4 release, install the matching [npm package](https://www.npmjs.com/package/request-guard-mcp) with `npm install -g request-guard-mcp@0.1.4` after it appears on npm, configure `AUTH_TOKENS`, then run `request-guard-mcp`. Until then, v0.1.3 is the published package. The package includes native binaries for Linux x64 (glibc and musl/Alpine), Windows x64, macOS Intel, and macOS Apple Silicon. Follow the [npm setup guide](docs/npm-release.md#install-and-connect) for environment and MCP client steps; [INSTALL.md](INSTALL.md) applies to downloaded native bundles.
 
-The [v0.1.3 native release](https://github.com/rhamenator/request-guard-mcp/releases/tag/v0.1.3) adds a Linux x64 musl archive for Alpine. Choose `linux-x64-musl` on Alpine and `linux-x64` on glibc hosts. See the [Kali-to-Alpine qualification evidence](docs/alpine-qualification-v0.1.3-candidate.md) and its limits.
+The current [v0.1.3 native release](https://github.com/rhamenator/request-guard-mcp/releases/tag/v0.1.3) has a Linux x64 musl archive for Alpine. The v0.1.4 candidate retains that platform and adds the [packaged PostgreSQL TLS qualification](docs/releases/v0.1.4-postgres-tls-evidence.md). Choose `linux-x64-musl` on Alpine and `linux-x64` on glibc hosts.
 
 The [companion skill](skills/request-guard-mcp/SKILL.md) tells a connected agent when and how to use this server’s classification tools. It does not deploy or replace the separate AI Scraping Defense products.
 
@@ -28,83 +28,51 @@ To package the skill for a directory listing, run `python3 scripts/package_skill
 - **Structured JSON logging** via `tracing`
 - **Redis-backed** threat reputation, canary registry, queue telemetry, and distributed cache
 - **Caller-isolated PostgreSQL** decision replay, feedback, drift, and calibration reports with automatic schema setup; configure a stable `CACHE_SCOPE_HMAC_KEY` when PostgreSQL is enabled
-- **PostgreSQL TLS trust on development main** uses the host operating system's CA store. With `sslmode=verify-full`, a private database CA can instead be supplied through `sslrootcert` in `MCP__POSTGRES__URL`; published v0.1.3 has not adopted the native-root change.
+- **PostgreSQL TLS trust in v0.1.4** uses the host operating system's CA store. With `sslmode=verify-full`, a private database CA can instead be supplied through `sslrootcert` in `MCP__POSTGRES__URL`. An untrusted issuer or hostname mismatch prevents startup when PostgreSQL is configured.
 - **HMAC-attested JA3/JA4 rules** with known-bad sets, UA/TLS mismatch detection, and verified cache partitioning
 - **MaxMind City/ASN/Anonymous-IP enrichment**, optionally combined with Redis reputation scores
 - **Docker + Kubernetes** ready with HPA, NetworkPolicy, health probes
 
 ### Transport scope
 
-WebSocket and HTTP POST JSON-RPC are the final supported MCP transports for
-this server. A gRPC listener is intentionally out of scope because the project
-does not define a separate protobuf service contract; the `grpc-tonic` feature
-in `opentelemetry-otlp` is used only to export telemetry to an OTLP collector.
-Development main returns HTTP 405 for an authorized ordinary GET to `/mcp`
-because it does not offer an SSE stream; a WebSocket upgrade on that path still
-uses the custom WebSocket transport. Published v0.1.3 does not guarantee this
-405 response.
-Development main also requires any explicit `MCP-Protocol-Version` header on
-a non-WebSocket `/mcp` HTTP request to equal `2025-06-18`, rejecting malformed or unsupported values with
-HTTP 400 before reading a POST body. The header may be omitted for older
-clients; this does not imply support for an older protocol revision. Published
-v0.1.3 does not enforce the header. The custom WebSocket upgrade does not
-use this Streamable HTTP header.
-Development main returns HTTP 415 before reading an MCP POST body if an
-explicit `Content-Type` is not `application/json` or
-`application/json; charset=utf-8` (case-insensitive). A missing header remains
-accepted for older direct clients. Published v0.1.3 does not enforce this
-media-type policy. MCP 2025-06-18 clients should send
-`Accept: application/json, text/event-stream`; this server returns JSON for
-requests. Development main rejects an explicit `Accept` that rules out JSON
-with HTTP 406 before reading the body, including `application/json;q=0` even
-when a less specific wildcard allows other types. A missing `Accept` remains
-accepted for older clients. Published v0.1.3 does not enforce this rule.
-Use a JSON-RPC `2.0` envelope and a string or integer request ID. MCP
-2025-06-18 forbids `null` request IDs. Development main returns JSON-RPC
-`-32600` with an error ID of `null` for `null`, fractional, or otherwise
-invalid request IDs on HTTP POST and WebSocket. Published v0.1.3 does not yet
-enforce the `null` and fractional ID restriction.
-Development main also rejects fractional client-response IDs and a `null`
-success-response ID. A `null` error-response ID remains valid for parse or
-invalid-request errors when the original request ID cannot be recovered;
-published v0.1.3 does not enforce
-the client-response ID restriction.
-Development main also requires a client success-response `result` to be a JSON
-object; primitive, `null`, and array results are rejected. Published v0.1.3 may
-acknowledge those malformed responses.
-Development main also requires `params` to be an object when present on a
-request or notification; arrays and `null` receive JSON-RPC `-32600` on HTTP
-POST requests and WebSocket messages. For a request with a valid ID, development
-main echoes that ID in the error; a rejected notification gets HTTP 400 with no
-body, or a `null`-ID JSON-RPC error over WebSocket.
-Omitted `params` remains valid. Published v0.1.3 may
-accept array parameters on methods that do not inspect them.
-On development main, an invalid ID-less notification or client response over
-HTTP gets 400 with an empty body; an accepted one gets 202 with an empty body.
+v0.1.4 supports authenticated HTTP POST JSON-RPC and a custom WebSocket
+transport on `/mcp`. It does not offer stdio, SSE GET, OAuth discovery,
+resources, or prompts. An authenticated ordinary GET to `/mcp` returns 405;
+WebSocket upgrades remain available. The full Streamable HTTP conformance
+work continues in [issue #59](https://github.com/rhamenator/request-guard-mcp/issues/59).
+
+For HTTP POST, send `Content-Type: application/json` and
+`Accept: application/json, text/event-stream`. An explicit unsupported
+content type gets 415; an explicit `Accept` that excludes JSON gets 406.
+After initialization, send `MCP-Protocol-Version: 2025-06-18`; an explicit
+malformed, duplicate, or unsupported value gets 400. Missing versions and
+media headers remain accepted for older direct clients. The server sends JSON
+for requests and does not offer an SSE response stream. Accepted client
+notifications and responses get 202 with no body.
+
+Use JSON-RPC `2.0` envelopes with string or integer request IDs. `null` and
+fractional request IDs receive `-32600`; valid IDs are echoed for invalid
+`params`. Request and notification `params`, when present, must be objects.
+Client success responses require a JSON object `result` and a string or
+integer ID. A `null` error-response ID is accepted only for parse or
+invalid-request errors when the original ID cannot be recovered. Rejected
+ID-less HTTP notifications or client responses get 400 with no body.
 The custom WebSocket transport reports malformed messages as JSON-RPC errors.
-v0.1.2 and newer builds return `-32600` for invalid envelope shapes and
-`-32700` for malformed JSON. Client notifications receive no JSON-RPC response;
-development main acknowledges accepted HTTP notifications and client responses
-with 202 and an empty body. Published v0.1.3 uses 204 and an empty body.
-Development main rejects MCP HTTP POST and WebSocket requests that carry an
-`Origin` header unless that exact origin is in `MCP_ALLOWED_ORIGINS` (a
-comma-separated list of full `http://` or `https://` origins). No origins are
-allowed by default; non-browser clients that omit `Origin` still use the
-configured authentication policy. For a browser client behind a reverse proxy, list its
-trusted public origin explicitly. This server does not answer CORS preflights:
-cross-origin browser clients also need a trusted proxy to handle CORS, while
-same-origin browser traffic does not. Browser WebSocket APIs cannot set the
-server's bearer Authorization header; a trusted proxy must authenticate the
-browser and supply upstream credentials for that path. Use lowercase hosts and omit default
-ports (`:80` for HTTP and `:443` for HTTPS) in the allowlist. The check applies
-to the MCP endpoint, not `/health`, `/ready`, or `/metrics`; restrict those
-endpoints at the proxy if browser access is a concern. The published v0.1.3 binary does not yet
-enforce this Origin check; protect that release at the TLS proxy. An Origin
-header is spoofable outside a browser and never replaces authentication.
-v0.1.2 and newer builds send WebSocket close code 1009
-when a frame or fragmented message exceeds `MCP__LIMITS__MAX_REQUEST_BYTES`.
-The published v0.1.1 release can instead close the connection without a
-WebSocket close frame.
+
+HTTP POST and WebSocket requests carrying `Origin` require an exact entry in
+`MCP_ALLOWED_ORIGINS`; the default empty allowlist denies such requests.
+Non-browser clients without `Origin` remain subject to bearer authentication.
+The server does not handle CORS preflights, so cross-origin browser clients
+need a trusted proxy. Browser WebSocket clients also need that proxy to
+authenticate them and set an upstream bearer header. Origin is spoofable
+outside browsers and never replaces authentication. The check does not cover
+`/health`, `/ready`, or `/metrics`; restrict those endpoints at the proxy.
+
+v0.1.2 and newer builds send WebSocket close code 1009 for an oversized frame
+or fragmented message; v0.1.1 may instead close without a close frame.
+The published v0.1.3 release predates the v0.1.4 HTTP and Origin rules above;
+use its [tagged documentation](https://github.com/rhamenator/request-guard-mcp/tree/v0.1.3)
+when operating that version.
 
 ## Quickstart
 

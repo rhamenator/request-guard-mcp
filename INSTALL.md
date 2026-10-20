@@ -1,7 +1,7 @@
 # Install Request Guard MCP from a release bundle
 
 For Linux x64, use the `linux-x64` archive on glibc systems and a separately
-labeled `linux-x64-musl` archive on Alpine/musl. The v0.1.3 release includes
+labeled `linux-x64-musl` archive on Alpine/musl. Releases v0.1.3 and newer include
 both archives; v0.1.2 has only the glibc archive. If the selected release has no
 musl archive, that release does not support Alpine.
 
@@ -28,17 +28,26 @@ MaxMind data are not needed for the core `classify` and `explain` tools.
    `http://127.0.0.1:8085/mcp` with `Authorization: Bearer <your token>`, then
    confirm `tools/list` includes `classify` and `explain`.
 
+For v0.1.4 HTTP clients, send `Content-Type: application/json` and
+`Accept: application/json, text/event-stream` on POST. After initialization,
+send `MCP-Protocol-Version: 2025-06-18`. A client notification or response
+accepted over HTTP receives 202 with no body. An authenticated ordinary GET
+to `/mcp` receives 405 because this server does not offer an SSE stream.
+
 For a remote client, use a trusted TLS endpoint in front of the server and
 restrict who can reach it. Do not send the bearer token over plain HTTP across
 an untrusted network. The server does not offer stdio or SSE GET transport.
-On development main, PostgreSQL TLS verification uses the operating system CA
+Starting with v0.1.4, PostgreSQL TLS verification uses the operating system CA
 store. For a private database CA, install it in that store or set
 `sslrootcert=/path/to/ca.pem` in `MCP__POSTGRES__URL`. Use
 `sslmode=verify-full` to verify both the certificate chain and hostname;
 `sslmode=require` encrypts the connection but does not verify either. Minimal
 container and Alpine hosts need a populated CA store unless `sslrootcert`
-supplies the private CA. Published v0.1.3 does not include the native-root change.
-On development main, MCP HTTP POST and WebSocket requests carrying `Origin`
+supplies the private CA. A configured PostgreSQL connection with an untrusted
+certificate or mismatched hostname prevents server startup; the core tools do
+not become available in that configuration. Published v0.1.3 predates the
+native-root change.
+Starting with v0.1.4, MCP HTTP POST and WebSocket requests carrying `Origin`
 must match an exact entry in `MCP_ALLOWED_ORIGINS`; for example,
 `MCP_ALLOWED_ORIGINS=https://console.example`. List the public browser origin
 when using a reverse proxy, including a nondefault port. Do not use wildcards,
