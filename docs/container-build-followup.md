@@ -24,3 +24,30 @@ published architecture coverage, or release provenance. The larger
 multiarch optimization remains open: instrument per-platform build time and
 cache reuse, then compare a split native build/manifest assembly with the
 current combined Buildx build before changing release publication.
+
+## Native cold-build experiment
+
+The manual `Container Cold Build Benchmark` workflow builds the Dockerfile
+separately on GitHub's `ubuntu-24.04` amd64 and `ubuntu-24.04-arm` arm64
+runners. It disables the BuildKit layer cache, loads each image only on its
+own runner, verifies its architecture, runs a local container health smoke,
+and records build-and-load seconds in each job summary. It does not log in to
+GHCR, push an image, or change the
+required container check. The benchmark's `no-cache` setting makes layer
+cache hits zero by design; it does not measure warm-cache behavior. Base-image
+pulls, package registry latency, and runner variation still affect elapsed
+time. The Dockerfile has no cross-compilation stage, so on these checked
+native runners its Rust build uses the runner architecture.
+
+The v0.1.3 combined tag job's 31m 25s is context, not a controlled baseline:
+it may have used cache and included setup, registry push, and attestations at
+a different commit. A split publication would take at least the slower of the
+two native jobs plus manifest assembly and verification. Repeat the benchmark
+and compare a no-cache combined build at the same commit before claiming a
+material improvement. If native builds then show a benefit, a separate
+PR can split publication into two architecture-specific builds and a manifest
+assembly job, with digest and client checks before the next tag. GitHub lists
+`ubuntu-24.04-arm` as a standard hosted runner for public repositories, and
+Docker documents the distributed build pattern:
+[GitHub runner reference](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax),
+[Docker multi-platform CI guide](https://docs.docker.com/build/ci/github-actions/multi-platform/).

@@ -1,0 +1,82 @@
+name: Container Cold Build Benchmark
+
+# Manual, unpublished experiment for issue #88. This does not replace the
+# required container check or publish anything to GHCR.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-cold-build:
+    name: Cold native ${{ matrix.arch }} image
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Verify native runner architecture
+        run: |
+          set -euo pipefail
+          expected='${{ matrix.arch }}'
+          case "$expected:$(uname -m)" in
+            amd64:x86_64|arm64:aarch64) ;;
+            *) echo "Unexpected runner architecture" >&2; exit 1 ;;
+          esac
+          echo "Runner $(uname -m)" >> "$GITHUB_STEP_SUMMARY"
+      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+      - name: Start cold build timer
+        id: timer
+        run: echo "start=$(date +%s)" >> "$GITHUB_OUTPUT"
+      - name: Build native image without BuildKit cache
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: docker/Dockerfile
+          platforms: linux/${{ matrix.arch }}
+          no-cache: true
+          load: true
+          push: false
+          tags: request-guard-mcp:cold-${{ matrix.arch }}
+      - name: Verify image and record cold duration
+        run: |
+          set -euo pipefail
+          image_arch=$(docker image inspect request-guard-mcp:cold-${{ matrix.arch }} --format '{{.Architecture}}')
+          test "$image_arch" = '${{ matrix.arch }}'
+          elapsed=$(( $(date +%s) - ${{ steps.timer.outputs.start }} ))
+          {
+            echo "### Unpublished native ${{ matrix.arch }} cold image"
+            echo "- Build and load elapsed: ${elapsed} seconds"
+            echo "- BuildKit layer cache: disabled (no-cache: true)"
+            echo "- Loaded image architecture: ${image_arch}"
+            echo "- Commit: ${{ github.sha }}"
+            echo "- Run attempt: ${{ github.run_attempt }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Smoke test the native image
+        run: |
+          set -euo pipefail
+          name="request-guard-cold-${{ matrix.arch }}"
+          trap 'docker rm -f "$name" >/dev/null 2>&1 || true' EXIT
+          docker run -d --name "$name" --network bridge \
+            -e AUTH_TOKENS=0123456789abcdef0123456789abcdef \
+            request-guard-mcp:cold-${{ matrix.arch }} >/dev/null
+          for attempt in $(seq 1 30); do
+            if docker exec "$name" curl -fsS --max-time 2 \
+                http://127.0.0.1:8085/health >/dev/null 2>&1; then
+              echo "Native image health smoke: passed" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Native image health smoke failed" >&2
+          exit 1
