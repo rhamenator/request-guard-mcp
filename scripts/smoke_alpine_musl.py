@@ -13,6 +13,8 @@ import time
 import urllib.error
 import urllib.request
 
+ALPINE_IMAGE = "docker.io/library/alpine:3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6"
+
 
 def call(url: str, token: str | None, method: str, params: dict | None = None) -> dict:
     body = {"jsonrpc": "2.0", "id": 1, "method": method}
@@ -37,7 +39,7 @@ def main() -> None:
     name = f"request-guard-musl-smoke-{os.getpid()}"
     # Docker Official Image index digest; refresh with:
     # docker buildx imagetools inspect docker.io/library/alpine:3.24.2
-    image = "docker.io/library/alpine:3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6"
+    image = ALPINE_IMAGE
     command = [
         "docker", "run", "--rm", "--name", name, "--network", "host",
         "--read-only", "--tmpfs", "/tmp", "--mount",
