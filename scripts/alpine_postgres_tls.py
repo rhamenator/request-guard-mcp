@@ -14,7 +14,7 @@ import time
 import urllib.request
 
 from alpine_postgres_recovery import (
-    MCP_PORT, PG_DIR, PG_PORT, POSTGRES_USER, classify, pg,
+    MCP_PORT, PG_DIR, PG_LOG, PG_PORT, POSTGRES_USER, classify, pg,
     replay, require_success, rpc, start_pg, stop_pg, stop_server,
 )
 
@@ -108,14 +108,18 @@ def run_case(binary: Path, expected_version: str, token: str, cache_key: str,
                 if exit_code == 0:
                     raise RuntimeError(f"{name}: untrusted PostgreSQL TLS exited successfully")
         finally:
+            pending_failure = sys.exc_info()[0] is not None
             stop_server(process)
-            log.seek(0)
-            captured = log.read(MAX_LOG_BYTES + 1)
-            if not captured or len(captured) > MAX_LOG_BYTES:
-                raise RuntimeError(f"{name}: server log empty or exceeded 64 KiB")
-            for secret in (token, cache_key):
-                if secret.encode() in captured:
-                    raise RuntimeError(f"{name}: synthetic secret appeared in server log")
+            if not pending_failure:
+                log.seek(0)
+                captured = log.read(MAX_LOG_BYTES + 1)
+                if not captured or len(captured) > MAX_LOG_BYTES:
+                    raise RuntimeError(f"{name}: server log empty or exceeded 64 KiB")
+                for secret in (token, cache_key):
+                    if secret.encode() in captured:
+                        raise RuntimeError(f"{name}: synthetic secret appeared in server log")
+                if not should_start and b"certificate" not in captured.lower():
+                    raise RuntimeError(f"{name}: failure was not attributable to TLS certificate verification")
 
 
 def main() -> None:
@@ -143,10 +147,18 @@ def main() -> None:
         run_case(binary, expected_version, token, cache_key, "OS store trusted CA",
                  host="pgci.test", root_cert=None, should_start=True)
     finally:
+        pending_failure = sys.exc_info()[0] is not None
         if subprocess.run(["pg_ctl", "-D", str(PG_DIR), "status"],
                           user=POSTGRES_USER.pw_uid, group=POSTGRES_USER.pw_gid,
                           capture_output=True, timeout=5).returncode == 0:
             stop_pg()
+        if not pending_failure:
+            pg_captured = PG_LOG.read_bytes()[:MAX_LOG_BYTES + 1]
+            if not pg_captured or len(pg_captured) > MAX_LOG_BYTES:
+                raise RuntimeError("PostgreSQL log empty or exceeded 64 KiB")
+            for secret in (token, cache_key):
+                if secret.encode() in pg_captured:
+                    raise RuntimeError("synthetic secret appeared in PostgreSQL log")
     print("PASS Alpine PostgreSQL TLS: explicit CA, untrusted CA, hostname, OS store, private logs")
 
 
