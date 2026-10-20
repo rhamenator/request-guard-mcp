@@ -7,10 +7,12 @@ is published. A fresh registry install with an empty npm cache
 passed Inspector authentication, initialization, listing 23 tools,
 `classify`, and `explain` on Linux x64. This is an experimental release;
 the adversarial production-readiness gate remains open.
-The v0.1.4 package must be assembled only from the final v0.1.4 native
-release archives and checksum sidecars, then pass a clean install and MCP
-Inspector smoke before publication. Until npm confirms that version is live,
-use the published 0.1.3 command below.
+The v0.1.4 package was assembled from all five final public native release
+archives and their checksum sidecars. A clean local tarball install passed MCP
+Inspector authentication, initialization, tool listing, `classify`, and
+`explain`. Registry publication is pending npm authentication and the owner's
+security-key approval. Until npm confirms that version is live, use the
+published 0.1.3 command below or the v0.1.4 native release.
 
 ## Install and connect
 
