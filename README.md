@@ -58,7 +58,11 @@ requests. Development main rejects an explicit `Accept` that rules out JSON
 with HTTP 406 before reading the body, including `application/json;q=0` even
 when a less specific wildcard allows other types. A missing `Accept` remains
 accepted for older clients. Published v0.1.3 does not enforce this rule.
-Use a JSON-RPC `2.0` envelope and a string or numeric request ID (or `null`).
+Use a JSON-RPC `2.0` envelope and a string or integer request ID. MCP
+2025-06-18 forbids `null` request IDs. Development main returns JSON-RPC
+`-32600` with an error ID of `null` for `null`, fractional, or otherwise
+invalid request IDs on HTTP POST and WebSocket. Published v0.1.3 does not yet
+enforce the `null` and fractional ID restriction.
 v0.1.2 and newer builds return `-32600` for invalid envelope shapes and
 `-32700` for malformed JSON. Client notifications receive no JSON-RPC response;
 development main acknowledges accepted HTTP notifications and client responses

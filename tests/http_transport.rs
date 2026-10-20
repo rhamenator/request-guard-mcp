@@ -509,6 +509,8 @@ async fn post_mcp_rejects_invalid_json_rpc_envelopes() {
         json!({"jsonrpc": "2.0", "id": true, "method": "ping"}),
         json!({"jsonrpc": "2.0", "id": {}, "method": "ping"}),
         json!({"jsonrpc": "2.0", "id": [], "method": "ping"}),
+        json!({"jsonrpc": "2.0", "id": null, "method": "ping"}),
+        json!({"jsonrpc": "2.0", "id": 1.5, "method": "ping"}),
         json!({"jsonrpc": "2.0", "id": 1}),
         json!({"jsonrpc": "2.0", "id": 1, "method": 42}),
         json!({"jsonrpc": "2.0", "id": 1, "method": "ping", "result": {}}),

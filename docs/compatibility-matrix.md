@@ -35,6 +35,10 @@ HTTP 406 before reading the body, honoring quality values and media-range
 specificity. Missing `Accept` remains accepted for older clients. Published
 v0.1.3 does not enforce this rule, so a client advertising only SSE may receive
 JSON from that release.
+For JSON-RPC requests, MCP 2025-06-18 requires a string or integer ID and
+forbids `null`. Development main returns `-32600` with error ID `null` for
+`null`, fractional, or other invalid request IDs on HTTP POST and WebSocket.
+Published v0.1.3 does not yet enforce the `null` and fractional restriction.
 
 ### `rhamenator/ai-scraping-defense` (Python/Django)
 

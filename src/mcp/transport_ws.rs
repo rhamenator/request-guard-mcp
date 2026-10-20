@@ -129,14 +129,19 @@ pub(crate) async fn process_message(
     if envelope.get("jsonrpc").and_then(Value::as_str) != Some("2.0") {
         return invalid_request(Value::Null);
     }
-    if let Some(id) = envelope.get("id") {
-        if !id.is_null() && !id.is_string() && !id.is_number() {
-            return invalid_request(Value::Null);
-        }
-    }
     if let Some(method) = envelope.get("method") {
         if !method.is_string() || envelope.contains_key("result") || envelope.contains_key("error")
         {
+            return invalid_request(Value::Null);
+        }
+        // MCP 2025-06-18 narrows JSON-RPC request IDs to strings or
+        // integers: null and fractional/exponent numbers are not valid.
+        if envelope.get("id").is_some_and(|id| {
+            !id.is_string()
+                && !id
+                    .as_number()
+                    .is_some_and(|number| number.is_i64() || number.is_u64())
+        }) {
             return invalid_request(Value::Null);
         }
         if envelope
@@ -147,6 +152,13 @@ pub(crate) async fn process_message(
         }
     } else if !envelope.contains_key("id")
         || envelope.contains_key("result") == envelope.contains_key("error")
+    {
+        return invalid_request(Value::Null);
+    }
+    if envelope.get("method").is_none()
+        && envelope
+            .get("id")
+            .is_some_and(|id| !id.is_null() && !id.is_string() && !id.is_number())
     {
         return invalid_request(Value::Null);
     }
@@ -471,6 +483,39 @@ mod tests {
                 .await
                 .is_none()
         );
+    }
+
+    #[tokio::test]
+    async fn mcp_request_ids_require_strings_or_integers() {
+        let (state, registry) = test_context();
+        for id in ["null", "1.5", "1e0", "true", "{}", "[]"] {
+            let request = format!(r#"{{"jsonrpc":"2.0","id":{id},"method":"ping"}}"#);
+            let response = process_message(&request, &state, &registry, "test-caller")
+                .await
+                .expect("invalid request response");
+            let response: Value = serde_json::from_str(&response).unwrap();
+            assert_eq!(response["error"]["code"], -32600, "id: {id}");
+            assert!(response["id"].is_null(), "id: {id}");
+        }
+        for id in ["0", "-1", "\"request-1\""] {
+            let request = format!(r#"{{"jsonrpc":"2.0","id":{id},"method":"ping"}}"#);
+            let response = process_message(&request, &state, &registry, "test-caller")
+                .await
+                .expect("valid request response");
+            let response: Value = serde_json::from_str(&response).unwrap();
+            assert_eq!(response["id"], serde_json::from_str::<Value>(id).unwrap());
+            assert!(response.get("result").is_some(), "id: {id}");
+        }
+        // A client error response may use null when the original request ID
+        // could not be recovered; it is not an MCP request.
+        assert!(process_message(
+            r#"{"jsonrpc":"2.0","id":null,"error":{"code":-32700,"message":"Parse error"}}"#,
+            &state,
+            &registry,
+            "test-caller"
+        )
+        .await
+        .is_none());
     }
 
     #[tokio::test]
