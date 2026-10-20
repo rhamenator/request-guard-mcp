@@ -48,7 +48,7 @@ candidate is being qualified separately; its npm package is not published.
 
 For a future approved npm release, after its native assets are published:
 
-1. Download all eight archive and `.sha256` assets for the **same** tag into a
+1. Download all ten archive and `.sha256` assets for the **same** tag into a
    private working directory. Do not include the local Agensi skill ZIP.
 2. Run `python3 scripts/package_npm.py --name request-guard-mcp --version
    <matching-tag> --assets <asset-directory> --output <new-package-directory>`.
@@ -62,5 +62,5 @@ For a future approved npm release, after its native assets are published:
    and command from a fresh registry install. Do not publish an RC as `latest`.
 
 The generated package contains the GPL-3.0-or-later license, a short npm setup
-guide, the launcher, and the four binaries. It contains no credentials, `.env`,
+guide, the launcher, and the five binaries. It contains no credentials, `.env`,
 Agensi skill ZIP, release build cache, or runtime npm dependencies.
