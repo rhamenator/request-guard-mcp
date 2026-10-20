@@ -172,6 +172,14 @@ pub(crate) async fn process_message(
     {
         return invalid_request(Value::Null);
     }
+    // MCP Result is an object, even when the JSON-RPC base protocol would
+    // permit other JSON values in a successful response.
+    if envelope
+        .get("result")
+        .is_some_and(|result| !result.is_object())
+    {
+        return invalid_request(Value::Null);
+    }
     let msg: McpMessage = match serde_json::from_value(value) {
         Ok(message) => message,
         Err(_) => return invalid_request(Value::Null),
@@ -569,6 +577,27 @@ mod tests {
             .expect("null ID on an internal error must be rejected");
         let rejected: Value = serde_json::from_str(&rejected).unwrap();
         assert_eq!(rejected["error"]["code"], -32600);
+    }
+
+    #[tokio::test]
+    async fn mcp_client_response_result_must_be_an_object() {
+        let (state, registry) = test_context();
+        for result in ["null", "true", "1", "\"text\"", "[]"] {
+            let response = format!(r#"{{"jsonrpc":"2.0","id":1,"result":{result}}}"#);
+            let rejected = process_message(&response, &state, &registry, "test-caller")
+                .await
+                .expect("invalid response error");
+            let rejected: Value = serde_json::from_str(&rejected).unwrap();
+            assert_eq!(rejected["error"]["code"], -32600, "result: {result}");
+        }
+        assert!(process_message(
+            r#"{"jsonrpc":"2.0","id":1,"result":{}}"#,
+            &state,
+            &registry,
+            "test-caller"
+        )
+        .await
+        .is_none());
     }
 
     #[tokio::test]
