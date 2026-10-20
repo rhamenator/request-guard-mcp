@@ -146,7 +146,7 @@ pub(crate) async fn process_message(
         }
         if envelope
             .get("params")
-            .is_some_and(|params| !params.is_object() && !params.is_array())
+            .is_some_and(|params| !params.is_object())
         {
             return invalid_request(Value::Null);
         }
@@ -510,6 +510,49 @@ mod tests {
         // could not be recovered; it is not an MCP request.
         assert!(process_message(
             r#"{"jsonrpc":"2.0","id":null,"error":{"code":-32700,"message":"Parse error"}}"#,
+            &state,
+            &registry,
+            "test-caller"
+        )
+        .await
+        .is_none());
+    }
+
+    #[tokio::test]
+    async fn mcp_params_must_be_objects_when_present() {
+        let (state, registry) = test_context();
+        for message in [
+            r#"{"jsonrpc":"2.0","id":1,"method":"ping","params":[]}"#,
+            r#"{"jsonrpc":"2.0","method":"notifications/initialized","params":[]}"#,
+            r#"{"jsonrpc":"2.0","id":1,"method":"ping","params":null}"#,
+        ] {
+            let response = process_message(message, &state, &registry, "test-caller")
+                .await
+                .expect("invalid request response");
+            let response: Value = serde_json::from_str(&response).unwrap();
+            assert_eq!(response["error"]["code"], -32600, "{message}");
+            assert!(response["id"].is_null(), "{message}");
+        }
+        for message in [
+            r#"{"jsonrpc":"2.0","id":1,"method":"ping"}"#,
+            r#"{"jsonrpc":"2.0","id":1,"method":"ping","params":{}}"#,
+        ] {
+            let response = process_message(message, &state, &registry, "test-caller")
+                .await
+                .expect("valid request response");
+            let response: Value = serde_json::from_str(&response).unwrap();
+            assert!(response.get("result").is_some(), "{message}");
+        }
+        assert!(process_message(
+            r#"{"jsonrpc":"2.0","method":"notifications/initialized"}"#,
+            &state,
+            &registry,
+            "test-caller"
+        )
+        .await
+        .is_none());
+        assert!(process_message(
+            r#"{"jsonrpc":"2.0","method":"notifications/initialized","params":{}}"#,
             &state,
             &registry,
             "test-caller"

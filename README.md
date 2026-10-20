@@ -63,6 +63,10 @@ Use a JSON-RPC `2.0` envelope and a string or integer request ID. MCP
 `-32600` with an error ID of `null` for `null`, fractional, or otherwise
 invalid request IDs on HTTP POST and WebSocket. Published v0.1.3 does not yet
 enforce the `null` and fractional ID restriction.
+Development main also requires `params` to be an object when present on a
+request or notification; arrays and `null` receive JSON-RPC `-32600` on HTTP
+POST and WebSocket. Omitted `params` remains valid. Published v0.1.3 may
+accept array parameters on methods that do not inspect them.
 v0.1.2 and newer builds return `-32600` for invalid envelope shapes and
 `-32700` for malformed JSON. Client notifications receive no JSON-RPC response;
 development main acknowledges accepted HTTP notifications and client responses
