@@ -9,7 +9,8 @@ use axum::{
     extract::{ws::WebSocketUpgrade, FromRequestParts, Request, State},
     http::{
         header::{
-            ALLOW, CONNECTION, CONTENT_LENGTH, CONTENT_TYPE, UPGRADE, X_CONTENT_TYPE_OPTIONS,
+            ACCEPT, ALLOW, CONNECTION, CONTENT_LENGTH, CONTENT_TYPE, UPGRADE,
+            X_CONTENT_TYPE_OPTIONS,
         },
         HeaderMap, HeaderValue, Method, StatusCode,
     },
@@ -133,6 +134,13 @@ async fn http_mcp_handler(state: ServerState, request: Request, caller_scope: St
         )
             .into_response();
     }
+    if !accepts_json(request.headers()) {
+        return (
+            StatusCode::NOT_ACCEPTABLE,
+            "MCP HTTP responses require an Accept range allowing application/json",
+        )
+            .into_response();
+    }
     if request
         .headers()
         .get(CONTENT_LENGTH)
@@ -220,6 +228,119 @@ fn json_content_type(headers: &HeaderMap) -> bool {
     true
 }
 
+// This endpoint has one response representation: application/json. RFC 9110
+// gives an exact media range precedence over a type wildcard and a type
+// wildcard precedence over */*, even when the more specific range has q=0.
+fn accepts_json(headers: &HeaderMap) -> bool {
+    let mut values = headers.get_all(ACCEPT).iter().peekable();
+    if values.peek().is_none() {
+        return true; // Legacy direct clients omit Accept.
+    }
+    let mut best: Option<(u8, u8, u16)> = None;
+    for value in values {
+        let Ok(value) = value.to_str() else {
+            return false;
+        };
+        let Some(ranges) = split_unquoted(value, ',') else {
+            return false;
+        };
+        'range: for range in ranges {
+            let Some(parameters) = split_unquoted(range.trim(), ';') else {
+                return false;
+            };
+            let mut parts = parameters.into_iter();
+            let media = parts.next().unwrap_or("").trim();
+            let specificity = if media.eq_ignore_ascii_case("application/json") {
+                2
+            } else if media.eq_ignore_ascii_case("application/*") {
+                1
+            } else if media == "*/*" {
+                0
+            } else {
+                continue;
+            };
+            let mut quality = 1000;
+            let mut saw_q = false;
+            let mut matched_parameters = 0;
+            for parameter in parts {
+                let Some((name, value)) = parameter.trim().split_once('=') else {
+                    continue 'range;
+                };
+                if name.trim().eq_ignore_ascii_case("q") {
+                    if saw_q {
+                        return false;
+                    }
+                    saw_q = true;
+                    let Some(parsed) = parse_quality(value.trim()) else {
+                        return false;
+                    };
+                    quality = parsed;
+                } else {
+                    // A media parameter not carried by our JSON response does
+                    // not match. It must not invalidate a later wildcard.
+                    if !name.trim().eq_ignore_ascii_case("charset")
+                        || !value.trim().trim_matches('"').eq_ignore_ascii_case("utf-8")
+                        || specificity != 2
+                    {
+                        continue 'range;
+                    }
+                    matched_parameters = 1;
+                }
+            }
+            if best.is_none_or(|(prior, params, _)| {
+                (specificity, matched_parameters) > (prior, params)
+            }) {
+                best = Some((specificity, matched_parameters, quality));
+            } else if let Some((prior, params, prior_quality)) = best {
+                if (specificity, matched_parameters) == (prior, params) && quality > prior_quality {
+                    best = Some((specificity, matched_parameters, quality));
+                }
+            }
+        }
+    }
+    best.is_some_and(|(_, _, quality)| quality > 0)
+}
+
+fn split_unquoted(value: &str, separator: char) -> Option<Vec<&str>> {
+    let mut parts = Vec::new();
+    let mut start = 0;
+    let mut quoted = false;
+    let mut escaped = false;
+    for (index, character) in value.char_indices() {
+        if escaped {
+            escaped = false;
+        } else if quoted && character == '\\' {
+            escaped = true;
+        } else if character == '"' {
+            quoted = !quoted;
+        } else if !quoted && character == separator {
+            parts.push(&value[start..index]);
+            start = index + character.len_utf8();
+        }
+    }
+    if quoted || escaped {
+        return None;
+    }
+    parts.push(&value[start..]);
+    Some(parts)
+}
+
+fn parse_quality(value: &str) -> Option<u16> {
+    let (whole, fraction) = value.split_once('.').unwrap_or((value, ""));
+    if fraction.len() > 3 || !fraction.bytes().all(|c| c.is_ascii_digit()) {
+        return None;
+    }
+    match whole {
+        "0" if fraction.is_empty() => Some(0),
+        "0" => fraction
+            .parse::<u16>()
+            .ok()
+            .map(|n| n * 10_u16.pow((3 - fraction.len()) as u32)),
+        "1" if fraction.bytes().all(|c| c == b'0') => Some(1000),
+        _ => None,
+    }
+}
+
 fn valid_protocol_version(headers: &HeaderMap) -> bool {
     let mut values = headers.get_all("mcp-protocol-version").iter();
     match values.next() {
@@ -264,6 +385,50 @@ mod protocol_version_tests {
         headers.append(CONTENT_TYPE, HeaderValue::from_static("application/json"));
         headers.append(CONTENT_TYPE, HeaderValue::from_static("application/json"));
         assert!(!json_content_type(&headers));
+    }
+
+    #[test]
+    fn accept_quality_and_specificity() {
+        for value in [
+            "application/json",
+            "application/json, text/event-stream",
+            "application/*",
+            "*/*",
+            "application/json;q=0.001",
+            "application/json;q=1.000",
+            "application/json;q=0.5, text/event-stream",
+            "application/json;q=0.5, application/*;q=0",
+            "Application/JSON; Q=1",
+            "application/json;foo=bar, */*",
+            "application/json;q=1;version=1, */*",
+            "multipart/form-data;boundary=\"x,application/json,y\", application/json",
+            "application/*;q=0, application/json",
+        ] {
+            let mut headers = HeaderMap::new();
+            headers.insert(ACCEPT, HeaderValue::from_str(value).unwrap());
+            assert!(accepts_json(&headers), "{value}");
+        }
+        for value in [
+            "text/event-stream",
+            "application/json;q=0",
+            "application/json;q=0, */*;q=1",
+            "application/*;q=0, */*;q=1",
+            "*/*;q=0",
+            "application/json;q=1.1",
+            "application/json;q=bogus",
+            "application/json;charset=utf-8;q=0, application/json",
+            "application/json;q=0;charset=utf-8, application/json;q=1",
+            "application/json;q=0.0001",
+            "multipart/form-data;boundary=\"x,application/json,y\"",
+        ] {
+            let mut headers = HeaderMap::new();
+            headers.insert(ACCEPT, HeaderValue::from_str(value).unwrap());
+            assert!(!accepts_json(&headers), "{value}");
+        }
+        let mut headers = HeaderMap::new();
+        headers.append(ACCEPT, HeaderValue::from_static("text/event-stream"));
+        headers.append(ACCEPT, HeaderValue::from_static("application/json"));
+        assert!(accepts_json(&headers));
     }
 }
 

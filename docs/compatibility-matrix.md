@@ -30,8 +30,11 @@ explicit `Content-Type` is not `application/json` or the same media type with
 for older clients; published v0.1.3 does not enforce this policy. The pinned
 transport requires clients to send an `Accept` header advertising both
 `application/json` and `text/event-stream`. This server returns JSON for
-requests and does not yet validate `Accept`, so a client that advertises only
-SSE may receive JSON.
+requests. Development main rejects an explicit `Accept` excluding JSON with
+HTTP 406 before reading the body, honoring quality values and media-range
+specificity. Missing `Accept` remains accepted for older clients. Published
+v0.1.3 does not enforce this rule, so a client advertising only SSE may receive
+JSON from that release.
 
 ### `rhamenator/ai-scraping-defense` (Python/Django)
 
