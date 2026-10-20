@@ -8,7 +8,7 @@ A **Rust MCP (Model Context Protocol) server** for request risk classification, 
 
 Install the experimental [npm release](https://www.npmjs.com/package/request-guard-mcp/v/0.1.2) with `npm install -g request-guard-mcp@0.1.2`, configure `AUTH_TOKENS`, then run `request-guard-mcp`. The package includes native binaries for Linux x64 (glibc), Windows x64, macOS Intel, and macOS Apple Silicon. Follow the [npm setup guide](docs/npm-release.md#install-and-connect) for environment and MCP client steps; [INSTALL.md](INSTALL.md) applies to downloaded native bundles.
 
-Alpine/musl support is being qualified for a later release in [issue #54](https://github.com/rhamenator/request-guard-mcp/issues/54). The [private candidate evidence](docs/alpine-qualification-v0.1.3-candidate.md) does not change the supported platforms of the published v0.1.2 packages.
+The [v0.1.3 native release](https://github.com/rhamenator/request-guard-mcp/releases/tag/v0.1.3) adds a Linux x64 musl archive for Alpine. Choose `linux-x64-musl` on Alpine and `linux-x64` on glibc hosts. See the [Kali-to-Alpine qualification evidence](docs/alpine-qualification-v0.1.3-candidate.md) and its limits.
 
 The [companion skill](skills/request-guard-mcp/SKILL.md) tells a connected agent when and how to use this server’s classification tools. It does not deploy or replace the separate AI Scraping Defense products.
 
@@ -102,7 +102,7 @@ tested results and current protocol limits.
 
 ## Ready-to-run releases
 
-Each GitHub release includes a checksum-protected native bundle for Linux x64,
+The v0.1.3 GitHub release includes checksum-protected native bundles for Linux x64 glibc and musl,
 Windows x64, macOS Intel, and macOS Apple Silicon. Download the archive for your
 platform and follow the bundled [INSTALL.md](INSTALL.md) for checksum verification,
 token setup, startup, and MCP client connection. A container
