@@ -1,5 +1,5 @@
 use axum::http::{
-    header::{AUTHORIZATION, ORIGIN, X_CONTENT_TYPE_OPTIONS},
+    header::{ALLOW, AUTHORIZATION, ORIGIN, X_CONTENT_TYPE_OPTIONS},
     HeaderValue, StatusCode,
 };
 use axum_test::TestServer;
@@ -55,6 +55,15 @@ async fn plain_mcp_get_reports_no_sse_stream_after_auth_and_origin_checks() {
         .await;
     no_sse.assert_status(StatusCode::METHOD_NOT_ALLOWED);
     assert!(no_sse.as_bytes().is_empty());
+    assert_eq!(no_sse.header(ALLOW), "POST, GET");
+
+    let unrelated_upgrade = server(false)
+        .get("/mcp")
+        .add_header("upgrade", HeaderValue::from_static("h2c"))
+        .add_header("connection", HeaderValue::from_static("upgrade"))
+        .await;
+    unrelated_upgrade.assert_status(StatusCode::METHOD_NOT_ALLOWED);
+    assert_eq!(unrelated_upgrade.header(ALLOW), "POST, GET");
 }
 
 #[tokio::test]

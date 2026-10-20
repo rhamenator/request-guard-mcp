@@ -7,7 +7,10 @@ use crate::telemetry::gather_metrics;
 use axum::{
     body::{to_bytes, Body},
     extract::{ws::WebSocketUpgrade, FromRequestParts, Request, State},
-    http::{header::X_CONTENT_TYPE_OPTIONS, HeaderMap, HeaderValue, StatusCode},
+    http::{
+        header::{ALLOW, CONNECTION, UPGRADE, X_CONTENT_TYPE_OPTIONS},
+        HeaderMap, HeaderValue, StatusCode,
+    },
     middleware::map_response,
     response::{IntoResponse, Response},
     routing::get,
@@ -60,8 +63,10 @@ async fn ws_handler(State(state): State<ServerState>, request: Request) -> Respo
 
     // The custom WebSocket transport shares this path with Streamable HTTP.
     // This server does not offer a server-initiated SSE GET stream.
-    if !request.headers().contains_key(axum::http::header::UPGRADE) {
-        return StatusCode::METHOD_NOT_ALLOWED.into_response();
+    if !header_has_token(request.headers(), UPGRADE, "websocket")
+        || !header_has_token(request.headers(), CONNECTION, "upgrade")
+    {
+        return (StatusCode::METHOD_NOT_ALLOWED, [(ALLOW, "POST, GET")]).into_response();
     }
     let (mut parts, _) = request.into_parts();
     let mut ws = match WebSocketUpgrade::from_request_parts(&mut parts, &state).await {
@@ -91,6 +96,19 @@ async fn ws_handler(State(state): State<ServerState>, request: Request) -> Respo
             caller_scope,
             connection_permit,
         )
+    })
+}
+
+fn header_has_token(
+    headers: &HeaderMap,
+    name: axum::http::header::HeaderName,
+    token: &str,
+) -> bool {
+    headers.get_all(name).iter().any(|value| {
+        value.to_str().is_ok_and(|text| {
+            text.split(',')
+                .any(|part| part.trim().eq_ignore_ascii_case(token))
+        })
     })
 }
 
