@@ -167,6 +167,11 @@ kubectl apply -f deploy/k8s/secret.yaml
 make k8s-apply
 ```
 
+The Kubernetes example pins the currently published v0.1.3 image and matching
+version labels. Update all three together after the v0.1.4 container tag and
+digest are verified; v0.1.3 does not implement the v0.1.4 transport and CA
+behavior described above.
+
 The application, Redis, and PostgreSQL intentionally refuse to start with the
 example credentials. Do not commit `deploy/k8s/secret.yaml`.
 

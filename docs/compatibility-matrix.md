@@ -9,8 +9,11 @@ tool methods. The handshake revision is `2025-06-18`; if a client offers a
 different revision, `initialize` counter-offers that version and the client
 must decide whether it can continue. The server does not implement the
 `2026-07-28` discovery lifecycle, stdio, OAuth discovery, SSE GET, resources,
-or prompts. MCP Inspector 2.5.0 release smoke passes on all five native
-platforms; full transport conformance remains open in issue #59.
+or prompts. MCP Inspector 2.5.0 smoke passed in the
+[five-platform v0.1.4 release candidate](https://github.com/rhamenator/request-guard-mcp/actions/runs/39501453989),
+including the packaged Alpine binary; see also the
+[interoperability evidence](inspector-interoperability.md). Full transport
+conformance remains open in issue #59.
 
 For v0.1.4 HTTP POST, send `Content-Type: application/json` and
 `Accept: application/json, text/event-stream`. The server returns JSON for

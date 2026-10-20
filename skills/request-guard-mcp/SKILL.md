@@ -22,6 +22,11 @@ server, and connect an HTTP POST MCP client to `/mcp` with that token. Confirm
 CI runs official MCP Inspector 2.5.0 against the native bundles; check your
 chosen client separately. Redis, PostgreSQL, and MaxMind data are optional for
 core tools but required by some additional tools and may incur costs.
+Until v0.1.4 is published, v0.1.3 remains the current release. It supports
+standard MCP initialization and tool calls but predates the v0.1.4 Origin,
+HTTP status/header, JSON-RPC envelope, and PostgreSQL native CA changes below.
+Use its [tagged installation instructions](https://github.com/rhamenator/request-guard-mcp/tree/v0.1.3)
+when operating v0.1.3; do not assume the following v0.1.4 checks apply to it.
 
 The server supports HTTP POST JSON-RPC and a custom WebSocket transport. It
 does not offer stdio, SSE GET, OAuth discovery, MCP resources or prompts. For
