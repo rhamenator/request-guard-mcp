@@ -63,6 +63,11 @@ Use a JSON-RPC `2.0` envelope and a string or integer request ID. MCP
 `-32600` with an error ID of `null` for `null`, fractional, or otherwise
 invalid request IDs on HTTP POST and WebSocket. Published v0.1.3 does not yet
 enforce the `null` and fractional ID restriction.
+Development main also rejects fractional client-response IDs and a `null`
+success-response ID. A `null` error-response ID remains valid for parse or
+invalid-request errors when the original request ID cannot be recovered;
+published v0.1.3 does not enforce
+the client-response ID restriction.
 Development main also requires `params` to be an object when present on a
 request or notification; arrays and `null` receive JSON-RPC `-32600` on HTTP
 POST requests and WebSocket messages. Omitted `params` remains valid. Published v0.1.3 may

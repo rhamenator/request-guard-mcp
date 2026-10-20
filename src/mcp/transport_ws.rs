@@ -156,9 +156,19 @@ pub(crate) async fn process_message(
         return invalid_request(Value::Null);
     }
     if envelope.get("method").is_none()
-        && envelope
-            .get("id")
-            .is_some_and(|id| !id.is_null() && !id.is_string() && !id.is_number())
+        && envelope.get("id").is_some_and(|id| {
+            !id.is_string()
+                && !id
+                    .as_number()
+                    .is_some_and(|number| number.is_i64() || number.is_u64())
+                && !(id.is_null()
+                    && envelope
+                        .get("error")
+                        .and_then(Value::as_object)
+                        .and_then(|error| error.get("code"))
+                        .and_then(Value::as_i64)
+                        .is_some_and(|code| code == -32700 || code == -32600))
+        })
     {
         return invalid_request(Value::Null);
     }
@@ -516,6 +526,49 @@ mod tests {
         )
         .await
         .is_none());
+        assert!(process_message(
+            r#"{"jsonrpc":"2.0","id":null,"error":{"code":-32600,"message":"Invalid Request"}}"#,
+            &state,
+            &registry,
+            "test-caller"
+        )
+        .await
+        .is_none());
+    }
+
+    #[tokio::test]
+    async fn mcp_client_response_ids_require_strings_or_integers() {
+        let (state, registry) = test_context();
+        for id in ["1.5", "1e0", "true", "{}", "[]"] {
+            let response = format!(r#"{{"jsonrpc":"2.0","id":{id},"result":{{}}}}"#);
+            let rejected = process_message(&response, &state, &registry, "test-caller")
+                .await
+                .expect("invalid response error");
+            let rejected: Value = serde_json::from_str(&rejected).unwrap();
+            assert_eq!(rejected["error"]["code"], -32600, "id: {id}");
+            assert!(rejected["id"].is_null(), "id: {id}");
+        }
+        for id in ["0", "-1", "\"response-1\""] {
+            let response = format!(r#"{{"jsonrpc":"2.0","id":{id},"result":{{}}}}"#);
+            assert!(process_message(&response, &state, &registry, "test-caller")
+                .await
+                .is_none());
+        }
+        assert!(process_message(
+            r#"{"jsonrpc":"2.0","id":null,"result":{}}"#,
+            &state,
+            &registry,
+            "test-caller"
+        )
+        .await
+        .is_some());
+        let invalid_null_error =
+            r#"{"jsonrpc":"2.0","id":null,"error":{"code":-32603,"message":"Internal error"}}"#;
+        let rejected = process_message(invalid_null_error, &state, &registry, "test-caller")
+            .await
+            .expect("null ID on an internal error must be rejected");
+        let rejected: Value = serde_json::from_str(&rejected).unwrap();
+        assert_eq!(rejected["error"]["code"], -32600);
     }
 
     #[tokio::test]
