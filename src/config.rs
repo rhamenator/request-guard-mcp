@@ -43,6 +43,10 @@ pub struct AuthConfig {
     /// key; configure it to keep scopes stable across restarts and replicas.
     #[serde(default)]
     pub cache_scope_hmac_key: Option<String>,
+    /// Exact browser origins permitted to call the MCP endpoint. An absent
+    /// Origin header is handled separately for non-browser clients.
+    #[serde(default)]
+    pub allowed_origins: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -173,6 +177,16 @@ impl Config {
             }
         }
 
+        if let Ok(val) = std::env::var("MCP_ALLOWED_ORIGINS") {
+            let origins = val
+                .split(',')
+                .map(str::trim)
+                .filter(|origin| !origin.is_empty())
+                .map(str::to_string)
+                .collect::<Vec<_>>();
+            builder = builder.set_override("auth.allowed_origins", origins)?;
+        }
+
         if let Ok(val) = std::env::var("CACHE_SCOPE_HMAC_KEY") {
             if !val.trim().is_empty() {
                 builder = builder.set_override("auth.cache_scope_hmac_key", val)?;
@@ -243,6 +257,15 @@ impl Config {
     }
 
     fn validate(&self) -> Result<()> {
+        if self.auth.allowed_origins.len() > 32
+            || self
+                .auth
+                .allowed_origins
+                .iter()
+                .any(|origin| !crate::mcp::origin::valid_origin(origin))
+        {
+            anyhow::bail!("MCP_ALLOWED_ORIGINS must contain at most 32 exact http(s) origins without paths or wildcards");
+        }
         if self.auth.enabled {
             if self.auth.tokens.is_empty() {
                 anyhow::bail!("authentication is enabled but AUTH_TOKENS is empty");
@@ -469,6 +492,7 @@ impl Default for AuthConfig {
             tokens: vec![],
             enabled: defaults::auth_enabled(),
             cache_scope_hmac_key: None,
+            allowed_origins: vec![],
         }
     }
 }
@@ -594,6 +618,18 @@ mod tests {
             ..Config::default()
         };
         assert!(valid.validate().is_ok());
+    }
+
+    #[test]
+    fn browser_origin_allowlist_rejects_wildcards_and_paths() {
+        let mut config = Config::default();
+        config.auth.tokens = vec!["a-real-test-token-with-32-characters".to_string()];
+        config.auth.allowed_origins = vec!["https://console.example".to_string()];
+        assert!(config.validate().is_ok());
+        for invalid in ["*", "null", "https://console.example/path"] {
+            config.auth.allowed_origins = vec![invalid.to_string()];
+            assert!(config.validate().is_err(), "{invalid}");
+        }
     }
 
     #[test]

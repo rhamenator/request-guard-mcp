@@ -1,5 +1,5 @@
 use axum::http::{
-    header::{AUTHORIZATION, X_CONTENT_TYPE_OPTIONS},
+    header::{AUTHORIZATION, ORIGIN, X_CONTENT_TYPE_OPTIONS},
     HeaderValue, StatusCode,
 };
 use axum_test::TestServer;
@@ -18,15 +18,46 @@ use tokio::{
 };
 
 fn server(auth_enabled: bool) -> TestServer {
+    server_with_origins(auth_enabled, &[])
+}
+
+fn server_with_origins(auth_enabled: bool, origins: &[&str]) -> TestServer {
     let mut config = Config::default();
     config.auth.enabled = auth_enabled;
     config.auth.tokens = vec!["http-test-token".to_string()];
+    config.auth.allowed_origins = origins.iter().map(|origin| (*origin).to_string()).collect();
     let max_body = config.limits.max_request_bytes;
     let state = ServerState {
         app: Arc::new(AppState::new(config)),
         registry: Arc::new(build_registry()),
     };
     TestServer::new(build_router(state, max_body))
+}
+
+#[tokio::test]
+async fn mcp_post_requires_explicit_browser_origin_allowlist() {
+    let request = json!({"jsonrpc": "2.0", "id": 1, "method": "ping"});
+    let rejected = server(false)
+        .post("/mcp")
+        .add_header(ORIGIN, HeaderValue::from_static("https://evil.example"))
+        .json(&request)
+        .await;
+    rejected.assert_status(StatusCode::FORBIDDEN);
+
+    let accepted = server_with_origins(false, &["https://console.example"])
+        .post("/mcp")
+        .add_header(ORIGIN, HeaderValue::from_static("https://console.example"))
+        .json(&request)
+        .await;
+    accepted.assert_status_ok();
+
+    let rebind = server_with_origins(false, &["https://console.example"])
+        .post("/mcp")
+        .add_header(ORIGIN, HeaderValue::from_static("https://evil.example"))
+        .add_header("host", HeaderValue::from_static("evil.example"))
+        .json(&request)
+        .await;
+    rebind.assert_status(StatusCode::FORBIDDEN);
 }
 
 #[tokio::test]

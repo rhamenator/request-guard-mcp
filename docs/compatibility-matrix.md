@@ -78,6 +78,14 @@ Development main returns HTTP 202; the published v0.1.3 server returns 204.
 The [pinned MCP transport revision](https://modelcontextprotocol.io/specification/2025-06-18/basic/transports#sending-messages-to-the-server)
 specifies 202 for accepted notifications and responses. Full Streamable HTTP
 conformance remains open in issue #59.
+On development main, browser-originated HTTP POST and WebSocket MCP requests
+require an exact configured `MCP_ALLOWED_ORIGINS` entry. The default empty
+allowlist denies requests carrying `Origin`, while non-browser requests without
+it still use the configured authentication policy. This follows the
+[MCP transport DNS-rebinding guidance](https://modelcontextprotocol.io/specification/2025-06-18/basic/transports#security-warning).
+Published v0.1.3 has no server-side Origin check, so its reverse proxy must
+enforce the intended browser-origin boundary. Origin is a browser protection,
+not a replacement for a token: non-browser callers can forge that header.
 
 ## Tool Availability by Feature Flag
 
