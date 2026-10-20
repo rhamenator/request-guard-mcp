@@ -86,6 +86,10 @@ it still use the configured authentication policy. This follows the
 Published v0.1.3 has no server-side Origin check, so its reverse proxy must
 enforce the intended browser-origin boundary. Origin is a browser protection,
 not a replacement for a token: non-browser callers can forge that header.
+The development check covers MCP POST and WebSocket upgrades. Health,
+readiness, and metrics endpoints remain outside it. Cross-origin browser
+clients need CORS preflight and response handling at a trusted proxy; the
+allowlist does not add CORS to the server.
 
 ## Tool Availability by Feature Flag
 

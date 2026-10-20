@@ -60,6 +60,60 @@ async fn mcp_post_requires_explicit_browser_origin_allowlist() {
     rebind.assert_status(StatusCode::FORBIDDEN);
 }
 
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn websocket_upgrade_requires_explicit_browser_origin_allowlist() {
+    let mut config = Config::default();
+    config.auth.enabled = false;
+    config.auth.allowed_origins = vec!["https://console.example".to_string()];
+    let max_body = config.limits.max_request_bytes;
+    let state = ServerState {
+        app: Arc::new(AppState::new(config)),
+        registry: Arc::new(build_registry()),
+    };
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let server_task = tokio::spawn(async move {
+        axum::serve(listener, build_router(state, max_body))
+            .await
+            .unwrap();
+    });
+
+    for (origin_lines, expected) in [
+        ("Origin: https://console.example\r\n", 101),
+        ("Origin: https://evil.example\r\n", 403),
+        (
+            "Origin: https://console.example\r\nOrigin: https://console.example\r\n",
+            403,
+        ),
+    ] {
+        let mut stream = TcpStream::connect(address).await.unwrap();
+        let request = format!(
+            "GET /mcp HTTP/1.1\r\nHost: {address}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n{origin_lines}\r\n"
+        );
+        stream.write_all(request.as_bytes()).await.unwrap();
+        let status = timeout(Duration::from_secs(5), async {
+            let mut line = Vec::new();
+            while !line.ends_with(b"\r\n") {
+                let mut byte = [0_u8];
+                assert_eq!(stream.read(&mut byte).await.unwrap(), 1);
+                line.push(byte[0]);
+                assert!(line.len() < 256);
+            }
+            std::str::from_utf8(&line)
+                .unwrap()
+                .split_whitespace()
+                .nth(1)
+                .unwrap()
+                .parse::<u16>()
+                .unwrap()
+        })
+        .await
+        .expect("WebSocket handshake must finish");
+        assert_eq!(status, expected, "{origin_lines}");
+    }
+    server_task.abort();
+}
+
 #[tokio::test]
 async fn post_mcp_dispatches_json_rpc_request() {
     let response = server(false)

@@ -42,12 +42,20 @@ pub(crate) fn valid_origin(value: &str) -> bool {
         .strip_prefix(authority.host())
         .is_some_and(|suffix| {
             suffix.is_empty()
-                || suffix
-                    .strip_prefix(':')
-                    .is_some_and(|port| port.parse::<u16>().is_ok_and(|value| value != 0))
+                || suffix.strip_prefix(':').is_some_and(|port| {
+                    port.parse::<u16>().is_ok_and(|value| {
+                        value != 0
+                            && !(scheme == "http" && value == 80)
+                            && !(scheme == "https" && value == 443)
+                    })
+                })
         });
     !authority.host().is_empty()
         && !authority.as_str().contains('@')
+        && !authority
+            .host()
+            .bytes()
+            .any(|byte| byte.is_ascii_uppercase())
         && port_ok
         && value == format!("{scheme}://{authority}")
 }
@@ -77,6 +85,9 @@ mod tests {
             "https://console.example#fragment",
             "https://console.example,https://evil.example",
             "https://console.example:99999",
+            "https://console.example:443",
+            "http://console.example:80",
+            "https://CONSOLE.example",
             " https://console.example",
         ] {
             assert!(!valid_origin(rejected), "{rejected}");

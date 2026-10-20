@@ -48,7 +48,12 @@ Development main rejects MCP HTTP POST and WebSocket requests that carry an
 comma-separated list of full `http://` or `https://` origins). No origins are
 allowed by default; non-browser clients that omit `Origin` still use the
 configured authentication policy. For a browser client behind a reverse proxy, list its
-trusted public origin explicitly. The published v0.1.3 binary does not yet
+trusted public origin explicitly. This server does not answer CORS preflights:
+cross-origin browser clients also need a trusted proxy to handle CORS, while
+same-origin browser traffic does not. Use lowercase hosts and omit default
+ports (`:80` for HTTP and `:443` for HTTPS) in the allowlist. The check applies
+to the MCP endpoint, not `/health`, `/ready`, or `/metrics`; restrict those
+endpoints at the proxy if browser access is a concern. The published v0.1.3 binary does not yet
 enforce this Origin check; protect that release at the TLS proxy. An Origin
 header is spoofable outside a browser and never replaces authentication.
 v0.1.2 and newer builds send WebSocket close code 1009

@@ -35,7 +35,10 @@ On development main, MCP HTTP POST and WebSocket requests carrying `Origin`
 must match an exact entry in `MCP_ALLOWED_ORIGINS`; for example,
 `MCP_ALLOWED_ORIGINS=https://console.example`. List the public browser origin
 when using a reverse proxy, including a nondefault port. Do not use wildcards,
-paths, or the literal `null`. Requests without `Origin` remain available to
+paths, default ports (`:80`/`:443`), uppercase hosts, or the literal `null`.
+For a cross-origin browser client, the trusted proxy must handle CORS preflights
+and response headers; the server allowlist alone does not enable CORS.
+Requests without `Origin` remain available to
 non-browser clients under the configured authentication policy. Published v0.1.3 does not
 include this check; enforce browser-origin restrictions at the proxy for it.
 
