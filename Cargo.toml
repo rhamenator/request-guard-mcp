@@ -98,7 +98,7 @@ deadpool-redis = { version = "0.23", optional = true }
 redis = { version = "1.5", features = ["tokio-comp", "connection-manager"] }
 
 # Optional: PostgreSQL
-sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json"], optional = true }
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "tls-rustls-ring-native-roots", "postgres", "uuid", "chrono", "json"], optional = true }
 
 # Async traits
 async-trait = "0.1"
