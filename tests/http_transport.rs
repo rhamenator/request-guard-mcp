@@ -511,7 +511,6 @@ async fn post_mcp_rejects_invalid_json_rpc_envelopes() {
         json!({"jsonrpc": "2.0", "id": [], "method": "ping"}),
         json!({"jsonrpc": "2.0", "id": null, "method": "ping"}),
         json!({"jsonrpc": "2.0", "id": 1.5, "method": "ping"}),
-        json!({"jsonrpc": "2.0", "id": 1}),
         json!({"jsonrpc": "2.0", "id": 1, "method": 42}),
         json!({"jsonrpc": "2.0", "id": 1, "method": "ping", "result": {}}),
         json!({"jsonrpc": "2.0", "id": 1, "method": "ping", "params": 42}),
@@ -545,11 +544,21 @@ async fn rejected_client_responses_return_http_error_without_json_rpc_body() {
         json!({"jsonrpc": "2.0", "id": 1, "result": {}, "error": {}}),
         json!({"jsonrpc": "2.0", "id": 1, "error": {"code": "bad", "message": "bad"}}),
         json!({"jsonrpc": "1.0", "id": 1, "result": {}}),
+        json!({"jsonrpc": "2.0", "result": {}}),
+        json!({"jsonrpc": "2.0", "id": 1}),
+        json!({"jsonrpc": "2.0", "id": true, "result": {}}),
+        json!({"jsonrpc": "2.0", "id": {}, "result": {}}),
     ] {
         let response = server.post("/mcp").json(&payload).await;
         response.assert_status(StatusCode::BAD_REQUEST);
         assert!(response.as_bytes().is_empty(), "{payload}");
     }
+    let accepted = server
+        .post("/mcp")
+        .json(&json!({"jsonrpc": "2.0", "id": null, "error": {"code": -32700, "message": "Parse error"}}))
+        .await;
+    accepted.assert_status(StatusCode::ACCEPTED);
+    assert!(accepted.as_bytes().is_empty());
 }
 
 #[tokio::test]
