@@ -174,16 +174,36 @@ async fn http_mcp_handler(state: ServerState, request: Request, caller_scope: St
             .into_response();
     };
     match process_message(text, &state.app, &state.registry, &caller_scope).await {
-        Some(response) => (
-            StatusCode::OK,
-            [(axum::http::header::CONTENT_TYPE, "application/json")],
-            response,
-        )
-            .into_response(),
+        Some(response) => {
+            // An ID-less method is a notification attempt. A rejected one
+            // needs an HTTP error status, not a JSON-RPC response to a
+            // notification (MCP 2025-06-18 Streamable HTTP).
+            if is_notification_candidate(text) {
+                StatusCode::BAD_REQUEST.into_response()
+            } else {
+                (
+                    StatusCode::OK,
+                    [(axum::http::header::CONTENT_TYPE, "application/json")],
+                    response,
+                )
+                    .into_response()
+            }
+        }
         // MCP 2025-06-18 Streamable HTTP acknowledges accepted client
         // notifications and responses with 202 and no response body.
         None => StatusCode::ACCEPTED.into_response(),
     }
+}
+
+fn is_notification_candidate(text: &str) -> bool {
+    serde_json::from_str::<serde_json::Value>(text)
+        .ok()
+        .and_then(|value| {
+            value
+                .as_object()
+                .map(|object| object.contains_key("method") && !object.contains_key("id"))
+        })
+        .unwrap_or(false)
 }
 
 fn json_content_type(headers: &HeaderMap) -> bool {

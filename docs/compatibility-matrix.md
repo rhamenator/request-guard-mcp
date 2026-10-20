@@ -41,8 +41,11 @@ forbids `null`. Development main returns `-32600` with error ID `null` for
 Published v0.1.3 does not yet enforce the `null` and fractional restriction.
 MCP 2025-06-18 also requires request and notification `params` to be an
 object when supplied. Development main rejects arrays and `null` with
-JSON-RPC `-32600` on HTTP POST and WebSocket; omission is accepted. Published
+JSON-RPC `-32600` for HTTP POST requests and WebSocket messages; omission is accepted. Published
 v0.1.3 may accept arrays for methods that ignore parameters.
+On development main, a rejected ID-less HTTP notification receives 400 with
+no body; an accepted one receives 202 with no body. The custom WebSocket
+transport uses JSON-RPC errors for malformed messages.
 
 ### `rhamenator/ai-scraping-defense` (Python/Django)
 
