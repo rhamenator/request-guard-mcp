@@ -35,6 +35,29 @@ fn server_with_origins(auth_enabled: bool, origins: &[&str]) -> TestServer {
 }
 
 #[tokio::test]
+async fn plain_mcp_get_reports_no_sse_stream_after_auth_and_origin_checks() {
+    let unauthenticated = server(true).get("/mcp").await;
+    unauthenticated.assert_status(StatusCode::UNAUTHORIZED);
+
+    let denied_origin = server_with_origins(false, &["https://console.example"])
+        .get("/mcp")
+        .add_header(ORIGIN, HeaderValue::from_static("https://evil.example"))
+        .await;
+    denied_origin.assert_status(StatusCode::FORBIDDEN);
+
+    let no_sse = server(true)
+        .get("/mcp")
+        .add_header(
+            AUTHORIZATION,
+            HeaderValue::from_static("Bearer http-test-token"),
+        )
+        .add_header("accept", HeaderValue::from_static("text/event-stream"))
+        .await;
+    no_sse.assert_status(StatusCode::METHOD_NOT_ALLOWED);
+    assert!(no_sse.as_bytes().is_empty());
+}
+
+#[tokio::test]
 async fn mcp_post_requires_explicit_browser_origin_allowlist() {
     let request = json!({"jsonrpc": "2.0", "id": 1, "method": "ping"});
     let rejected = server(false)

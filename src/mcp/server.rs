@@ -6,7 +6,7 @@ use crate::state::AppState;
 use crate::telemetry::gather_metrics;
 use axum::{
     body::{to_bytes, Body},
-    extract::{ws::WebSocketUpgrade, Request, State},
+    extract::{ws::WebSocketUpgrade, FromRequestParts, Request, State},
     http::{header::X_CONTENT_TYPE_OPTIONS, HeaderMap, HeaderValue, StatusCode},
     middleware::map_response,
     response::{IntoResponse, Response},
@@ -49,18 +49,25 @@ async fn add_security_headers(mut response: Response) -> Response {
     response
 }
 
-async fn ws_handler(
-    mut ws: WebSocketUpgrade,
-    headers: HeaderMap,
-    State(state): State<ServerState>,
-) -> Response {
-    let caller_scope = match authorize(&headers, &state.app) {
+async fn ws_handler(State(state): State<ServerState>, request: Request) -> Response {
+    let caller_scope = match authorize(request.headers(), &state.app) {
         Ok(scope) => scope,
         Err(error) => return error_response(&error),
     };
-    if let Err(status) = check_origin(&headers, &state.app.config.auth.allowed_origins) {
+    if let Err(status) = check_origin(request.headers(), &state.app.config.auth.allowed_origins) {
         return status.into_response();
     }
+
+    // The custom WebSocket transport shares this path with Streamable HTTP.
+    // This server does not offer a server-initiated SSE GET stream.
+    if !request.headers().contains_key(axum::http::header::UPGRADE) {
+        return StatusCode::METHOD_NOT_ALLOWED.into_response();
+    }
+    let (mut parts, _) = request.into_parts();
+    let mut ws = match WebSocketUpgrade::from_request_parts(&mut parts, &state).await {
+        Ok(ws) => ws,
+        Err(rejection) => return rejection.into_response(),
+    };
 
     let Ok(connection_permit) = Arc::clone(&state.app.connection_semaphore).try_acquire_owned()
     else {
