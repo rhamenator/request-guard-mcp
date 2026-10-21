@@ -51,8 +51,11 @@ def main():
     parser.add_argument("--guard-sha256", help="Expected SHA256 of the Request Guard binary")
     args = parser.parse_args()
     if args.guard_sha256:
+        digest = hashlib.sha256()
         with open(args.request_guard_binary, "rb") as binary:
-            actual = hashlib.file_digest(binary, "sha256").hexdigest()
+            for chunk in iter(lambda: binary.read(1024 * 1024), b""):
+                digest.update(chunk)
+        actual = digest.hexdigest()
         if actual.lower() != args.guard_sha256.lower():
             raise RuntimeError("Request Guard binary SHA256 mismatch")
     guard_port, proxy_port = free_port(), free_port()
