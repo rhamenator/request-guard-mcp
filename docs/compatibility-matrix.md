@@ -7,7 +7,7 @@ custom WebSocket clients can use the same path. The server implements
 `initialize`, `ping`, `tools/list`, and `tools/call` while retaining direct
 tool methods. The handshake revision is `2025-06-18`; if a client offers a
 different revision, `initialize` counter-offers that version and the client
-must decide whether it can continue. The server does not implement the
+must decide whether it can continue. The published v0.1.4 server does not implement the
 `2026-07-28` discovery lifecycle, stdio, OAuth discovery, SSE GET, resources,
 or prompts. MCP Inspector 2.5.0 smoke passed in the
 [five-platform v0.1.4 release evidence](releases/v0.1.4-postgres-tls-evidence.md),
@@ -111,7 +111,13 @@ Fallback is triggered when:
 |---------|-----------|-----------|
 | 2025-06-18 | WebSocket JSON-RPC (custom client transport) | Implemented; 22-case packaged-binary envelope probe passed; broader client matrix open |
 | 2025-06-18 | HTTP POST JSON-RPC | Inspector 2.5.0, Python MCP SDK 2.3.0, and 13-case packaged-binary envelope probe passed |
-| 2025-06-18 | stdio, SSE GET, gRPC | Not implemented; v0.1.4 returns 405 for authenticated, ordinary GET `/mcp` |
+| 2025-06-18 | stdio | Not in published v0.1.4; development v0.1.5 candidate passed an official Python SDK 2.3.0 local smoke, pending packaged qualification |
+| 2025-06-18 | SSE GET, gRPC | Not implemented; v0.1.4 returns 405 for authenticated, ordinary GET `/mcp` |
+
+Development main is testing a v0.1.5 `--stdio` mode with the official Python
+MCP SDK. It is process-local and trusts the launching user instead of a bearer
+token. It does not change published v0.1.4 or add SSE GET support. See the
+[development setup](../INSTALL.md) for configuration and limits.
 
 The [pinned MCP transport revision](https://modelcontextprotocol.io/specification/2025-06-18/basic/transports#sending-messages-to-the-server)
 requires 202 with no body for accepted client notifications and responses;

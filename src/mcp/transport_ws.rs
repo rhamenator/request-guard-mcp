@@ -157,17 +157,17 @@ pub(crate) async fn process_message(
     }
     if envelope.get("method").is_none()
         && envelope.get("id").is_some_and(|id| {
-            !id.is_string()
-                && !id
+            !(id.is_string()
+                || id
                     .as_number()
                     .is_some_and(|number| number.is_i64() || number.is_u64())
-                && !(id.is_null()
+                || (id.is_null()
                     && envelope
                         .get("error")
                         .and_then(Value::as_object)
                         .and_then(|error| error.get("code"))
                         .and_then(Value::as_i64)
-                        .is_some_and(|code| code == -32700 || code == -32600))
+                        .is_some_and(|code| code == -32700 || code == -32600)))
         })
     {
         return invalid_request(Value::Null);

@@ -143,11 +143,24 @@ pub struct TlsFingerprintConfig {
 impl Config {
     /// Load configuration from environment variables and optional config file.
     pub fn load() -> Result<Self> {
-        if let Err(error) = dotenvy::dotenv() {
-            match &error {
-                dotenvy::Error::Io(io_error) if io_error.kind() == std::io::ErrorKind::NotFound => {
+        Self::load_for_transport(false)
+    }
+
+    /// Load for a process-local stdio client. No network listener or bearer
+    /// authentication is used; possession of the child process pipes is the
+    /// trust boundary.
+    pub fn load_stdio() -> Result<Self> {
+        Self::load_for_transport(true)
+    }
+
+    fn load_for_transport(stdio: bool) -> Result<Self> {
+        if !stdio {
+            if let Err(error) = dotenvy::dotenv() {
+                match &error {
+                    dotenvy::Error::Io(io_error)
+                        if io_error.kind() == std::io::ErrorKind::NotFound => {}
+                    _ => return Err(error).context("failed to load .env"),
                 }
-                _ => return Err(error).context("failed to load .env"),
             }
         }
         let mut builder = config::Config::builder();
@@ -232,13 +245,24 @@ impl Config {
             builder = builder.set_override("log_level", val)?;
         }
 
-        let cfg: Config = builder
+        let mut cfg: Config = builder
             .build()
             .context("failed to build config")?
             .try_deserialize()
             .context("failed to deserialize config")?;
 
-        cfg.validate()?;
+        if stdio {
+            // A local child process has no bearer header. Avoid reporting
+            // HTTP authentication as active through config_snapshot.
+            cfg.auth.enabled = false;
+            cfg.auth.tokens.clear();
+            // PostgreSQL rows do not expire. The process-unique stdio scope
+            // would leave unreachable rows after every launch.
+            if cfg.postgres.url.is_some() {
+                anyhow::bail!("PostgreSQL is not yet supported in stdio mode");
+            }
+        }
+        cfg.validate_for_transport(stdio)?;
         Ok(cfg)
     }
 
@@ -256,7 +280,12 @@ impl Config {
         Duration::from_secs(self.limits.classify_timeout_secs)
     }
 
+    #[cfg(test)]
     fn validate(&self) -> Result<()> {
+        self.validate_for_transport(false)
+    }
+
+    fn validate_for_transport(&self, stdio: bool) -> Result<()> {
         if self.auth.allowed_origins.len() > 32
             || self
                 .auth
@@ -266,7 +295,7 @@ impl Config {
         {
             anyhow::bail!("MCP_ALLOWED_ORIGINS must contain at most 32 exact http(s) origins without paths or wildcards");
         }
-        if self.auth.enabled {
+        if self.auth.enabled && !stdio {
             if self.auth.tokens.is_empty() {
                 anyhow::bail!("authentication is enabled but AUTH_TOKENS is empty");
             }
@@ -279,7 +308,7 @@ impl Config {
                     "AUTH_TOKENS entries must contain at least 32 characters and cannot be placeholders; run python scripts/configure_credentials.py"
                 );
             }
-        } else if !self.bind_addr()?.ip().is_loopback() {
+        } else if !stdio && !self.bind_addr()?.ip().is_loopback() {
             anyhow::bail!(
                 "authentication may only be disabled when MCP__HOST is a loopback address"
             );
@@ -293,6 +322,7 @@ impl Config {
             anyhow::bail!("CACHE_SCOPE_HMAC_KEY must contain at least 32 bytes when configured");
         }
         if self.auth.enabled
+            && !stdio
             && self.postgres.url.is_some()
             && self.auth.cache_scope_hmac_key.is_none()
         {
@@ -618,6 +648,16 @@ mod tests {
             ..Config::default()
         };
         assert!(valid.validate().is_ok());
+    }
+
+    #[test]
+    fn stdio_uses_process_boundary_without_network_bearer() {
+        let config = Config::default();
+        assert!(config.validate().is_err());
+        assert!(config.validate_for_transport(true).is_ok());
+        let mut invalid = config;
+        invalid.limits.max_request_bytes = 0;
+        assert!(invalid.validate_for_transport(true).is_err());
     }
 
     #[test]
