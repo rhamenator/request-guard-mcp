@@ -23,7 +23,9 @@ from urllib.error import HTTPError
 from pathlib import Path
 
 
-INSPECTOR = "@modelcontextprotocol/inspector@2.11.0"
+INSPECTOR_FIXTURE = Path(__file__).with_name("inspector-fixture")
+EXPECTED_INSPECTOR_VERSION = "2.11.0"
+EXPECTED_CLIENT_VERSION = "2.3.1"
 
 
 def require(condition: bool, message: str) -> None:
@@ -48,11 +50,19 @@ def free_loopback_port() -> int:
 def install_inspector(directory: str) -> Path:
     npm = shutil.which("npm.cmd" if os.name == "nt" else "npm")
     require(npm is not None, "npm executable was not found")
-    command = [npm, "install", "--prefix", directory, "--ignore-scripts",
-               "--no-audit", "--no-fund", "--no-package-lock", INSPECTOR]
+    for name in ("package.json", "package-lock.json"):
+        shutil.copy2(INSPECTOR_FIXTURE / name, Path(directory) / name)
+    command = [npm, "ci", "--prefix", directory, "--ignore-scripts",
+               "--no-audit", "--no-fund"]
     completed = subprocess.run(command, capture_output=True, text=True, timeout=180)
     if completed.returncode:
         raise RuntimeError(f"Inspector install failed: {completed.stderr[-1000:]}")
+    for package, expected in (("@modelcontextprotocol/inspector", EXPECTED_INSPECTOR_VERSION),
+                              ("@modelcontextprotocol/client", EXPECTED_CLIENT_VERSION)):
+        installed = Path(directory) / "node_modules" / package / "package.json"
+        require(installed.is_file(), f"installed {package} was not found")
+        actual = json.loads(installed.read_text())["version"]
+        require(actual == expected, f"installed {package} is not the reviewed version")
     launcher = (Path(directory) / "node_modules" / "@modelcontextprotocol" /
                 "inspector" / "clients" / "launcher" / "build" / "index.js")
     require(launcher.is_file(), "installed Inspector CLI entrypoint was not found")

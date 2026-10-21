@@ -19,12 +19,14 @@ def main() -> None:
     args = parser.parse_args()
     binary = args.binary.resolve(strict=True)
     inspector_script = Path(__file__).with_name("inspector_smoke.py").resolve(strict=True)
+    inspector_fixture = Path(__file__).with_name("inspector-fixture").resolve(strict=True)
     name = f"request-guard-inspector-alpine-{os.getpid()}-{secrets.token_hex(4)}"
     command = [
         "docker", "run", "--rm", "--init", "--name", name, "--network", "bridge",
         "--memory", "1g", "--cpus", "2", "--pids-limit", "256",
         "--mount", f"type=bind,src={binary},dst=/test/request-guard-mcp,readonly",
         "--mount", f"type=bind,src={inspector_script},dst=/test/inspector_smoke.py,readonly",
+        "--mount", f"type=bind,src={inspector_fixture},dst=/test/inspector-fixture,readonly",
         ALPINE_IMAGE, "sh", "-ec",
         "apk add --no-cache python3 nodejs npm >/dev/null; "
         "node --version; npm --version; "
