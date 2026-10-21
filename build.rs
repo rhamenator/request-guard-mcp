@@ -14,8 +14,13 @@ fn main() {
     {
         let resource = PathBuf::from(env::var("CARGO_MANIFEST_DIR").expect("manifest directory"))
             .join("assets/app-icon.res");
+        assert!(
+            resource.is_file(),
+            "missing Windows icon resource: {}",
+            resource.display()
+        );
         println!(
-            "cargo:rustc-link-arg-bin=request-guard-mcp=\"{}\"",
+            "cargo:rustc-link-arg-bin=request-guard-mcp={}",
             resource.display()
         );
     }
