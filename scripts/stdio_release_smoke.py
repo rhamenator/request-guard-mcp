@@ -52,6 +52,7 @@ def main():
     essentials = {"PATH", "SYSTEMROOT", "WINDIR", "TEMP", "TMPDIR", "USERPROFILE"}
     env = {key: value for key, value in os.environ.items() if key.upper() in essentials}
     env["MCP__LIMITS__MAX_REQUEST_BYTES"] = "1024"
+    env["MCP__AUTH__ENABLED"] = "true"
     env["AUTH_TOKENS"] = synthetic_secret
     with tempfile.TemporaryDirectory(prefix="request-guard-stdio-release-") as cwd:
         env["HOME"] = cwd
@@ -72,10 +73,16 @@ def main():
     require(responses[4]["error"]["code"] == -413, "oversized line was not rejected")
     require(responses[5]["error"]["code"] == -32700, "malformed UTF-8 was not rejected")
     require(responses[6]["result"] == {}, "server did not recover after malformed lines")
-    require(responses[7]["result"]["structuredContent"]["verdict"] in
-            {"allow", "block", "flag", "unknown"}, "injection text was not treated as classify data")
-    require(synthetic_secret.encode() not in result.stdout + result.stderr,
-            "synthetic environment secret leaked to protocol output or diagnostics")
+    require("error" not in responses[7] and not responses[7].get("result", {}).get("isError"),
+            "prompt-like user-agent did not produce a normal classify result")
+    injected_result = responses[7]["result"].get("structuredContent", {})
+    require(injected_result.get("verdict") in
+            {"allow", "block", "challenge", "flag", "unknown"},
+            "prompt-like user-agent did not remain classification data")
+    require(set(injected_result) == set(responses[2]["result"]["structuredContent"]),
+            "prompt-like user-agent changed classify response shape")
+    require(b"RG_MCP_SYNTHETIC_STDIO_SECRET" not in result.stdout + result.stderr,
+            "synthetic environment token marker leaked to protocol output or diagnostics")
     print("PASS packaged stdio: initialize, tools, notification, bounded errors, recovery, injection data, secret redaction")
 
 
