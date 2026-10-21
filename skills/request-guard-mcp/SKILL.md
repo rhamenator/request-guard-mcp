@@ -22,15 +22,18 @@ server, and connect an HTTP POST MCP client to `/mcp` with that token. Confirm
 CI runs official MCP Inspector 2.5.0 against the native bundles. The exact
 public v0.1.4 Linux binary also passed deterministic HTTP and custom WebSocket
 envelope probes; check any other chosen client separately. Optional SSE and
-stdio transports are not implemented. Redis, PostgreSQL, and MaxMind data are
+stdio transports are not implemented in v0.1.4. Redis, PostgreSQL, and MaxMind data are
 optional for core tools but required by some additional tools and may incur costs.
+Development main contains a candidate `--stdio` mode for v0.1.5, but it is
+not in the published v0.1.4 skill/server pair or its verified client matrix.
+PostgreSQL integration is currently unavailable in that candidate stdio mode.
 The earlier v0.1.3 release supports
 standard MCP initialization and tool calls but predates the v0.1.4 Origin,
 HTTP status/header, JSON-RPC envelope, and PostgreSQL native CA changes below.
 Use its [tagged installation instructions](https://github.com/rhamenator/request-guard-mcp/tree/v0.1.3)
 when operating v0.1.3; do not assume the following v0.1.4 checks apply to it.
 
-The server supports HTTP POST JSON-RPC and a custom WebSocket transport. It
+The published v0.1.4 server supports HTTP POST JSON-RPC and a custom WebSocket transport. It
 does not offer stdio, SSE GET, OAuth discovery, MCP resources or prompts. For
 HTTP POST, send `Content-Type: application/json` and
 `Accept: application/json, text/event-stream`. After initialization, send

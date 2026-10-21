@@ -5,6 +5,7 @@ use opentelemetry_otlp::{
 };
 use opentelemetry_sdk::{trace::SdkTracerProvider, Resource};
 use tracing::info;
+use tracing_subscriber::fmt::writer::BoxMakeWriter;
 use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 /// Initialize the tracing subscriber.
@@ -12,8 +13,14 @@ pub fn init_tracing(
     log_level: &str,
     service_name: &str,
     otlp_endpoint: Option<&str>,
+    stdio: bool,
 ) -> Result<Option<SdkTracerProvider>> {
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(log_level));
+    let log_writer = if stdio {
+        BoxMakeWriter::new(std::io::stderr)
+    } else {
+        BoxMakeWriter::new(std::io::stdout)
+    };
 
     let provider = if let Some(endpoint) = otlp_endpoint {
         let mut builder = opentelemetry_otlp::SpanExporter::builder()
@@ -36,7 +43,7 @@ pub fn init_tracing(
         let tracer = provider.tracer(service_name.to_string());
         tracing_subscriber::registry()
             .with(filter)
-            .with(fmt::layer().json())
+            .with(fmt::layer().json().with_writer(log_writer))
             .with(tracing_opentelemetry::layer().with_tracer(tracer))
             .try_init()
             .context("failed to initialize tracing subscriber")?;
@@ -44,7 +51,7 @@ pub fn init_tracing(
     } else {
         tracing_subscriber::registry()
             .with(filter)
-            .with(fmt::layer().json())
+            .with(fmt::layer().json().with_writer(log_writer))
             .try_init()
             .context("failed to initialize tracing subscriber")?;
         None
