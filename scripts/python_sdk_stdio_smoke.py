@@ -35,13 +35,18 @@ async def probe(binary, expected_version):
                 require(initialized.server_info.version == expected_version, "unexpected server version")
                 listed = await session.list_tools()
                 require({"classify", "explain"} <= {tool.name for tool in listed.tools}, "core tools missing")
-                result = await session.call_tool("classify", {
+                observed = {
                     "ip": "192.0.2.1", "user_agent": "GPTBot/1.0", "path": "/",
-                })
+                }
+                result = await session.call_tool("classify", observed)
                 require(not result.is_error, "classify returned tool error")
                 require(result.structured_content is not None, "classify omitted structured content")
                 require(result.structured_content["verdict"] == "block", "unexpected verdict")
-                print("PASS Python MCP SDK stdio: initialize, tools/list, classify")
+                explanation = await session.call_tool("explain", {"classification": observed})
+                require(not explanation.is_error, "explain returned tool error")
+                require(explanation.structured_content is not None, "explain omitted structured content")
+                require(bool(explanation.structured_content["factors"]), "explain omitted factors")
+                print("PASS Python MCP SDK stdio: initialize, tools/list, classify, explain")
 
 
 def main():
