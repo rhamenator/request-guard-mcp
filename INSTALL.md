@@ -38,7 +38,12 @@ For a remote client, use a trusted TLS endpoint in front of the server and
 restrict who can reach it. Do not send the bearer token over plain HTTP across
 an untrusted network. The published v0.1.4 server does not offer stdio or SSE GET transport.
 Development main adds a candidate `--stdio` mode for v0.1.5. It is not in
-the published v0.1.4 installers; qualify it before relying on a release.
+the published v0.1.4 installers or npm package. Private, unpublished candidate
+bundles passed stdio smoke on all five platforms; an official Python SDK
+client and an offline npm install assembled from those private bundles passed
+on Linux. Buyers cannot obtain that candidate from the public release or npm
+registry. A final public v0.1.5 tag is still required before treating this as
+an installable release.
 
 For a local development build, set the MCP client's command to the absolute
 path of `request-guard-mcp` and its arguments to `["--stdio"]`. The client

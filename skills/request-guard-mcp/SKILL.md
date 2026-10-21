@@ -24,9 +24,20 @@ public v0.1.4 Linux binary also passed deterministic HTTP and custom WebSocket
 envelope probes; check any other chosen client separately. Optional SSE and
 stdio transports are not implemented in v0.1.4. Redis, PostgreSQL, and MaxMind data are
 optional for core tools but required by some additional tools and may incur costs.
-Development main contains a candidate `--stdio` mode for v0.1.5, but it is
-not in the published v0.1.4 skill/server pair or its verified client matrix.
-PostgreSQL integration is currently unavailable in that candidate stdio mode.
+Development main contains a tested candidate `--stdio` mode for v0.1.5, but it
+is not in the published v0.1.4 skill/server pair. To test it before release,
+build development main from source with `cargo build --locked --release`; set
+the local client's command to that built executable and its arguments to
+`["--stdio"]`, then verify
+`tools/list` before using this skill. The client owns the child process;
+stdin/stdout carry one JSON-RPC message per line and diagnostics go to stderr.
+No HTTP listener or bearer token protects this channel, so grant process and
+environment access only to trusted local users. Automatic `.env` discovery
+is disabled; pass optional configuration explicitly. Calls are sequential;
+there is no request cancellation or session resumption. PostgreSQL integration
+is unavailable in candidate stdio mode. Private five-platform packaged smoke,
+an official Python SDK 2.3.0 client, and a clean npm-installed Linux launcher
+passed; this does not establish support for every client.
 The earlier v0.1.3 release supports
 standard MCP initialization and tool calls but predates the v0.1.4 Origin,
 HTTP status/header, JSON-RPC envelope, and PostgreSQL native CA changes below.
