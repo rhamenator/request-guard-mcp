@@ -139,9 +139,11 @@ Trusted TLS producers must also follow [the attestation contract](docs/tls-finge
 For a clean client check against an installed binary, run
 `python3 scripts/inspector_smoke.py /path/to/request-guard-mcp`. It starts a
 loopback instance with a temporary bearer token and uses pinned official MCP
-Inspector 2.5.0 for `initialize`, `tools/list`, and `tools/call` (`classify` and
+Inspector 2.11.0 for `initialize`, `tools/list`, and `tools/call` (`classify` and
 `explain`). Node.js 22.19.0 or newer, npm, and access to that Inspector package
 are required.
+Published v0.1.5 release jobs used the earlier Inspector 2.5.0 pin; the
+2.11.0 smoke has also passed against its exact public Linux x64 binary.
 See [the interoperability evidence](docs/inspector-interoperability.md) for
 tested results and current protocol limits.
 

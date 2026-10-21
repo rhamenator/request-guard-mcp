@@ -27,6 +27,7 @@ def main() -> None:
         "--mount", f"type=bind,src={inspector_script},dst=/test/inspector_smoke.py,readonly",
         ALPINE_IMAGE, "sh", "-ec",
         "apk add --no-cache python3 nodejs npm >/dev/null; "
+        "node --version; npm --version; "
         "python3 /test/inspector_smoke.py --expected-version \"$1\" "
         "/test/request-guard-mcp > /tmp/inspector.log 2>&1 || "
         "{ echo 'Alpine Inspector failed; test output withheld to protect its bearer token' >&2; exit 1; }; "
