@@ -68,6 +68,7 @@ def main() -> None:
         parser.error("invalid npm package name")
     if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?", version):
         parser.error("version must be npm-compatible semver")
+    supports_stdio = tuple(map(int, version.split("-", 1)[0].split("."))) >= (0, 1, 5)
     if args.output.exists():
         parser.error("output directory already exists")
 
@@ -101,6 +102,14 @@ def main() -> None:
         "files": ["bin/", "vendor/", "LICENSE", "README.md"],
     }
     (args.output / "package.json").write_text(json.dumps(package, indent=2) + "\n", encoding="utf-8")
+    stdio_help = (
+        "For a local process MCP client, run `request-guard-mcp --stdio` as the "
+        "client's command. The client starts the process and communicates over "
+        "stdin/stdout; no HTTP listener or bearer token is used. Grant access only "
+        "to clients you trust with the local process environment. PostgreSQL is "
+        "not supported in stdio mode.\n\n"
+        if supports_stdio else ""
+    )
     (args.output / "README.md").write_text(
         f"# {args.name}\n\n"
         "Native Request Guard MCP server for Linux x64 (glibc or musl), Windows x64, macOS Intel, and macOS Apple Silicon. "
@@ -110,7 +119,8 @@ def main() -> None:
         "`MCP__HOST=127.0.0.1`. Connect an HTTP POST MCP client to "
         "`http://127.0.0.1:8085/mcp` using `Authorization: Bearer <your token>`. "
         "The core `classify` and `explain` tools do not require Redis or PostgreSQL.\n\n"
-        "For setup, permissions, and transport limits, see "
+        + stdio_help
+        + "For setup, permissions, and transport limits, see "
         "[the repository](https://github.com/rhamenator/request-guard-mcp). "
         "The companion Agensi skill is distributed separately and is not included here.\n",
         encoding="utf-8",

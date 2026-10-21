@@ -59,6 +59,7 @@ class NativeNpmPackageTests(unittest.TestCase):
         self.assertEqual(manifest["version"], "0.1.1")
         self.assertNotIn("dependencies", manifest)
         self.assertNotIn("scripts", manifest)
+        self.assertNotIn("--stdio", (output / "README.md").read_text(encoding="utf-8"))
         for platform, (_, binary_name) in PLATFORMS.items():
             self.assertTrue((output / "vendor" / platform / binary_name).is_file())
         launched = subprocess.run(
