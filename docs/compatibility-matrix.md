@@ -12,8 +12,10 @@ must decide whether it can continue. The server does not implement the
 or prompts. MCP Inspector 2.5.0 smoke passed in the
 [five-platform v0.1.4 release evidence](releases/v0.1.4-postgres-tls-evidence.md),
 including the packaged Alpine binary; see also the
-[interoperability evidence](inspector-interoperability.md). Full transport
-conformance remains open in issue #59.
+[interoperability evidence](inspector-interoperability.md). The supported HTTP
+and custom WebSocket envelope cases were also exercised against the exact
+public v0.1.4 binary; optional transports and broader client coverage are
+tracked in issue #121.
 
 For v0.1.4 HTTP POST, send `Content-Type: application/json` and
 `Accept: application/json, text/event-stream`. The server returns JSON for
@@ -92,13 +94,15 @@ Fallback is triggered when:
 
 | Version | Transport | Supported |
 |---------|-----------|-----------|
-| 2025-06-18 | WebSocket JSON-RPC (custom client transport) | Implemented; client interoperability gate open |
-| 2025-06-18 | HTTP POST JSON-RPC | Inspector 2.5.0 smoke passed; full conformance gate open |
+| 2025-06-18 | WebSocket JSON-RPC (custom client transport) | Implemented; 22-case packaged-binary envelope probe passed; broader client matrix open |
+| 2025-06-18 | HTTP POST JSON-RPC | Inspector 2.5.0 and 13-case packaged-binary envelope probe passed |
 | 2025-06-18 | stdio, SSE GET, gRPC | Not implemented; v0.1.4 returns 405 for authenticated, ordinary GET `/mcp` |
 
 The [pinned MCP transport revision](https://modelcontextprotocol.io/specification/2025-06-18/basic/transports#sending-messages-to-the-server)
 requires 202 with no body for accepted client notifications and responses;
-v0.1.4 does so. Full Streamable HTTP conformance remains open in issue #59.
+v0.1.4 does so. JSON response mode and an authenticated GET 405 are permitted
+by this pinned specification. Optional SSE and additional client transports
+are tracked in issue #121.
 Browser-originated HTTP POST and WebSocket MCP requests require an exact
 `MCP_ALLOWED_ORIGINS` entry in addition to bearer authentication. The default
 empty allowlist denies requests carrying `Origin`; clients without `Origin`

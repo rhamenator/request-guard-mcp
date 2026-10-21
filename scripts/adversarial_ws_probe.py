@@ -2,6 +2,7 @@
 """Bounded WebSocket adversarial probe for an authorized Request Guard lab."""
 import argparse
 import base64
+import ipaddress
 import json
 import os
 import socket
@@ -14,6 +15,12 @@ parser.add_argument("--host", default="127.0.0.1")
 parser.add_argument("--port", type=int, default=8085)
 parser.add_argument("--max-request-bytes", type=int, help="enable bounded frame-limit tests with this configured server limit (max 65536)")
 args = parser.parse_args()
+try:
+    address = ipaddress.ip_address(args.host)
+except ValueError:
+    parser.error("--host must be a numeric private or loopback lab IP")
+if not (address.is_private or address.is_loopback) or address.is_unspecified or not 1 <= args.port <= 65535:
+    parser.error("--host and --port must identify a private or loopback lab endpoint")
 if args.max_request_bytes is not None and not len(INITIALIZE_MESSAGE.encode()) <= args.max_request_bytes <= 65536:
     parser.error(f"--max-request-bytes must be from {len(INITIALIZE_MESSAGE.encode())} to 65536 so initialize fits the configured limit")
 HOST = args.host
@@ -32,7 +39,8 @@ def connect(token=None):
     sock=socket.create_connection((HOST,PORT),timeout=5)
     sock.settimeout(5)
     key=base64.b64encode(os.urandom(16)).decode()
-    headers=[f'GET /mcp HTTP/1.1',f'Host: {HOST}:{PORT}','Upgrade: websocket','Connection: Upgrade',f'Sec-WebSocket-Key: {key}','Sec-WebSocket-Version: 13','Sec-WebSocket-Protocol: mcp']
+    host_header=f'[{HOST}]' if ':' in HOST else HOST
+    headers=[f'GET /mcp HTTP/1.1',f'Host: {host_header}:{PORT}','Upgrade: websocket','Connection: Upgrade',f'Sec-WebSocket-Key: {key}','Sec-WebSocket-Version: 13','Sec-WebSocket-Protocol: mcp']
     if token is not None: headers.append('Authorization: Bearer '+token)
     sock.sendall(('\r\n'.join(headers)+'\r\n\r\n').encode())
     raw=b''
@@ -73,18 +81,55 @@ if status==101:
     check('ws_initialize',op==1 and value.get('result',{}).get('protocolVersion')=='2025-06-18',{'opcode':op,'id':value.get('id')})
     send_text(sock,'{broken')
     op,payload=recv_frame(sock);value=json.loads(payload)
-    check('ws_malformed_json',op==1 and value.get('error',{}).get('code')==-32700,{'opcode':op,'code':value.get('error',{}).get('code')})
+    check('ws_malformed_json',op==1 and value.get('jsonrpc')=='2.0' and value.get('error',{}).get('code')==-32700 and 'id' in value and value['id'] is None,{'opcode':op,'code':value.get('error',{}).get('code')})
     for name,envelope,expected_id in [
         ('ws_wrong_jsonrpc_version',{'jsonrpc':'1.0','id':2,'method':'ping'},None),
         ('ws_scalar_params',{'jsonrpc':'2.0','id':2,'method':'ping','params':42},2),
+        ('ws_array_input',[],None),
+        ('ws_empty_object',{},None),
+        ('ws_null_request_id',{'jsonrpc':'2.0','id':None,'method':'ping'},None),
+        ('ws_fractional_request_id',{'jsonrpc':'2.0','id':1.5,'method':'ping'},None),
+        ('ws_nonobject_params',{'jsonrpc':'2.0','id':'known','method':'ping','params':[]},'known'),
+        ('ws_bad_notification',{'jsonrpc':'2.0','method':'notifications/initialized','params':[]},None),
+        ('ws_bad_client_result',{'jsonrpc':'2.0','id':7,'result':[]},None),
     ]:
         send_text(sock,json.dumps(envelope))
         op,payload=recv_frame(sock);value=json.loads(payload)
-        check(name,op==1 and value.get('error',{}).get('code')==-32600 and value.get('id')==expected_id,{'opcode':op,'code':value.get('error',{}).get('code')})
+        check(name,op==1 and value.get('jsonrpc')=='2.0' and value.get('error',{}).get('code')==-32600 and 'id' in value and value['id']==expected_id,{'opcode':op,'code':value.get('error',{}).get('code')})
+    for name,request_id in [('ws_integer_id',7),('ws_string_id','string')]:
+        send_text(sock,json.dumps({'jsonrpc':'2.0','id':request_id,'method':'ping'}))
+        op,payload=recv_frame(sock);value=json.loads(payload)
+        check(name,op==1 and value.get('jsonrpc')=='2.0' and value.get('id')==request_id and value.get('result')=={}, {'opcode':op,'id':value.get('id')})
     send_text(sock,json.dumps({'jsonrpc':'2.0','id':3,'method':'tools/list'}))
     op,payload=recv_frame(sock);value=json.loads(payload)
     names={tool['name'] for tool in value.get('result',{}).get('tools',[])}
     check('ws_tools_list',op==1 and {'classify','explain'}<=names,{'opcode':op,'tools':len(names)})
+    sock.close()
+for name,envelope in [
+    ('ws_notification_no_reply',{'jsonrpc':'2.0','method':'notifications/initialized'}),
+    ('ws_client_response_no_reply',{'jsonrpc':'2.0','id':7,'result':{}}),
+]:
+    sock,status=connect(TOKEN)
+    if status==101:
+        send_text(sock,json.dumps(envelope))
+        sock.settimeout(0.5)
+        try:
+            sock.recv(1)
+            no_reply=False
+        except socket.timeout:
+            no_reply=True
+        sock.settimeout(5)
+        alive=False
+        if no_reply:
+            try:
+                send_text(sock,json.dumps({'jsonrpc':'2.0','id':901,'method':'ping'}))
+                op,payload=recv_frame(sock);value=json.loads(payload)
+                alive=op==1 and value.get('id')==901 and value.get('result')=={}
+            except (OSError,EOFError,ValueError):
+                pass
+        check(name,no_reply and alive,{'upgrade':status,'no_reply':no_reply,'recovered':alive})
+    else:
+        check(name,False,{'upgrade':status})
     sock.close()
 if args.max_request_bytes is not None:
     for name,fragmented in [('ws_oversized_frame',False),('ws_oversized_fragmented_message',True)]:

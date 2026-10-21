@@ -71,6 +71,10 @@ The public v0.1.4 executable also passed the 13-case deterministic HTTP
 envelope matrix in `releases/v0.1.4-envelope-matrix.md`, including malformed
 JSON, array input, ID types, notifications, client responses, and recovery.
 This does not cover the custom WebSocket transport or optional SSE behavior.
+The exact same public executable passed the 22-case custom WebSocket envelope
+and lifecycle probe and a fresh official Inspector 2.5.0 client run; see
+`releases/v0.1.4-ws-envelope-matrix.md`. Optional SSE and a broader client
+matrix remain outside the implemented v0.1.4 transport scope.
 
 The stdlib-only `scripts/adversarial_probe.py` is a first HTTP smoke subset. Start a lab server with a temporary token of at least 32 characters, then run:
 
