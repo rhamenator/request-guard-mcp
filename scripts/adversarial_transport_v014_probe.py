@@ -27,7 +27,9 @@ def send(base, token, *, method="POST", body=None, headers=None, authorize=True)
         base.rstrip("/") + "/mcp", data=body, headers=request_headers, method=method
     )
     try:
-        with urllib.request.build_opener(NoRedirect).open(request, timeout=5) as response:
+        with urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect).open(
+            request, timeout=5
+        ) as response:
             return response.status, response.read(65537), response.headers
     except urllib.error.HTTPError as error:
         try:
