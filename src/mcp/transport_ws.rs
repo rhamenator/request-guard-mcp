@@ -335,7 +335,7 @@ pub(crate) async fn process_message(
             state
                 .metrics
                 .requests_total
-                .with_label_values(&[&tool_name, "ok"])
+                .with_label_values(&[tool_name.as_str(), "ok"])
                 .inc();
             let result = if standard_tool_call {
                 let text = serde_json::to_string(&value).unwrap_or_default();
@@ -354,12 +354,12 @@ pub(crate) async fn process_message(
             state
                 .metrics
                 .requests_total
-                .with_label_values(&[&tool_name, "error"])
+                .with_label_values(&[tool_name.as_str(), "error"])
                 .inc();
             state
                 .metrics
                 .tool_errors_total
-                .with_label_values(&[&tool_name, app_err.code()])
+                .with_label_values(&[tool_name.as_str(), app_err.code()])
                 .inc();
             McpMessage::error_from_app(id, &app_err)
         }
@@ -368,7 +368,7 @@ pub(crate) async fn process_message(
             state
                 .metrics
                 .requests_total
-                .with_label_values(&[&tool_name, "timeout"])
+                .with_label_values(&[tool_name.as_str(), "timeout"])
                 .inc();
             McpMessage::error_from_app(id, &AppError::Timeout)
         }
@@ -377,7 +377,7 @@ pub(crate) async fn process_message(
     state
         .metrics
         .request_duration_seconds
-        .with_label_values(&[&tool_name])
+        .with_label_values(&[tool_name.as_str()])
         .observe(latency as f64 / 1000.0);
 
     Some(serialize_message(&response))
