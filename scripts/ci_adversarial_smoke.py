@@ -139,6 +139,25 @@ def main():
             subprocess.run(
                 [
                     sys.executable,
+                    str(ROOT / "scripts/adversarial_envelope_v014_probe.py"),
+                    "--url", f"http://127.0.0.1:{port}",
+                ],
+                input=token + "\n",
+                text=True,
+                env={
+                    **environment,
+                    "HTTP_PROXY": "http://127.0.0.1:9",
+                    "HTTPS_PROXY": "http://127.0.0.1:9",
+                    "ALL_PROXY": "http://127.0.0.1:9",
+                    "NO_PROXY": "",
+                    "no_proxy": "",
+                },
+                check=True,
+                timeout=30,
+            )
+            subprocess.run(
+                [
+                    sys.executable,
                     str(ROOT / "scripts/adversarial_backend_probe.py"),
                     "--url",
                     f"http://127.0.0.1:{port}",
