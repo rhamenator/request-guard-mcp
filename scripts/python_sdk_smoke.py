@@ -18,7 +18,7 @@ import urllib.request
 from urllib.error import HTTPError
 from pathlib import Path
 
-import httpx2
+import httpx2  # required by mcp==2.3.0
 from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 
@@ -48,6 +48,7 @@ async def probe(url, token, expected_version):
                     "ip": "192.0.2.1", "user_agent": "GPTBot/1.0", "path": "/",
                 })
                 require(not result.is_error, "classify returned tool error")
+                require(result.structured_content is not None, "classify omitted structured content")
                 require(result.structured_content["verdict"] == "block", "unexpected verdict")
                 require(result.structured_content["threat_category"] == "ai_scraping", "unexpected category")
                 print("PASS Python MCP SDK: initialize, tools/list, classify")
@@ -74,7 +75,8 @@ def main():
                 if server.poll() is not None:
                     raise RuntimeError("server exited before readiness")
                 try:
-                    urllib.request.urlopen(f"http://127.0.0.1:{port}/health", timeout=1)
+                    with urllib.request.urlopen(f"http://127.0.0.1:{port}/health", timeout=1):
+                        pass
                     break
                 except (OSError, TimeoutError):
                     time.sleep(0.1)
@@ -87,7 +89,8 @@ def main():
                          "Accept": "application/json, text/event-stream"},
             )
             try:
-                urllib.request.urlopen(unauthenticated, timeout=5)
+                with urllib.request.urlopen(unauthenticated, timeout=5):
+                    pass
             except HTTPError as error:
                 require(error.code == 401, f"expected 401 without bearer, got {error.code}")
             else:
