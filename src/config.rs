@@ -256,6 +256,8 @@ impl Config {
             // HTTP authentication as active through config_snapshot.
             cfg.auth.enabled = false;
             cfg.auth.tokens.clear();
+            cfg.auth.allowed_origins.clear();
+            cfg.auth.cache_scope_hmac_key = None;
             // PostgreSQL rows do not expire. The process-unique stdio scope
             // would leave unreachable rows after every launch.
             if cfg.postgres.url.is_some() {
@@ -286,12 +288,13 @@ impl Config {
     }
 
     fn validate_for_transport(&self, stdio: bool) -> Result<()> {
-        if self.auth.allowed_origins.len() > 32
-            || self
-                .auth
-                .allowed_origins
-                .iter()
-                .any(|origin| !crate::mcp::origin::valid_origin(origin))
+        if !stdio
+            && (self.auth.allowed_origins.len() > 32
+                || self
+                    .auth
+                    .allowed_origins
+                    .iter()
+                    .any(|origin| !crate::mcp::origin::valid_origin(origin)))
         {
             anyhow::bail!("MCP_ALLOWED_ORIGINS must contain at most 32 exact http(s) origins without paths or wildcards");
         }
@@ -313,11 +316,12 @@ impl Config {
                 "authentication may only be disabled when MCP__HOST is a loopback address"
             );
         }
-        if self
-            .auth
-            .cache_scope_hmac_key
-            .as_deref()
-            .is_some_and(|key| key.len() < 32)
+        if !stdio
+            && self
+                .auth
+                .cache_scope_hmac_key
+                .as_deref()
+                .is_some_and(|key| key.len() < 32)
         {
             anyhow::bail!("CACHE_SCOPE_HMAC_KEY must contain at least 32 bytes when configured");
         }
@@ -658,6 +662,11 @@ mod tests {
         let mut invalid = config;
         invalid.limits.max_request_bytes = 0;
         assert!(invalid.validate_for_transport(true).is_err());
+        invalid.limits.max_request_bytes = 1024;
+        invalid.auth.allowed_origins = vec!["https://invalid.example/path".to_string()];
+        invalid.auth.cache_scope_hmac_key = Some("short".to_string());
+        assert!(invalid.validate().is_err());
+        assert!(invalid.validate_for_transport(true).is_ok());
     }
 
     #[test]

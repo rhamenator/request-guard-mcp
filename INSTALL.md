@@ -44,8 +44,9 @@ For a local development build, set the MCP client's command to the absolute
 path of `request-guard-mcp` and its arguments to `["--stdio"]`. The client
 owns the child process and exchanges one JSON-RPC message per line over its
 stdin/stdout; logs go to stderr. No TCP listener starts. Process access is
-the trust boundary: `AUTH_TOKENS`, `MCP__HOST`, and `MCP__PORT` do not secure
-or configure the stdio channel. Keep the executable and client configuration
+the trust boundary: `AUTH_TOKENS`, `MCP_ALLOWED_ORIGINS`,
+`CACHE_SCOPE_HMAC_KEY`, `MCP__HOST`, and `MCP__PORT` do not secure or configure
+the stdio channel. Keep the executable and client configuration
 accessible only to trusted local users. Explicit environment variables and
 `CONFIG_FILE` still configure optional backends; automatic `.env` discovery
 is disabled in stdio mode. PostgreSQL is currently rejected in this mode
