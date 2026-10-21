@@ -16,7 +16,7 @@ python3 scripts/inspector_smoke.py target/release/request-guard-mcp
 ```
 
 The smoke script starts the binary on a temporary loopback port with a random
-bearer token, installs `@modelcontextprotocol/inspector@2.5.0` in a temporary
+bearer token, installs `@modelcontextprotocol/inspector@2.11.0` in a temporary
 directory with npm, then invokes its CLI entrypoint with Node.js using
 `--cli --transport http --method ... --format json`. It checks the 2025-06-18
 initialize response, missing-token rejection, all advertised tool definitions, a `classify` structured
@@ -24,6 +24,25 @@ verdict, and an `explain` result with contributing factors. It exits nonzero
 if any step fails. Node.js 22.19.0 or newer, npm, and package registry access (or a cached
 Inspector package) are required. No Redis, PostgreSQL, MaxMind data, or
 application credential is needed for these two core tools.
+
+The active smoke pin is Inspector 2.11.0. Its package declares
+`@modelcontextprotocol/client@2.3.1`, replacing the 2.0.0 client declared by
+the earlier Inspector 2.5.0 pin. The smoke installation disables npm lifecycle
+scripts. On 2026-10-21, a fresh 2.11.0 install resolved client 2.3.1 and
+`npm audit` reported zero vulnerabilities with Node.js 22.20.0 and npm
+11.19.1. This is a point-in-time observation: the Inspector version is fixed,
+but its transitive dependency tree is installed without a committed lockfile
+and can change on a later run. The registry reported Node.js >=22.19.0 for
+Inspector 2.11.0. Against the exact public v0.1.5
+Linux x64 executable (SHA256
+`2c68a15272619d9b2240303815f4dcf61bc283eac3d022deb3227ea17711e25f`),
+the updated smoke passed missing-token rejection, initialize at 2025-06-18,
+23-tool listing, `classify`, and `explain`. Earlier 2.5.0 results below are
+historical observations, not the active CI dependency.
+The same five checks passed inside the pinned Alpine 3.24.2 container on the
+exact public v0.1.5 musl binary. That run's Alpine packages supplied Node.js
+24.18.1 and npm 11.12.1; the smoke script enforced its >=22.19.0 Node floor.
+Alpine package versions can change even though the base-image digest is fixed.
 
 ## Observed on 2026-10-18
 

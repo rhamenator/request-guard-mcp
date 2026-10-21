@@ -22,7 +22,10 @@ or custom WebSocket, configure a unique `AUTH_TOKENS` bearer token of at least
 32 characters, start the server, and connect the client to `/mcp` with that
 token. Confirm
 `tools/list` includes `classify` and `explain` before using the skill. Release
-CI runs official MCP Inspector 2.5.0 against the native bundles. The exact
+The release workflow is configured to run official MCP Inspector 2.11.0 on
+future native bundles. Published v0.1.5 bundles were built with the prior
+2.5.0 smoke; a separate 2.11.0 smoke passed on the exact public Linux x64
+binary. The exact
 public v0.1.4 Linux binary also passed deterministic HTTP and custom WebSocket
 envelope probes; check any other chosen client separately. Optional SSE is
 not implemented. Redis, PostgreSQL, and MaxMind data are optional for core

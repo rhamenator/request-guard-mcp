@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Run the pinned official MCP Inspector against a locally installed server binary.
 
-Requires Node.js/npm and network access or an npm cache containing Inspector 2.5.0.
+Requires Node.js/npm and network access or an npm cache containing Inspector 2.11.0.
 No application credentials or backend services are needed; a temporary test token
 is generated for the loopback listener.
 """
@@ -23,7 +23,7 @@ from urllib.error import HTTPError
 from pathlib import Path
 
 
-INSPECTOR = "@modelcontextprotocol/inspector@2.5.0"
+INSPECTOR = "@modelcontextprotocol/inspector@2.11.0"
 
 
 def require(condition: bool, message: str) -> None:
@@ -36,7 +36,7 @@ def check_node_version() -> None:
                                timeout=10, check=True)
     match = re.fullmatch(r"v(\d+)\.(\d+)\.(\d+)", completed.stdout.strip())
     require(match is not None and tuple(map(int, match.groups())) >= (22, 19, 0),
-            "MCP Inspector 2.5.0 requires Node.js >=22.19.0")
+            "MCP Inspector 2.11.0 requires Node.js >=22.19.0")
 
 
 def free_loopback_port() -> int:
