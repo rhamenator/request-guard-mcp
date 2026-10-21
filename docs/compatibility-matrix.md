@@ -17,6 +17,21 @@ and custom WebSocket envelope cases were also exercised against the exact
 public v0.1.4 binary; optional transports and broader client coverage are
 tracked in issue #121.
 
+The official Python MCP SDK 2.3.0 also completed authenticated Streamable
+HTTP `initialize`, `tools/list`, and `classify` against the public Linux x64
+v0.1.4 binary (SHA256 `e1863970dc8fdc96bb861af667bf7bc3f52810b2319190f8f2c192b033ab0fd5`).
+The reproducible [client probe](../scripts/python_sdk_smoke.py) uses a local
+listener and synthetic bearer token. The SDK tolerates the server's 405 for
+SSE GET. This verifies that specific SDK path; it does not add SSE GET, stdio,
+or session support. To repeat it in a disposable Python virtual environment:
+
+```sh
+pip install 'mcp==2.3.0'
+python scripts/python_sdk_smoke.py --binary /path/to/request-guard-mcp --expected-version 0.1.4
+```
+
+The probe also checks that a request without the bearer token receives HTTP 401.
+
 For v0.1.4 HTTP POST, send `Content-Type: application/json` and
 `Accept: application/json, text/event-stream`. The server returns JSON for
 requests and rejects an explicit unsupported content type with 415 or an
@@ -95,7 +110,7 @@ Fallback is triggered when:
 | Version | Transport | Supported |
 |---------|-----------|-----------|
 | 2025-06-18 | WebSocket JSON-RPC (custom client transport) | Implemented; 22-case packaged-binary envelope probe passed; broader client matrix open |
-| 2025-06-18 | HTTP POST JSON-RPC | Inspector 2.5.0 and 13-case packaged-binary envelope probe passed |
+| 2025-06-18 | HTTP POST JSON-RPC | Inspector 2.5.0, Python MCP SDK 2.3.0, and 13-case packaged-binary envelope probe passed |
 | 2025-06-18 | stdio, SSE GET, gRPC | Not implemented; v0.1.4 returns 405 for authenticated, ordinary GET `/mcp` |
 
 The [pinned MCP transport revision](https://modelcontextprotocol.io/specification/2025-06-18/basic/transports#sending-messages-to-the-server)
