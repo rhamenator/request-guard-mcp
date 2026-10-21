@@ -12,8 +12,9 @@ policy, or guard the agent's outbound fetches. Stable release readiness still
 depends on the repository's adversarial release gate.
 
 For v0.1.5, install the matching native release bundle and follow its bundled
-`INSTALL.md`. Install `request-guard-mcp@0.1.5` from npm only after that exact
-version appears in the registry; v0.1.4 on npm lacks stdio. Linux x64 has
+`INSTALL.md`, or install the verified `request-guard-mcp@0.1.5` npm package.
+The npm package passed a fresh public-registry Inspector and stdio smoke;
+v0.1.4 on npm lacks stdio. Linux x64 has
 separate glibc and musl/Alpine bundles;
 Windows x64, macOS Intel, and macOS Apple Silicon are also packaged. Verify
 native archive checksums. The skill ZIP contains instructions only. For HTTP

@@ -10,7 +10,7 @@
 
 A **Rust MCP (Model Context Protocol) server** for request risk classification, enrichment, and abuse-signal analysis. The official MCP Inspector can call its tools over HTTP POST; custom WebSocket clients can use the JSON-RPC endpoint. Client support depends on transport and authentication compatibility. The `ai-scraping-defense` projects are optional clients. Stable release readiness is subject to the [adversarial release gate](docs/adversarial-release-gate.md).
 
-The experimental [v0.1.5 native release](https://github.com/rhamenator/request-guard-mcp/releases/tag/v0.1.5) includes checksum-protected binaries for Linux x64 (glibc and musl/Alpine), Windows x64, macOS Intel, and macOS Apple Silicon. Follow [INSTALL.md](INSTALL.md) for native setup. The [npm guide](docs/npm-release.md#install-and-connect) explains registry installation; use an exact matching package version when it is published, since v0.1.4 does not contain stdio.
+The experimental [v0.1.5 native release](https://github.com/rhamenator/request-guard-mcp/releases/tag/v0.1.5) includes checksum-protected binaries for Linux x64 (glibc and musl/Alpine), Windows x64, macOS Intel, and macOS Apple Silicon. Follow [INSTALL.md](INSTALL.md) for native setup. The matching [npm package](https://www.npmjs.com/package/request-guard-mcp/v/0.1.5) is also published; see the [npm guide](docs/npm-release.md#install-and-connect). v0.1.4 does not contain stdio.
 
 The v0.1.5 release retains the Linux x64 musl archive for Alpine and the [PostgreSQL TLS behavior qualified for v0.1.4](docs/releases/v0.1.4-postgres-tls-evidence.md). Choose `linux-x64-musl` on Alpine and `linux-x64` on glibc hosts.
 
@@ -157,10 +157,10 @@ companion skill locally with `python3 scripts/package_skill.py` if you need a
 directory listing ZIP; GitHub releases do not include that ZIP.
 
 The [`request-guard-mcp` npm package](https://www.npmjs.com/package/request-guard-mcp)
-is a separate native installation option. A fresh registry install of 0.1.4
+is a separate native installation option. A fresh registry install of 0.1.5
 passed official MCP Inspector initialization, tool listing, `classify`, and
-`explain`; that version has no stdio. Use npm 0.1.5 only after the matching
-registry package is verified. See the [npm release guide](docs/npm-release.md).
+`explain`, plus the bounded stdio smoke on Linux x64. v0.1.4 has no stdio. See the
+[npm release guide](docs/npm-release.md).
 
 ## Docker
 
