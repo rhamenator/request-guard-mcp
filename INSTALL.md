@@ -36,17 +36,12 @@ to `/mcp` receives 405 because this server does not offer an SSE stream.
 
 For a remote client, use a trusted TLS endpoint in front of the server and
 restrict who can reach it. Do not send the bearer token over plain HTTP across
-an untrusted network. The published v0.1.4 server does not offer stdio or SSE GET transport.
-Development main adds a candidate `--stdio` mode for v0.1.5. It is not in
-the published v0.1.4 installers or npm package. Private, unpublished candidate
-bundles passed stdio smoke on all five platforms; an official Python SDK
-client and an offline npm install assembled from those private bundles passed
-on Linux. Buyers cannot obtain that candidate from the public release or npm
-registry. A final public v0.1.5 tag is still required before treating this as
-an installable release.
+an untrusted network. v0.1.5 also offers process-local `--stdio`; v0.1.4 does
+not. Neither release offers SSE GET.
 
-For a local development build, set the MCP client's command to the absolute
-path of `request-guard-mcp` and its arguments to `["--stdio"]`. The client
+For a local v0.1.5 native installation, set the MCP client's command to the
+absolute path of the extracted `request-guard-mcp` executable (or
+`request-guard-mcp.exe` on Windows) and its arguments to `["--stdio"]`. The client
 owns the child process and exchanges one JSON-RPC message per line over its
 stdin/stdout; logs go to stderr. No TCP listener starts. Process access is
 the trust boundary: `AUTH_TOKENS`, `MCP_ALLOWED_ORIGINS`,

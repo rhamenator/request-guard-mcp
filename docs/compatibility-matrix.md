@@ -7,9 +7,9 @@ custom WebSocket clients can use the same path. The server implements
 `initialize`, `ping`, `tools/list`, and `tools/call` while retaining direct
 tool methods. The handshake revision is `2025-06-18`; if a client offers a
 different revision, `initialize` counter-offers that version and the client
-must decide whether it can continue. The published v0.1.4 server does not implement the
-`2026-07-28` discovery lifecycle, stdio, OAuth discovery, SSE GET, resources,
-or prompts. MCP Inspector 2.5.0 smoke passed in the
+must decide whether it can continue. v0.1.5 adds process-local stdio but does
+not implement the `2026-07-28` discovery lifecycle, OAuth discovery, SSE GET,
+resources, or prompts. MCP Inspector 2.5.0 smoke passed in the
 [five-platform v0.1.4 release evidence](releases/v0.1.4-postgres-tls-evidence.md),
 including the packaged Alpine binary; see also the
 [interoperability evidence](inspector-interoperability.md). The supported HTTP
@@ -32,7 +32,7 @@ python scripts/python_sdk_smoke.py --binary /path/to/request-guard-mcp --expecte
 
 The probe also checks that a request without the bearer token receives HTTP 401.
 
-For v0.1.4 HTTP POST, send `Content-Type: application/json` and
+For v0.1.4 and later HTTP POST, send `Content-Type: application/json` and
 `Accept: application/json, text/event-stream`. The server returns JSON for
 requests and rejects an explicit unsupported content type with 415 or an
 explicit `Accept` excluding JSON with 406. After initialization, send
@@ -111,13 +111,12 @@ Fallback is triggered when:
 |---------|-----------|-----------|
 | 2025-06-18 | WebSocket JSON-RPC (custom client transport) | Implemented; 22-case packaged-binary envelope probe passed; broader client matrix open |
 | 2025-06-18 | HTTP POST JSON-RPC | Inspector 2.5.0, Python MCP SDK 2.3.0, and 13-case packaged-binary envelope probe passed |
-| 2025-06-18 | stdio | Not in published v0.1.4; development v0.1.5 candidate passed official Python SDK 2.3.0, private packaged smoke on five platforms, and clean npm launcher smoke on Linux |
+| 2025-06-18 | stdio | v0.1.5 native; official Python SDK 2.3.0, private packaged smoke on five platforms, and clean npm launcher smoke on Linux passed before release; absent from v0.1.4 |
 | 2025-06-18 | SSE GET, gRPC | Not implemented; v0.1.4 returns 405 for authenticated, ordinary GET `/mcp` |
 
-Development main implements a v0.1.5 `--stdio` candidate. It is process-local
-and trusts the launching user instead of a bearer token. It does not change
-published v0.1.4 or add SSE GET support. See the
-[development setup](../INSTALL.md) and [private candidate evidence](releases/v0.1.5-stdio-candidate.md).
+v0.1.5 adds process-local `--stdio`, which trusts the launching user instead
+of a bearer token. It does not add SSE GET support. See the
+[native setup](../INSTALL.md) and [private pre-release evidence](releases/v0.1.5-stdio-candidate.md).
 
 The [pinned MCP transport revision](https://modelcontextprotocol.io/specification/2025-06-18/basic/transports#sending-messages-to-the-server)
 requires 202 with no body for accepted client notifications and responses;
