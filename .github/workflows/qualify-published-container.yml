@@ -1,0 +1,44 @@
+name: Qualify Published Container
+
+on:
+  workflow_dispatch:
+    inputs:
+      digest:
+        description: "Immutable GHCR index digest (sha256: followed by 64 lowercase hex characters)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  native-smoke:
+    name: Published container smoke (${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Smoke exact published index digest on native runner
+        env:
+          DIGEST: ${{ inputs.digest }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          python3 scripts/smoke_native_container.py \
+            --image "ghcr.io/rhamenator/request-guard-mcp@$DIGEST" --arch "$ARCH"
+          printf 'Published index %s passed native %s bounded smoke\n' "$DIGEST" "$ARCH" >> "$GITHUB_STEP_SUMMARY"

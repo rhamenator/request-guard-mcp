@@ -46,7 +46,7 @@ def wait_for_listener(host: str, port: int, name: str, token: str) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--image", required=True, help="immutable GHCR platform digest")
+    parser.add_argument("--image", required=True, help="immutable GHCR index or platform digest")
     parser.add_argument("--arch", required=True, choices=("amd64", "arm64"))
     args = parser.parse_args()
     if not IMAGE_RE.fullmatch(args.image):

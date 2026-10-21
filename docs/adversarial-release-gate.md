@@ -94,6 +94,16 @@ bridge network. This checks native arm64 execution in CI, but it does not
 retroactively qualify the published v0.1.5 arm64 image or replace the full
 candidate adversarial gate.
 
+For an already published index, run the manual **Qualify Published Container**
+workflow with its exact `sha256:` index digest. It pulls the same immutable
+index on native amd64 and arm64 runners, verifies the selected image
+architecture, and runs the same 51 bounded HTTP/WebSocket/classifier cases.
+For example, `gh workflow run qualify-published-container.yml -f
+digest=sha256:...` uses the workflow on the default branch; record the run URL,
+workflow commit, digest, and both job results with the release evidence. This
+is a client and classifier smoke, not a substitute for backend outages, TLS,
+resource exhaustion, or independent stable-release review.
+
 The stdlib-only `scripts/adversarial_probe.py` is a first HTTP smoke subset. Start a lab server with a temporary token of at least 32 characters, then run:
 
 ```bash
