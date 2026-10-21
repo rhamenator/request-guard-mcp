@@ -7,15 +7,28 @@ custom WebSocket clients can use the same path. The server implements
 `initialize`, `ping`, `tools/list`, and `tools/call` while retaining direct
 tool methods. The handshake revision is `2025-06-18`; if a client offers a
 different revision, `initialize` counter-offers that version and the client
-must decide whether it can continue. v0.1.5 adds process-local stdio but does
+must decide whether it can continue. v0.1.5 includes process-local stdio but does
 not implement the `2026-07-28` discovery lifecycle, OAuth discovery, SSE GET,
-resources, or prompts. MCP Inspector 2.5.0 smoke passed in the
-[five-platform v0.1.4 release evidence](releases/v0.1.4-postgres-tls-evidence.md),
-including the packaged Alpine binary; see also the
-[interoperability evidence](inspector-interoperability.md). The supported HTTP
+resources, or prompts. Current Inspector 2.11.0 smoke passed against the
+published v0.1.5 glibc and musl binaries; earlier Inspector 2.5.0 smoke passed
+in the [five-platform v0.1.4 release evidence](releases/v0.1.4-postgres-tls-evidence.md).
+See the [interoperability evidence](inspector-interoperability.md). The supported HTTP
 and custom WebSocket envelope cases were also exercised against the exact
 public v0.1.4 binary; optional transports and broader client coverage are
 tracked in issue #121.
+
+### v1 transport scope decision
+
+The pinned [MCP 2025-06-18 transport specification](https://modelcontextprotocol.io/specification/2025-06-18/basic/transports)
+allows a single JSON response to POST, HTTP 405 when no SSE GET stream is
+offered, and optional session IDs and event resumption. Request Guard's MCP
+HTTP transport uses a stateless JSON POST/405 GET request-response profile,
+process-local stdio, and a separately documented custom WebSocket transport.
+SSE POST/GET streaming, sessions, and resumption are deferred until a supported
+client or workflow demonstrates a need. This is a supported-scope decision,
+not a claim that every MCP client or optional transport is compatible. Clients
+requiring an SSE stream, server-initiated messages, or session resumption need
+a different server or a separately tested future Request Guard version.
 
 The official Python MCP SDK 2.3.0 also completed authenticated Streamable
 HTTP `initialize`, `tools/list`, and `classify` against the public Linux x64
@@ -101,9 +114,10 @@ If the MCP server is unavailable, clients should fall back to their local non-MC
 | `ai-scraping-defense-iis` | Built-in .NET rule engine (`AiDefense.Classifier`) |
 | `ai-scraping-defense-rust` | Local Rust provider/router behavior |
 
-Fallback is triggered when:
-- WebSocket connection fails after 3 retries with exponential backoff
-- MCP server returns `TIMEOUT` or `INTERNAL_ERROR` for 5 consecutive requests
+Suggested client-side fallback triggers are three failed WebSocket connection
+attempts with exponential backoff, or five consecutive `TIMEOUT` or
+`INTERNAL_ERROR` results. These are deployment examples, not behavior supplied
+by Request Guard or verified for every current revision of those clients.
 
 ## Transport Protocol
 
@@ -159,8 +173,19 @@ return synthetic success data.
 
 ## Tested Client Versions
 
-| Client | Version | Status |
-|--------|---------|--------|
-| `ai-scraping-defense` | main | ✅ Compatible |
-| `ai-scraping-defense-iis` | main | ✅ Compatible |
-| `ai-scraping-defense-rust` | main | ✅ Compatible |
+| Client | Version and transport | Observed public-release scope |
+|--------|-----------------------|-------------------------------|
+| MCP Inspector | 2.11.0, HTTP POST | Published v0.1.5 glibc and musl: authentication, initialization, tool discovery, classify and explain. See [Inspector evidence](inspector-interoperability.md). |
+| Python MCP SDK | 2.3.0, stdio | Published v0.1.5 Linux x64: bounded initialize/tool smoke. See [public qualification](releases/v0.1.5-public-qualification.md). Its authenticated HTTP POST path was separately tested against public v0.1.4. |
+| Claude Code | 2.1.301, stdio | One `classify` call against public v0.1.5 Linux x64 on synthetic metadata. The trace did not expose initialization or negotiated protocol version. See [client evidence](releases/v0.1.5-claude-code-stdio.md). |
+| Cursor Agent CLI | 2026.10.19-6bbf2c4, stdio | One `classify` call against public v0.1.5 Linux x64 on synthetic metadata. This noninteractive test required `--trust --force`; the raw trace is local and maintainer-attested, and initialization/protocol revision were not visible. See [client evidence](releases/v0.1.5-cursor-cli-stdio.md). |
+
+The AI Scraping Defense configurations above show optional integration
+settings. They do not establish that every current `main` revision of those
+projects was exercised against the exact public v0.1.5 server. Claude Code
+and Cursor evidence does not establish their GUI, HTTP, cancellation,
+cross-platform, or all-tool behavior. Those stdio client tests used the
+launching process as the trust boundary, without an HTTP bearer token. The
+custom WebSocket endpoint has scripted protocol-probe evidence; it is not
+advertised as a standard transport automatically supported by arbitrary MCP
+clients.
