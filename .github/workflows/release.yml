@@ -145,6 +145,12 @@ jobs:
             --artifacts artifacts \
             --binary "request-guard-mcp${{ matrix.suffix }}" \
             --port 18766
+      - name: Smoke test packaged stdio transport
+        shell: bash
+        run: |
+          python scripts/stdio_release_smoke.py \
+            --binary "verified-release/request-guard-mcp-${RELEASE_VERSION}-${{ matrix.platform }}/request-guard-mcp${{ matrix.suffix }}" \
+            --expected-version "$(python -c 'import tomllib; print(tomllib.load(open("Cargo.toml", "rb"))["package"]["version"])')"
       - name: Smoke test musl binary in Alpine
         if: matrix.target == 'x86_64-unknown-linux-musl'
         shell: bash
