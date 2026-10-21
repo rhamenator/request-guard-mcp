@@ -59,10 +59,13 @@ The bounded Nmap and Nikto on-wire request counts and capture method are in
 `adversarial-scanner-counts-kali-ubuntu-2026-10-19.md`.
 The independent cross-project scanner/path evasion corpus, black-box misses,
 and HTTP regression results are in `adversarial-classifier-parity-2026-10-19.md`.
-The bounded 63-second slow-header saturation run, including per-cycle recovery,
-server RSS, and sampled host load/I/O pressure, is in
-`adversarial-sustained-exhaustion-2026-10-19.md`. It is host-side evidence;
-packaged next-release and cross-VM retests remain pending.
+The initial bounded 63-second slow-header saturation run, including per-cycle
+recovery, server RSS, and sampled host load/I/O pressure, is in
+`adversarial-sustained-exhaustion-2026-10-19.md`. The public v0.1.4 archive
+was later tested from Kali against Ubuntu, with packaged-binary saturation,
+scanner counts, transport probes, and residual limits recorded in
+`releases/v0.1.4-kali-ubuntu-adversarial.md`. Independent review and the
+remaining issue #118 release decision are still pending.
 
 The stdlib-only `scripts/adversarial_probe.py` is a first HTTP smoke subset. Start a lab server with a temporary token of at least 32 characters, then run:
 
