@@ -58,7 +58,11 @@ For a future approved npm release, after its native assets are published:
 3. Run `npm pack --dry-run --json` in the generated directory and inspect its
    file list. Install the resulting tarball into a clean temporary npm prefix,
    start the packaged command with a fresh bearer token, and repeat the HTTP
-   MCP Inspector smoke test against that installed command.
+   MCP Inspector smoke test against that installed command. For v0.1.5 and
+   later, also run `python3 scripts/stdio_release_smoke.py --binary <installed-command>
+   --expected-version <version>` against the clean install. Verify the npm
+   launcher forwards the caller's `--stdio` flag and keeps protocol output free
+   of diagnostics.
 4. Confirm the npm account owns the intended package name, configure npm
    publishing credentials or trusted publishing, and publish the matching
    version only after its release is approved. Verify the published tarball
