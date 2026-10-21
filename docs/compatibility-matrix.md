@@ -74,9 +74,9 @@ when operating that version.
 
 The Python adapter's bare `MODEL_URI=mcp://primary/classify` wraps request
 fields under `input`. A public v0.1.5 probe returned `allow` without
-examining the intended fields. Until the client-side mapping fix in
-[AI Scraping Defense PR #1848](https://github.com/rhamenator/ai-scraping-defense/pull/1848)
-is merged and installed, call the existing `call_mcp_tool()` helper with
+examining the intended fields. Until an installation contains the fix from
+[AI Scraping Defense PR #1848](https://github.com/rhamenator/ai-scraping-defense/pull/1848),
+call the existing `call_mcp_tool()` helper with
 top-level request fields instead of using that bare `MODEL_URI`:
 
 ```dotenv
