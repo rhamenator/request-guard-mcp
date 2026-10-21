@@ -19,9 +19,11 @@ native archive checksums. The skill ZIP contains instructions only. Configure
 a unique `AUTH_TOKENS` bearer token of at least 32 characters, start the
 server, and connect an HTTP POST MCP client to `/mcp` with that token. Confirm
 `tools/list` includes `classify` and `explain` before using the skill. Release
-CI runs official MCP Inspector 2.5.0 against the native bundles; check your
-chosen client separately. Redis, PostgreSQL, and MaxMind data are optional for
-core tools but required by some additional tools and may incur costs.
+CI runs official MCP Inspector 2.5.0 against the native bundles. The exact
+public v0.1.4 Linux binary also passed deterministic HTTP and custom WebSocket
+envelope probes; check any other chosen client separately. Optional SSE and
+stdio transports are not implemented. Redis, PostgreSQL, and MaxMind data are
+optional for core tools but required by some additional tools and may incur costs.
 The earlier v0.1.3 release supports
 standard MCP initialization and tool calls but predates the v0.1.4 Origin,
 HTTP status/header, JSON-RPC envelope, and PostgreSQL native CA changes below.

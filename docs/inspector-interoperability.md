@@ -71,6 +71,15 @@ uploaded as a release or marketplace package.
 
 ## Current client limits
 
+On 2026-10-20 (America/Detroit), the pinned Inspector 2.5.0 was freshly
+installed and run against the exact public v0.1.4 Linux x64 executable
+(SHA-256 `e1863970dc8fdc96bb861af667bf7bc3f52810b2319190f8f2c192b033ab0fd5`)
+with `--expected-version 0.1.4`. Missing bearer rejection, initialize at
+`2025-06-18`, 23-tool listing, `classify`, and `explain` all passed. The
+HTTP and custom WebSocket envelope matrices are recorded in
+`releases/v0.1.4-envelope-matrix.md` and
+`releases/v0.1.4-ws-envelope-matrix.md`.
+
 The server offers HTTP POST JSON-RPC and a custom WebSocket JSON-RPC endpoint.
 It does not provide stdio, SSE GET streaming, OAuth discovery, resources,
 prompts, or the 2026-07-28 `server/discover` lifecycle. Tool availability may

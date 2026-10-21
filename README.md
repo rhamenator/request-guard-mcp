@@ -42,8 +42,10 @@ To package the skill for a directory listing, run `python3 scripts/package_skill
 v0.1.4 supports authenticated HTTP POST JSON-RPC and a custom WebSocket
 transport on `/mcp`. It does not offer stdio, SSE GET, OAuth discovery,
 resources, or prompts. An authenticated ordinary GET to `/mcp` returns 405;
-WebSocket upgrades remain available. The full Streamable HTTP conformance
-work continues in [issue #59](https://github.com/rhamenator/request-guard-mcp/issues/59).
+WebSocket upgrades remain available. The HTTP and custom WebSocket JSON-RPC
+envelopes have [packaged-binary regression evidence](docs/releases/v0.1.4-ws-envelope-matrix.md)
+for the supported flows. Optional streaming transports and a broader client
+matrix are tracked in [issue #121](https://github.com/rhamenator/request-guard-mcp/issues/121).
 
 For HTTP POST, send `Content-Type: application/json` and
 `Accept: application/json, text/event-stream`. An explicit unsupported
