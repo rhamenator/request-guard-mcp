@@ -76,6 +76,15 @@ and lifecycle probe and a fresh official Inspector 2.5.0 client run; see
 `releases/v0.1.4-ws-envelope-matrix.md`. Optional SSE and a broader client
 matrix remain outside the implemented v0.1.4 transport scope.
 
+The published v0.1.5 Linux amd64 GHCR image passed authenticated MCP,
+malformed-envelope, classifier, connection-cap, and 63-second bounded
+slow-header saturation probes. Its bounded container logs were checked for
+absence of the synthetic bearer. The index also contains an arm64
+manifest and linked attestations; runtime execution in this run was amd64.
+See `releases/v0.1.5-public-ghcr-adversarial.md`. This adds to the v0.1.5
+public native, Kali-to-Ubuntu, backend, and TLS evidence, but does not close
+the stable v1.0 gate in issue #125.
+
 The stdlib-only `scripts/adversarial_probe.py` is a first HTTP smoke subset. Start a lab server with a temporary token of at least 32 characters, then run:
 
 ```bash
