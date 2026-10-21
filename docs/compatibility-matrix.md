@@ -111,12 +111,14 @@ Fallback is triggered when:
 |---------|-----------|-----------|
 | 2025-06-18 | WebSocket JSON-RPC (custom client transport) | Implemented; 22-case packaged-binary envelope probe passed; broader client matrix open |
 | 2025-06-18 | HTTP POST JSON-RPC | Inspector 2.5.0, Python MCP SDK 2.3.0, and 13-case packaged-binary envelope probe passed |
-| 2025-06-18 | stdio | v0.1.5 native; official Python SDK 2.3.0, private packaged smoke on five platforms, and clean npm launcher smoke on Linux passed before release; absent from v0.1.4 |
+| 2025-06-18 | stdio | v0.1.5 native; official Python SDK 2.3.0, private packaged smoke on five platforms, and clean npm launcher smoke on Linux passed. One Claude Code 2.1.301 `classify` call against the exact public Linux x64 binary also succeeded; its negotiated protocol revision was not captured. Absent from v0.1.4. |
 | 2025-06-18 | SSE GET, gRPC | Not implemented; v0.1.4 returns 405 for authenticated, ordinary GET `/mcp` |
 
 v0.1.5 adds process-local `--stdio`, which trusts the launching user instead
 of a bearer token. It does not add SSE GET support. See the
 [native setup](../INSTALL.md) and [private pre-release evidence](releases/v0.1.5-stdio-candidate.md).
+The bounded public-binary Claude Code client result and its limits are in
+[v0.1.5 Claude Code stdio evidence](releases/v0.1.5-claude-code-stdio.md).
 
 The [pinned MCP transport revision](https://modelcontextprotocol.io/specification/2025-06-18/basic/transports#sending-messages-to-the-server)
 requires 202 with no body for accepted client notifications and responses;
