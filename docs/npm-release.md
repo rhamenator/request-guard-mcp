@@ -61,7 +61,8 @@ For a future approved npm release, after its native assets are published:
    MCP Inspector smoke test against that installed command. For v0.1.5 and
    later, also run `scripts/stdio_release_smoke.py --binary <installed-command>
    --expected-version <version>` against the clean install. Verify the npm
-   launcher passes `--stdio` and keeps protocol output free of diagnostics.
+   launcher forwards the caller's `--stdio` flag and keeps protocol output free
+   of diagnostics.
 4. Confirm the npm account owns the intended package name, configure npm
    publishing credentials or trusted publishing, and publish the matching
    version only after its release is approved. Verify the published tarball
