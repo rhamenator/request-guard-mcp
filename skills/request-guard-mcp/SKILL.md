@@ -11,23 +11,23 @@ It does not include the server binary, intercept live traffic, enforce a site
 policy, or guard the agent's outbound fetches. Stable release readiness still
 depends on the repository's adversarial release gate.
 
-For v0.1.4, install the matching native release bundle and follow its bundled
-`INSTALL.md`, or install the published npm package with
-`npm install -g request-guard-mcp@0.1.4`. Linux x64 has separate glibc and musl/Alpine bundles;
+For v0.1.5, install the matching native release bundle and follow its bundled
+`INSTALL.md`. Install `request-guard-mcp@0.1.5` from npm only after that exact
+version appears in the registry; v0.1.4 on npm lacks stdio. Linux x64 has
+separate glibc and musl/Alpine bundles;
 Windows x64, macOS Intel, and macOS Apple Silicon are also packaged. Verify
-native archive checksums. The skill ZIP contains instructions only. Configure
-a unique `AUTH_TOKENS` bearer token of at least 32 characters, start the
-server, and connect an HTTP POST MCP client to `/mcp` with that token. Confirm
+native archive checksums. The skill ZIP contains instructions only. For HTTP
+or custom WebSocket, configure a unique `AUTH_TOKENS` bearer token of at least
+32 characters, start the server, and connect the client to `/mcp` with that
+token. Confirm
 `tools/list` includes `classify` and `explain` before using the skill. Release
 CI runs official MCP Inspector 2.5.0 against the native bundles. The exact
 public v0.1.4 Linux binary also passed deterministic HTTP and custom WebSocket
-envelope probes; check any other chosen client separately. Optional SSE and
-stdio transports are not implemented in v0.1.4. Redis, PostgreSQL, and MaxMind data are
-optional for core tools but required by some additional tools and may incur costs.
-Development main contains a tested candidate `--stdio` mode for v0.1.5, but it
-is not in the published v0.1.4 skill/server pair. To test it before release,
-build development main from source with `cargo build --locked --release`; set
-the local client's command to that built executable and its arguments to
+envelope probes; check any other chosen client separately. Optional SSE is
+not implemented. Redis, PostgreSQL, and MaxMind data are optional for core
+tools but required by some additional tools and may incur costs.
+For a local stdio client on v0.1.5, set the client's command to the installed
+native executable and its arguments to
 `["--stdio"]`, then verify
 `tools/list` before using this skill. The client owns the child process;
 stdin/stdout carry one JSON-RPC message per line and diagnostics go to stderr.
@@ -35,17 +35,17 @@ No HTTP listener or bearer token protects this channel, so grant process and
 environment access only to trusted local users. Automatic `.env` discovery
 is disabled; pass optional configuration explicitly. Calls are sequential;
 there is no request cancellation or session resumption. PostgreSQL integration
-is unavailable in candidate stdio mode. Private five-platform packaged smoke,
+is unavailable in stdio mode. Private five-platform packaged smoke,
 an official Python SDK 2.3.0 client, and a clean npm-installed Linux launcher
-passed; this does not establish support for every client.
+passed before release; this does not establish support for every client.
 The earlier v0.1.3 release supports
 standard MCP initialization and tool calls but predates the v0.1.4 Origin,
 HTTP status/header, JSON-RPC envelope, and PostgreSQL native CA changes below.
 Use its [tagged installation instructions](https://github.com/rhamenator/request-guard-mcp/tree/v0.1.3)
 when operating v0.1.3; do not assume the following v0.1.4 checks apply to it.
 
-The published v0.1.4 server supports HTTP POST JSON-RPC and a custom WebSocket transport. It
-does not offer stdio, SSE GET, OAuth discovery, MCP resources or prompts. For
+v0.1.5 supports HTTP POST JSON-RPC, a custom WebSocket transport, and local
+stdio. It does not offer SSE GET, OAuth discovery, MCP resources or prompts. For
 HTTP POST, send `Content-Type: application/json` and
 `Accept: application/json, text/event-stream`. After initialization, send
 `MCP-Protocol-Version: 2025-06-18`; an explicit invalid version gets HTTP 400.

@@ -10,9 +10,9 @@
 
 A **Rust MCP (Model Context Protocol) server** for request risk classification, enrichment, and abuse-signal analysis. The official MCP Inspector can call its tools over HTTP POST; custom WebSocket clients can use the JSON-RPC endpoint. Client support depends on transport and authentication compatibility. The `ai-scraping-defense` projects are optional clients. Stable release readiness is subject to the [adversarial release gate](docs/adversarial-release-gate.md).
 
-The experimental [v0.1.4 native release](https://github.com/rhamenator/request-guard-mcp/releases/tag/v0.1.4) includes checksum-protected binaries for Linux x64 (glibc and musl/Alpine), Windows x64, macOS Intel, and macOS Apple Silicon. The matching [npm package](https://www.npmjs.com/package/request-guard-mcp/v/0.1.4) passed a fresh public-registry install and MCP client test. Follow [INSTALL.md](INSTALL.md) for native setup or the [npm guide](docs/npm-release.md#install-and-connect) for npm setup.
+The experimental [v0.1.5 native release](https://github.com/rhamenator/request-guard-mcp/releases/tag/v0.1.5) includes checksum-protected binaries for Linux x64 (glibc and musl/Alpine), Windows x64, macOS Intel, and macOS Apple Silicon. Follow [INSTALL.md](INSTALL.md) for native setup. The [npm guide](docs/npm-release.md#install-and-connect) explains registry installation; use an exact matching package version when it is published, since v0.1.4 does not contain stdio.
 
-The v0.1.4 release retains the Linux x64 musl archive for Alpine and passed [packaged PostgreSQL TLS qualification](docs/releases/v0.1.4-postgres-tls-evidence.md). Choose `linux-x64-musl` on Alpine and `linux-x64` on glibc hosts.
+The v0.1.5 release retains the Linux x64 musl archive for Alpine and the [PostgreSQL TLS behavior qualified for v0.1.4](docs/releases/v0.1.4-postgres-tls-evidence.md). Choose `linux-x64-musl` on Alpine and `linux-x64` on glibc hosts.
 
 The [companion skill](skills/request-guard-mcp/SKILL.md) tells a connected agent when and how to use this server’s classification tools. It does not deploy or replace the separate AI Scraping Defense products.
 
@@ -39,22 +39,22 @@ To package the skill for a directory listing, run `python3 scripts/package_skill
 
 ### Transport scope
 
-v0.1.4 supports authenticated HTTP POST JSON-RPC and a custom WebSocket
-transport on `/mcp`. It does not offer stdio, SSE GET, OAuth discovery,
+v0.1.5 supports authenticated HTTP POST JSON-RPC and a custom WebSocket
+transport on `/mcp`, plus process-local stdio. It does not offer SSE GET, OAuth discovery,
 resources, or prompts. An authenticated ordinary GET to `/mcp` returns 405;
 WebSocket upgrades remain available. The HTTP and custom WebSocket JSON-RPC
 envelopes have [packaged-binary regression evidence](docs/releases/v0.1.4-ws-envelope-matrix.md)
 for the supported flows. Optional streaming transports and a broader client
 matrix are tracked in [issue #121](https://github.com/rhamenator/request-guard-mcp/issues/121).
 
-Development main has a v0.1.5 candidate with a process-local `--stdio` mode.
-It uses newline-delimited JSON-RPC on stdin/stdout, sends diagnostics to
+Run the native executable with `--stdio` for a local process MCP client. It
+uses newline-delimited JSON-RPC on stdin/stdout, sends diagnostics to
 stderr, and does not open a listener. The launching user's process access is
-the trust boundary; HTTP bearer tokens do not apply to stdio. This mode has
-passed private five-platform packaged smoke and official Python SDK 2.3.0
-client tests, but is absent from the published v0.1.4 release. See the
-[candidate evidence](docs/releases/v0.1.5-stdio-candidate.md).
-PostgreSQL is currently excluded from this candidate mode because its
+the trust boundary; HTTP bearer tokens do not apply to stdio. This mode passed
+private five-platform packaged smoke, official Python SDK 2.3.0 and clean
+npm-installed launcher tests before release. See the
+[candidate evidence](docs/releases/v0.1.5-stdio-candidate.md). It is absent
+from v0.1.4. PostgreSQL is excluded from stdio because its
 persistent per-caller rows have no expiry; see [setup and limits](INSTALL.md).
 
 For HTTP POST, send `Content-Type: application/json` and
@@ -147,7 +147,7 @@ tested results and current protocol limits.
 
 ## Ready-to-run releases
 
-The v0.1.4 GitHub release includes checksum-protected native bundles for Linux x64 glibc and musl,
+The v0.1.5 GitHub release includes checksum-protected native bundles for Linux x64 glibc and musl,
 Windows x64, macOS Intel, and macOS Apple Silicon. Download the archive for your
 platform and follow the bundled [INSTALL.md](INSTALL.md) for checksum verification,
 token setup, startup, and MCP client connection. A container
@@ -159,7 +159,8 @@ directory listing ZIP; GitHub releases do not include that ZIP.
 The [`request-guard-mcp` npm package](https://www.npmjs.com/package/request-guard-mcp)
 is a separate native installation option. A fresh registry install of 0.1.4
 passed official MCP Inspector initialization, tool listing, `classify`, and
-`explain`. See the [npm release guide](docs/npm-release.md) for package details.
+`explain`; that version has no stdio. Use npm 0.1.5 only after the matching
+registry package is verified. See the [npm release guide](docs/npm-release.md).
 
 ## Docker
 
