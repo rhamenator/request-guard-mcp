@@ -29,22 +29,27 @@ def free_port():
         return listener.getsockname()[1]
 
 
+def require(condition, message):
+    if not condition:
+        raise RuntimeError(message)
+
+
 async def probe(url, token, expected_version):
     async with httpx2.AsyncClient(headers={"Authorization": f"Bearer {token}"}, timeout=10.0) as client:
         async with streamable_http_client(url, http_client=client) as (reader, writer):
             async with ClientSession(reader, writer) as session:
                 initialized = await session.initialize()
-                assert initialized.protocol_version == "2025-06-18"
+                require(initialized.protocol_version == "2025-06-18", "unexpected protocol version")
                 if expected_version:
-                    assert initialized.server_info.version == expected_version
+                    require(initialized.server_info.version == expected_version, "unexpected server version")
                 listed = await session.list_tools()
-                assert {"classify", "explain"} <= {tool.name for tool in listed.tools}
+                require({"classify", "explain"} <= {tool.name for tool in listed.tools}, "core tools missing")
                 result = await session.call_tool("classify", {
                     "ip": "192.0.2.1", "user_agent": "GPTBot/1.0", "path": "/",
                 })
-                assert not result.is_error
-                assert result.structured_content["verdict"] == "block"
-                assert result.structured_content["threat_category"] == "ai_scraping"
+                require(not result.is_error, "classify returned tool error")
+                require(result.structured_content["verdict"] == "block", "unexpected verdict")
+                require(result.structured_content["threat_category"] == "ai_scraping", "unexpected category")
                 print("PASS Python MCP SDK: initialize, tools/list, classify")
 
 
@@ -56,13 +61,14 @@ def main():
     binary = args.binary.resolve(strict=True)
     token = secrets.token_urlsafe(32)
     port = free_port()
-    essentials = {"PATH", "HOME", "TMPDIR", "SYSTEMROOT", "WINDIR", "TEMP", "USERPROFILE"}
+    essentials = {"PATH", "TMPDIR"}
     env = {key: value for key, value in os.environ.items() if key.upper() in essentials}
     env.update({"MCP__HOST": "127.0.0.1", "MCP__PORT": str(port),
                 "MCP__AUTH__ENABLED": "true", "AUTH_TOKENS": token})
     with tempfile.TemporaryDirectory(prefix="request-guard-python-sdk-") as cwd:
+        env["HOME"] = cwd
         server = subprocess.Popen([str(binary)], cwd=cwd, env=env,
-                                  stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         try:
             for _ in range(100):
                 if server.poll() is not None:
@@ -77,14 +83,16 @@ def main():
             unauthenticated = urllib.request.Request(
                 f"http://127.0.0.1:{port}/mcp",
                 data=b'{"jsonrpc":"2.0","id":1,"method":"ping"}',
-                headers={"Content-Type": "application/json"},
+                headers={"Content-Type": "application/json",
+                         "Accept": "application/json, text/event-stream"},
             )
             try:
                 urllib.request.urlopen(unauthenticated, timeout=5)
             except HTTPError as error:
-                assert error.code == 401, f"expected 401 without bearer, got {error.code}"
+                require(error.code == 401, f"expected 401 without bearer, got {error.code}")
             else:
-                raise AssertionError("server accepted a request without bearer token")
+                raise RuntimeError("server accepted a request without bearer token")
+            require(server.poll() is None, "server exited during readiness check")
             asyncio.run(probe(f"http://127.0.0.1:{port}/mcp", token, args.expected_version))
         finally:
             server.terminate()

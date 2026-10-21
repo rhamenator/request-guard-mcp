@@ -18,14 +18,19 @@ public v0.1.4 binary; optional transports and broader client coverage are
 tracked in issue #121.
 
 The official Python MCP SDK 2.3.0 also completed authenticated Streamable
-HTTP `initialize`, `tools/list`, and `classify` against the exact public
-Linux x64 v0.1.4 binary. The reproducible [client probe](../scripts/python_sdk_smoke.py)
-uses a disposable local listener and synthetic bearer token. This verifies
-that specific SDK path; it does not add SSE GET, stdio, or session support.
-To repeat it, install `mcp==2.3.0` in a disposable Python virtual environment
-and pass the extracted release executable to `python scripts/python_sdk_smoke.py
---binary /path/to/request-guard-mcp --expected-version 0.1.4`. The probe also
-checks that a request without the bearer token receives HTTP 401.
+HTTP `initialize`, `tools/list`, and `classify` against the public Linux x64
+v0.1.4 binary (SHA256 `e1863970dc8fdc96bb861af667bf7bc3f52810b2319190f8f2c192b033ab0fd5`).
+The reproducible [client probe](../scripts/python_sdk_smoke.py) uses a local
+listener and synthetic bearer token. The SDK tolerates the server's 405 for
+SSE GET. This verifies that specific SDK path; it does not add SSE GET, stdio,
+or session support. To repeat it in a disposable Python virtual environment:
+
+```sh
+pip install 'mcp==2.3.0'
+python scripts/python_sdk_smoke.py --binary /path/to/request-guard-mcp --expected-version 0.1.4
+```
+
+The probe also checks that a request without the bearer token receives HTTP 401.
 
 For v0.1.4 HTTP POST, send `Content-Type: application/json` and
 `Accept: application/json, text/event-stream`. The server returns JSON for
