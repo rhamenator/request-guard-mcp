@@ -23,6 +23,7 @@ jobs:
           node-version: "22.20.0"
       - run: node --check npm/bin/request-guard-mcp.js
       - run: python3 scripts/test_package_npm.py
+      - run: python3 scripts/verify_inspector_fixture.py
 
   fmt:
     name: Formatting
