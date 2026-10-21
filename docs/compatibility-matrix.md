@@ -111,13 +111,13 @@ Fallback is triggered when:
 |---------|-----------|-----------|
 | 2025-06-18 | WebSocket JSON-RPC (custom client transport) | Implemented; 22-case packaged-binary envelope probe passed; broader client matrix open |
 | 2025-06-18 | HTTP POST JSON-RPC | Inspector 2.5.0, Python MCP SDK 2.3.0, and 13-case packaged-binary envelope probe passed |
-| 2025-06-18 | stdio | Not in published v0.1.4; development v0.1.5 candidate passed an official Python SDK 2.3.0 local smoke, pending packaged qualification |
+| 2025-06-18 | stdio | Not in published v0.1.4; development v0.1.5 candidate passed official Python SDK 2.3.0, private packaged smoke on five platforms, and clean npm launcher smoke on Linux |
 | 2025-06-18 | SSE GET, gRPC | Not implemented; v0.1.4 returns 405 for authenticated, ordinary GET `/mcp` |
 
-Development main is testing a v0.1.5 `--stdio` mode with the official Python
-MCP SDK. It is process-local and trusts the launching user instead of a bearer
-token. It does not change published v0.1.4 or add SSE GET support. See the
-[development setup](../INSTALL.md) for configuration and limits.
+Development main implements a v0.1.5 `--stdio` candidate. It is process-local
+and trusts the launching user instead of a bearer token. It does not change
+published v0.1.4 or add SSE GET support. See the
+[development setup](../INSTALL.md) and [private candidate evidence](releases/v0.1.5-stdio-candidate.md).
 
 The [pinned MCP transport revision](https://modelcontextprotocol.io/specification/2025-06-18/basic/transports#sending-messages-to-the-server)
 requires 202 with no body for accepted client notifications and responses;

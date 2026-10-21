@@ -47,11 +47,13 @@ envelopes have [packaged-binary regression evidence](docs/releases/v0.1.4-ws-env
 for the supported flows. Optional streaming transports and a broader client
 matrix are tracked in [issue #121](https://github.com/rhamenator/request-guard-mcp/issues/121).
 
-Development main is preparing v0.1.5 with a process-local `--stdio` mode.
+Development main has a v0.1.5 candidate with a process-local `--stdio` mode.
 It uses newline-delimited JSON-RPC on stdin/stdout, sends diagnostics to
 stderr, and does not open a listener. The launching user's process access is
 the trust boundary; HTTP bearer tokens do not apply to stdio. This mode has
-not yet passed packaged release qualification and is absent from v0.1.4.
+passed private five-platform packaged smoke and official Python SDK 2.3.0
+client tests, but is absent from the published v0.1.4 release. See the
+[candidate evidence](docs/releases/v0.1.5-stdio-candidate.md).
 PostgreSQL is currently excluded from this candidate mode because its
 persistent per-caller rows have no expiry; see [setup and limits](INSTALL.md).
 
