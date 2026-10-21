@@ -72,13 +72,34 @@ when operating that version.
 
 ### `rhamenator/ai-scraping-defense` (Python/Django)
 
+The Python adapter's bare `MODEL_URI=mcp://primary/classify` wraps request
+fields under `input`. A public v0.1.5 probe returned `allow` without
+examining the intended fields. Until an installation contains the fix from
+[AI Scraping Defense PR #1848](https://github.com/rhamenator/ai-scraping-defense/pull/1848),
+call the existing `call_mcp_tool()` helper with
+top-level request fields instead of using that bare `MODEL_URI`:
+
 ```dotenv
-MODEL_URI=mcp://primary/classify
 MCP_SERVER_PRIMARY_TRANSPORT=ws
 MCP_SERVER_PRIMARY_URL=ws://request-guard-mcp:8085/mcp
 MCP_SERVER_PRIMARY_AUTH_TOKEN=replace_me
 MCP_SERVER_PRIMARY_TIMEOUT=10
 ```
+
+```python
+from src.shared.mcp_client import call_mcp_tool
+
+result = call_mcp_tool("mcp://primary/classify", {
+    "ip": "192.0.2.42",
+    "user_agent": "GPTBot/1.0",
+    "path": "/robots.txt",
+    "method": "GET",
+})
+```
+
+After the client-side fix is installed, its `MODEL_URI` adapter can use
+`mcp://primary/classify?argument_key=&options_key=` to pass those fields
+directly. See the [exact public-binary client probe](releases/v0.1.5-asd-python-client.md).
 
 ### `rhamenator/ai-scraping-defense-iis` (.NET/IIS)
 
