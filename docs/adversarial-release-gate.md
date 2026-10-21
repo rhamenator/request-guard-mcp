@@ -85,6 +85,15 @@ See `releases/v0.1.5-public-ghcr-adversarial.md`. This adds to the v0.1.5
 public native, Kali-to-Ubuntu, backend, and TLS evidence, but does not close
 the stable v1.0 gate in issue #125.
 
+For future main and tag container builds, native amd64 and arm64 GitHub runners
+now pull each just-pushed immutable platform digest and run bounded authenticated
+HTTP, WebSocket, and classifier probes before their digests can be assembled into
+the multiarch tag. `scripts/smoke_native_container.py` verifies that Docker
+loaded the expected architecture and reaches the container over its runner's
+bridge network. This checks native arm64 execution in CI, but it does not
+retroactively qualify the published v0.1.5 arm64 image or replace the full
+candidate adversarial gate.
+
 The stdlib-only `scripts/adversarial_probe.py` is a first HTTP smoke subset. Start a lab server with a temporary token of at least 32 characters, then run:
 
 ```bash
