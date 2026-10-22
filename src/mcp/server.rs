@@ -841,9 +841,11 @@ mod slow_client_tests {
                 get(|| async { axum::body::Bytes::from(vec![b'x'; 16 * 1024 * 1024]) }),
             )
             .route("/health", get(|| async { "ok" }));
-        let mut limits = LimitsConfig::default();
-        limits.max_connections = 1;
-        limits.http_header_timeout_secs = 1;
+        let limits = LimitsConfig {
+            max_connections: 1,
+            http_header_timeout_secs: 1,
+            ..LimitsConfig::default()
+        };
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
         let task = tokio::spawn(async move {
