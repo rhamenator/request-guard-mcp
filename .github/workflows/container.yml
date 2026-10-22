@@ -20,21 +20,31 @@ env:
 
 jobs:
   verify-container-ref:
-    name: Verify container tag version and source
-    if: github.ref_type == 'tag'
+    name: Verify container publication ref
+    if: github.ref_type == 'tag' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    outputs:
+      publish: ${{ steps.tag.outputs.publish || steps.main.outputs.publish }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
           fetch-depth: 0
       - name: Validate tag and main ancestry
+        id: tag
+        if: github.ref_type == 'tag'
         # Manual dispatch on a tag is also a publication path. Check it as a
         # tag, rather than as a private release-candidate dispatch.
         env:
           GITHUB_EVENT_NAME: push
-        run: python3 scripts/verify_release_ref.py
+        run: |
+          python3 scripts/verify_release_ref.py
+          echo 'publish=true' >> "$GITHUB_OUTPUT"
+      - name: Restrict automatic main images to experimental versions
+        id: main
+        if: github.ref == 'refs/heads/main'
+        run: python3 scripts/main_container_publish.py >> "$GITHUB_OUTPUT"
 
   stable-tag-approval:
     name: Approve stable container tag
@@ -90,7 +100,7 @@ jobs:
     needs: [verify-container-ref, stable-tag-approval]
     # Manual branch dispatch is allowed only on main; a version-named branch
     # must never create a public image tag without the stable-tag gate.
-    if: ${{ !cancelled() && github.event_name != 'pull_request' && (github.ref_type == 'tag' || github.ref == 'refs/heads/main') && (needs.verify-container-ref.result == 'success' || needs.verify-container-ref.result == 'skipped') && (needs.stable-tag-approval.result == 'success' || needs.stable-tag-approval.result == 'skipped') }}
+    if: ${{ !cancelled() && github.event_name != 'pull_request' && (github.ref_type == 'tag' || github.ref == 'refs/heads/main') && needs.verify-container-ref.result == 'success' && needs.verify-container-ref.outputs.publish == 'true' && (needs.stable-tag-approval.result == 'success' || needs.stable-tag-approval.result == 'skipped') }}
     strategy:
       fail-fast: false
       matrix:
