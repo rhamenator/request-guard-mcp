@@ -91,8 +91,9 @@ def main():
     with tempfile.TemporaryDirectory() as working_dir:
         log_path = Path(working_dir) / "server.log"
         server_log = log_path.open("wb")
+        # Listener-mode tracing writes to stdout; stdio transport differs.
         process = subprocess.Popen([str(binary)], cwd=working_dir, env=env,
-                                   stdout=subprocess.DEVNULL, stderr=server_log)
+                                   stdout=server_log, stderr=subprocess.DEVNULL)
         try:
             for _ in range(40):
                 if health(port) == 200:
@@ -133,10 +134,11 @@ def main():
             assert process.poll() is None
             assert health(port) == 200
             assert recovered_status == 101, recovered_status
-            # A runner may hit the write-buffer error or finish sending and
-            # reach the receive-idle deadline before the send timer fires.
-            # The exact old binary fails the recovered-upgrade assertion.
+            # Listener-mode tracing is captured from stdout. Require evidence
+            # that the outgoing send deadline, rather than another close path,
+            # released at least one of the occupied permits.
             send_deadline_logged = "WebSocket send deadline exceeded" in log_path.read_text()
+            assert send_deadline_logged
             print(json.dumps({"case": "non_reading_websocket_recovery",
                               "passed": True, "sent": counts,
                               "idle_control": control_status,
