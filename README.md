@@ -46,6 +46,8 @@ WebSocket upgrades remain available. The HTTP and custom WebSocket JSON-RPC
 envelopes have [packaged-binary regression evidence](docs/releases/v0.1.4-ws-envelope-matrix.md)
 for the supported flows. Optional streaming transports and a broader client
 matrix are tracked in [issue #121](https://github.com/rhamenator/request-guard-mcp/issues/121).
+Development main serves custom WebSocket over HTTP/1 upgrade and does not
+enable HTTP/2 extended CONNECT.
 
 Run the native executable with `--stdio` for a local process MCP client. It
 uses newline-delimited JSON-RPC on stdin/stdout, sends diagnostics to

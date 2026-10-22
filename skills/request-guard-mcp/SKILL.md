@@ -50,7 +50,8 @@ when operating v0.1.3; do not assume the following v0.1.4 checks apply to it.
 
 v0.1.5 supports HTTP POST JSON-RPC, a custom WebSocket transport, and local
 stdio. It does not offer SSE GET, OAuth discovery, MCP resources or prompts. For
-HTTP POST, send `Content-Type: application/json` and
+development main, custom WebSocket uses HTTP/1 upgrade; HTTP/2 extended CONNECT
+is disabled. For HTTP POST, send `Content-Type: application/json` and
 `Accept: application/json, text/event-stream`. After initialization, send
 `MCP-Protocol-Version: 2025-06-18`; an explicit invalid version gets HTTP 400.
 Explicit unsupported content types get 415 and an `Accept` that excludes JSON
