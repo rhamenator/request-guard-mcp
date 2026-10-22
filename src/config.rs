@@ -784,5 +784,12 @@ mod tests {
             ..Config::default()
         };
         assert!(config.validate().is_err());
+
+        let mut http2 = Config::default();
+        http2.auth.tokens = vec!["test-token-with-at-least-32-characters".to_string()];
+        assert!(http2.validate().is_ok());
+        http2.limits.http2_idle_timeout_secs = 0;
+        assert!(http2.validate().is_err());
+        assert_eq!(LimitsConfig::default().http2_idle_timeout_secs, 60);
     }
 }

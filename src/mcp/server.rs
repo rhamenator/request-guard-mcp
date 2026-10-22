@@ -601,10 +601,7 @@ async fn serve_listener(
                 .http1()
                 .timer(TokioTimer::new())
                 .header_read_timeout(header_timeout);
-            builder
-                .http2()
-                .enable_connect_protocol()
-                .max_concurrent_streams(16);
+            builder.http2().max_concurrent_streams(16);
             {
                 let connection =
                     builder.serve_connection_with_upgrades(TokioIo::new(stream), service);
