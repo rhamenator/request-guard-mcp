@@ -1,14 +1,20 @@
 # syntax=docker/dockerfile:1.7
 # ─── Build stage ──────────────────────────────────────────────────────────────
-FROM rust:1-slim-bookworm AS builder
+# Review both multi-architecture index digests when updating the toolchain or OS.
+FROM rust:1.99.1-slim-bookworm@sha256:54e39a2f4480fd827ebfa47736212703a1e46be0fddf7e1590aa0e94b8d0cae1 AS builder
 
 WORKDIR /build
 
 # Install build dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN grep -Fxq 'VERSION_CODENAME=bookworm' /etc/os-release \
+    && apt-get update && apt-get install -y --no-install-recommends \
     pkg-config \
     libssl-dev \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && rustc --version | grep -Fq 'rustc 1.99.1 ' \
+    && dpkg-query -W -f='${Package}:${Architecture}=${Version}\n' | sort > /build/builder-packages.txt \
+    && rustc --version > /build/toolchain.txt \
+    && cargo --version >> /build/toolchain.txt
 
 # Cache dependencies separately from source
 COPY Cargo.toml Cargo.lock ./
@@ -25,13 +31,19 @@ RUN touch src/main.rs src/lib.rs && \
     cargo build --release --locked
 
 # ─── Runtime stage ────────────────────────────────────────────────────────────
-FROM debian:bookworm-slim AS runtime
+FROM debian:bookworm-slim@sha256:7ff6ba31527b9e336162fa061746c366c4b2032f4d2cff2078bea43f78efe3f8 AS runtime
 
-RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
+RUN grep -Fxq 'VERSION_CODENAME=bookworm' /etc/os-release \
+    && apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
     libssl3 \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && mkdir -p /usr/share/request-guard-mcp \
+    && dpkg-query -W -f='${Package}:${Architecture}=${Version}\n' | sort > /usr/share/request-guard-mcp/runtime-packages.txt
+
+COPY --from=builder /build/builder-packages.txt /usr/share/request-guard-mcp/builder-packages.txt
+COPY --from=builder /build/toolchain.txt /usr/share/request-guard-mcp/toolchain.txt
 
 # Create non-root user
 RUN groupadd -r mcp && useradd -r -g mcp -d /app -s /sbin/nologin mcp
