@@ -591,18 +591,30 @@ async fn serve_listener(
             let service = service_fn(move |request: hyper::Request<Incoming>| {
                 let is_http2 = request.version() == hyper::Version::HTTP_2;
                 let activity_tx = activity_tx.clone();
+                let mut over_http2_request_cap = false;
                 if is_http2 {
                     activity_tx.send_modify(|activity| {
                         activity.seen = true;
-                        activity.active += 1;
-                        activity.requests = activity.requests.saturating_add(1);
+                        if activity.requests >= http2_max_requests {
+                            over_http2_request_cap = true;
+                        } else {
+                            activity.active += 1;
+                            activity.requests += 1;
+                        }
                     });
                 }
-                let request_guard = is_http2.then(|| Http2RequestGuard(activity_tx));
+                let request_guard =
+                    (is_http2 && !over_http2_request_cap).then(|| Http2RequestGuard(activity_tx));
                 first_request_for_service.notify_one();
                 let mut router = router.clone();
                 async move {
                     let _request_guard = request_guard;
+                    if over_http2_request_cap {
+                        return Ok(
+                            (StatusCode::SERVICE_UNAVAILABLE, "connection request limit")
+                                .into_response(),
+                        );
+                    }
                     router.call(request.map(Body::new)).await
                 }
             });
@@ -673,21 +685,11 @@ async fn serve_listener(
                             // dispatch, and the response can outlive its handler.
                             // Wait for hyper's two-phase GOAWAY to finish, with a
                             // hard cap for peers that never answer its PING.
-                            // The first GOAWAY can admit already-sent streams;
-                            // allow one concurrent-stream window beyond the
-                            // request cap, then close even during the drain.
-                            loop {
-                                let activity = *activity_rx.borrow_and_update();
-                                if activity.requests >= http2_max_requests + 16 {
-                                    break;
-                                }
-                                tokio::select! {
-                                    _ = &mut connection => break,
-                                    _ = &mut drain_deadline => break,
-                                    changed = activity_rx.changed() => {
-                                        if changed.is_err() { break; }
-                                    }
-                                }
+                            // Dispatch rejects requests over the cap even if
+                            // hyper accepts them during the first GOAWAY phase.
+                            tokio::select! {
+                                _ = &mut connection => {},
+                                _ = &mut drain_deadline => {},
                             }
                         }
                         result
@@ -893,16 +895,27 @@ mod slow_client_tests {
         })
         .await
         .expect("bounded health requests must complete");
-        let stream_id = 255_u32;
-        let mut frame = [0_u8, 0, 17, 1, 5, 0, 0, 0, 0];
-        frame[5..9].copy_from_slice(&stream_id.to_be_bytes());
-        h2.write_all(&frame).await.unwrap();
-        h2.write_all(headers).await.unwrap();
+        // Send the 128th and 129th streams before reading GOAWAY. Only the
+        // former may reach the health handler even if hyper accepts both.
+        for stream_id in [255_u32, 257_u32] {
+            let mut frame = [0_u8, 0, 17, 1, 5, 0, 0, 0, 0];
+            frame[5..9].copy_from_slice(&stream_id.to_be_bytes());
+            h2.write_all(&frame).await.unwrap();
+            h2.write_all(headers).await.unwrap();
+        }
         let mut response = Vec::new();
         timeout(Duration::from_secs(10), h2.read_to_end(&mut response))
             .await
             .expect("request cap must close the HTTP/2 connection")
             .unwrap();
+        assert!(
+            response
+                .windows(b"\"version\":".len())
+                .filter(|part| *part == b"\"version\":")
+                .count()
+                <= 1,
+            "request 129 must not reach the health handler"
+        );
         let mut healthy = TcpStream::connect(addr).await.unwrap();
         healthy
             .write_all(b"GET /health HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
