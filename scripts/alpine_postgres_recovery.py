@@ -313,9 +313,10 @@ def main() -> None:
                 if (not captured or len(captured) > MAX_LOG_BYTES
                         or len(pg_captured) > MAX_LOG_BYTES):
                     raise RuntimeError("Alpine PostgreSQL logs were empty or exceeded 64 KiB")
-                for secret in (token, cache_key, request_id, marker):
+                for label, secret in (("bearer", token), ("cache key", cache_key),
+                                      ("request ID", request_id), ("path marker", marker)):
                     if secret.encode() in captured:
-                        raise RuntimeError("Alpine MCP server log disclosed a synthetic secret")
+                        raise RuntimeError(f"Alpine MCP server log disclosed synthetic {label}")
     print("PASS Alpine PostgreSQL: classify/replay, outage -502, recovery, "
           "operator retention cascade, private logs")
 

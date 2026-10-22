@@ -388,7 +388,9 @@ pub(crate) async fn process_message(
             McpMessage::success(id, result)
         }
         Ok(Err(app_err)) => {
-            warn!(tool = %tool_name, error = %app_err, "tool error");
+            // AppError text can include caller-supplied request IDs or other
+            // parameters. Keep diagnostic logging to the bounded category.
+            warn!(tool = %tool_name, error_code = app_err.code(), "tool error");
             state
                 .metrics
                 .requests_total
