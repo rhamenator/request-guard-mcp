@@ -79,7 +79,10 @@ All WebSocket connections are authenticated at connection establishment using a 
 
 - All engine code returns `Result<_, AppError>` and handles errors gracefully.
 - `AppError` variants carry non-leaky messages for clients.
-- Internal details are logged server-side but not exposed to clients.
+- Development main logs categorical tool error codes rather than rendered
+  `AppError` text, which can include caller-supplied request IDs. Published
+  v0.1.5 may log those IDs on tool errors; keep request IDs nonsecret. Other
+  backend and transport diagnostics can still contain implementation details.
 - `config_snapshot` never returns an OTLP endpoint or its embedded credentials;
   requests with `redact_secrets:false` are rejected.
 
