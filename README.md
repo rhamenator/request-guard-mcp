@@ -206,8 +206,13 @@ The Kubernetes example pins the published v0.1.4 image and matching version
 labels. The verified multiarch image index is
 `sha256:a553eb4f25ee7eebdf67ad4d7df5be1c0d9b337e78274eb93565137134df90f7`.
 
-The application, Redis, and PostgreSQL intentionally refuse to start with the
-example credentials. Do not commit `deploy/k8s/secret.yaml`.
+Replace **every** example Secret value before deployment. Development main
+rejects the shipped bearer, cache-scope HMAC, and TLS attestation key
+placeholders at server startup; published v0.1.5 does not reject the latter
+two. Configured TLS attestation keys are also validated in stdio mode. Redis
+and PostgreSQL may start with example passwords, so do not rely on
+their startup checks to protect the deployment. Do not commit
+`deploy/k8s/secret.yaml`.
 
 ## Development
 

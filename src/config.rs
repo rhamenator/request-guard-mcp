@@ -304,11 +304,12 @@ impl Config {
             if self.auth.tokens.is_empty() {
                 anyhow::bail!("authentication is enabled but AUTH_TOKENS is empty");
             }
-            if self.auth.tokens.iter().any(|token| {
-                token.len() < 32
-                    || token == "replace_me"
-                    || token == "replace_me_with_a_strong_token"
-            }) {
+            if self
+                .auth
+                .tokens
+                .iter()
+                .any(|token| token.len() < 32 || token.contains("replace_me"))
+            {
                 anyhow::bail!(
                     "AUTH_TOKENS entries must contain at least 32 characters and cannot be placeholders; run python scripts/configure_credentials.py"
                 );
@@ -323,9 +324,9 @@ impl Config {
                 .auth
                 .cache_scope_hmac_key
                 .as_deref()
-                .is_some_and(|key| key.len() < 32)
+                .is_some_and(|key| key.len() < 32 || key.contains("replace_me"))
         {
-            anyhow::bail!("CACHE_SCOPE_HMAC_KEY must contain at least 32 bytes when configured");
+            anyhow::bail!("CACHE_SCOPE_HMAC_KEY must contain at least 32 bytes and cannot be the example placeholder");
         }
         if self.auth.enabled
             && !stdio
@@ -338,20 +339,20 @@ impl Config {
             .tls_fingerprints
             .attestation_key
             .as_deref()
-            .is_some_and(|key| key.len() < 32)
+            .is_some_and(|key| key.len() < 32 || key.contains("replace_me"))
         {
             anyhow::bail!(
-                "TLS_FINGERPRINT_ATTESTATION_KEY must contain at least 32 bytes when configured"
+                "TLS_FINGERPRINT_ATTESTATION_KEY must contain at least 32 bytes and cannot be the example placeholder"
             );
         }
         if self
             .tls_fingerprints
             .previous_attestation_key
             .as_deref()
-            .is_some_and(|key| key.len() < 32)
+            .is_some_and(|key| key.len() < 32 || key.contains("replace_me"))
         {
             anyhow::bail!(
-                "TLS_FINGERPRINT_ATTESTATION_PREVIOUS_KEY must contain at least 32 bytes when configured"
+                "TLS_FINGERPRINT_ATTESTATION_PREVIOUS_KEY must contain at least 32 bytes and cannot be the example placeholder"
             );
         }
         if self.tls_fingerprints.max_age_seconds == 0 {
@@ -659,6 +660,53 @@ mod tests {
             ..Config::default()
         };
         assert!(valid.validate().is_ok());
+    }
+
+    #[test]
+    fn shipped_key_placeholders_cannot_start_http_listener() {
+        let mut config = Config::default();
+        config.auth.tokens = vec!["a-real-test-token-with-32-characters".to_string()];
+
+        config.auth.tokens = vec!["replace_me_with_a_strong_token  ".to_string()];
+        assert!(config.validate().is_err());
+        config.auth.tokens = vec!["a-real-test-token-with-32-characters".to_string()];
+
+        for placeholder in [
+            "replace_me_with_32_or_more_random_bytes",
+            "replace_me_with_the_old_random_key",
+            "replace_me_with_32_or_more_random_bytes\n",
+        ] {
+            config.auth.cache_scope_hmac_key = Some(placeholder.to_string());
+            assert!(config.validate().is_err());
+        }
+        config.auth.cache_scope_hmac_key =
+            Some("a-separate-random-test-hmac-key-with-32-bytes".to_string());
+        assert!(config.validate().is_ok());
+
+        for placeholder in [
+            "replace_me_with_32_or_more_random_bytes",
+            "replace_me_with_the_old_random_key",
+            "replace_me_with_32_or_more_random_bytes\n",
+        ] {
+            config.tls_fingerprints.attestation_key = Some(placeholder.to_string());
+            assert!(config.validate().is_err());
+        }
+        config.tls_fingerprints.attestation_key =
+            Some("a-separate-random-test-attestation-key".to_string());
+        assert!(config.validate().is_ok());
+
+        for placeholder in [
+            "replace_me_with_32_or_more_random_bytes",
+            "replace_me_with_the_old_random_key",
+            "replace_me_with_the_old_random_key\n",
+        ] {
+            config.tls_fingerprints.previous_attestation_key = Some(placeholder.to_string());
+            assert!(config.validate().is_err());
+            assert!(config.validate_for_transport(true).is_err());
+        }
+        config.tls_fingerprints.previous_attestation_key =
+            Some("a-different-rotation-test-key-with-32-bytes".to_string());
+        assert!(config.validate().is_ok());
     }
 
     #[test]
