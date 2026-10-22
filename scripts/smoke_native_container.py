@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Exercise a published native GHCR image on its matching Actions runner."""
+"""Exercise a published digest or private loaded image on a native runner."""
 
 import argparse
 import os
@@ -14,6 +14,7 @@ from pathlib import Path
 
 
 IMAGE_RE = re.compile(r"^ghcr\.io/rhamenator/request-guard-mcp@sha256:[0-9a-f]{64}$")
+PRIVATE_IMAGE_RE = re.compile(r"^request-guard-mcp:private-(amd64|arm64)$")
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -35,22 +36,30 @@ def safe_logs(name: str, token: str) -> str:
 def wait_for_listener(host: str, port: int, name: str, token: str) -> None:
     for _ in range(50):
         if command("docker", "inspect", "--format", "{{.State.Running}}", name) != "true":
-            raise RuntimeError(f"published container exited before ready: {safe_logs(name, token)}")
+            raise RuntimeError(f"container exited before ready: {safe_logs(name, token)}")
         try:
             with socket.create_connection((host, port), timeout=0.2):
                 return
         except OSError:
             time.sleep(0.2)
-    raise RuntimeError(f"published container listener did not become ready: {safe_logs(name, token)}")
+    raise RuntimeError(f"container listener did not become ready: {safe_logs(name, token)}")
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--image", required=True, help="immutable GHCR index or platform digest")
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--image", help="immutable published GHCR index or platform digest")
+    source.add_argument("--private-image", help="locally loaded unpublished candidate image")
     parser.add_argument("--arch", required=True, choices=("amd64", "arm64"))
     args = parser.parse_args()
-    if not IMAGE_RE.fullmatch(args.image):
+    if args.image and not IMAGE_RE.fullmatch(args.image):
         parser.error("image must be the immutable Request Guard GHCR sha256 digest")
+    if args.private_image and (
+        not PRIVATE_IMAGE_RE.fullmatch(args.private_image)
+        or not args.private_image.endswith(args.arch)
+    ):
+        parser.error("private image must match the requested native architecture")
+    image = args.image or args.private_image
 
     token = secrets.token_urlsafe(36)
     with tempfile.TemporaryDirectory(prefix="request-guard-native-smoke-") as directory:
@@ -60,8 +69,9 @@ def main() -> None:
         name = f"request-guard-native-smoke-{os.getpid()}"
         started = False
         try:
-            command("docker", "pull", "--platform", f"linux/{args.arch}", args.image, timeout=180)
-            actual_arch = command("docker", "image", "inspect", "--format", "{{.Architecture}}", args.image)
+            if args.image:
+                command("docker", "pull", "--platform", f"linux/{args.arch}", image, timeout=180)
+            actual_arch = command("docker", "image", "inspect", "--format", "{{.Architecture}}", image)
             if actual_arch != args.arch:
                 raise RuntimeError(f"image architecture {actual_arch} differs from runner {args.arch}")
             command(
@@ -69,7 +79,7 @@ def main() -> None:
                 "--memory", "512m", "--cpus", "2", "--pids-limit", "128",
                 "--security-opt", "no-new-privileges", "-e", "MCP__HOST=0.0.0.0",
                 "-e", "MCP__PORT=8085", "-e", "MCP__LIMITS__MAX_REQUEST_BYTES=4096",
-                args.image,
+                image,
             )
             started = True
             host = command(
@@ -93,7 +103,8 @@ def main() -> None:
                     detail = (result.stdout + result.stderr)[-2000:].replace(token, "[REDACTED]")
                     raise RuntimeError(f"{filename} failed: {detail}; container: {safe_logs(name, token)}")
                 print(f"{filename}: {result.stdout.strip()}")
-            print(f"native {args.arch} published-digest container smoke passed")
+            source_label = "published-digest" if args.image else "private-loaded"
+            print(f"native {args.arch} {source_label} container smoke passed")
         finally:
             if started:
                 prior_error = sys.exc_info()[0] is not None
