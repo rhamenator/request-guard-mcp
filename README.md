@@ -49,6 +49,9 @@ for the supported flows. Optional streaming transports and a broader client
 matrix are tracked in [issue #121](https://github.com/rhamenator/request-guard-mcp/issues/121).
 Development main serves custom WebSocket over HTTP/1 upgrade and does not
 enable HTTP/2 extended CONNECT.
+Development main also limits each WebSocket response or control-frame send to
+five seconds so a non-reading client cannot retain a connection permit during
+an unbounded write. Published v0.1.5 lacks that send deadline.
 
 Run the native executable with `--stdio` for a local process MCP client. It
 uses newline-delimited JSON-RPC on stdin/stdout, sends diagnostics to

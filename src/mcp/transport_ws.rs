@@ -16,6 +16,23 @@ const UNKNOWN_TOOL_METRIC_LABEL: &str = "__unknown__";
 // Redis operation records are best-effort. Keep an unavailable backend from
 // delaying the core classifier beyond a short, independent bookkeeping budget.
 const REDIS_BOOKKEEPING_TIMEOUT: Duration = Duration::from_millis(500);
+// A peer that stops reading must not retain a WebSocket connection permit
+// indefinitely while a response (including a control frame) is being sent.
+const WS_SEND_TIMEOUT: Duration = Duration::from_secs(5);
+
+async fn send_bounded(socket: &mut WebSocket, message: Message) -> bool {
+    match timeout(WS_SEND_TIMEOUT, socket.send(message)).await {
+        Ok(Ok(())) => true,
+        Ok(Err(error)) => {
+            warn!(%error, "failed to send WebSocket message");
+            false
+        }
+        Err(_) => {
+            warn!("WebSocket send deadline exceeded");
+            false
+        }
+    }
+}
 
 async fn bounded_redis_record<T>(
     future: impl Future<Output = T>,
@@ -47,8 +64,7 @@ pub async fn handle_ws_connection(
                 if let Some(response) =
                     process_message(&text, &state, &registry, &caller_scope).await
                 {
-                    if let Err(e) = socket.send(Message::Text(response.into())).await {
-                        warn!(error = %e, "failed to send WS response");
+                    if !send_bounded(&mut socket, Message::Text(response.into())).await {
                         break;
                     }
                 }
@@ -58,8 +74,7 @@ pub async fn handle_ws_connection(
                     if let Some(response) =
                         process_message(text, &state, &registry, &caller_scope).await
                     {
-                        if let Err(e) = socket.send(Message::Text(response.into())).await {
-                            warn!(error = %e, "failed to send WS response");
+                        if !send_bounded(&mut socket, Message::Text(response.into())).await {
                             break;
                         }
                     }
@@ -71,14 +86,15 @@ pub async fn handle_ws_connection(
                         -32700,
                         "Parse error: MCP messages must be UTF-8",
                     ));
-                    if let Err(e) = socket.send(Message::Text(response.into())).await {
-                        warn!(error = %e, "failed to send WS parse error");
+                    if !send_bounded(&mut socket, Message::Text(response.into())).await {
                         break;
                     }
                 }
             },
             Ok(Some(Ok(Message::Ping(data)))) => {
-                let _ = socket.send(Message::Pong(data)).await;
+                if !send_bounded(&mut socket, Message::Pong(data)).await {
+                    break;
+                }
             }
             Ok(Some(Ok(Message::Close(_)))) | Ok(None) => {
                 info!("WebSocket connection closed");
@@ -93,12 +109,14 @@ pub async fn handle_ws_connection(
                         CapacityError::MessageTooLong { .. }
                     ))
                 ) {
-                    let _ = socket
-                        .send(Message::Close(Some(CloseFrame {
+                    let _ = send_bounded(
+                        &mut socket,
+                        Message::Close(Some(CloseFrame {
                             code: 1009,
                             reason: "Message too big".into(),
-                        })))
-                        .await;
+                        })),
+                    )
+                    .await;
                 }
                 break;
             }
