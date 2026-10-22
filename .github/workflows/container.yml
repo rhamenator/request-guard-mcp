@@ -19,6 +19,16 @@ env:
   IMAGE_NAME: rhamenator/request-guard-mcp
 
 jobs:
+  stable-tag-approval:
+    name: Approve stable container tag
+    if: github.ref_type == 'tag' && !startsWith(github.ref_name, 'v0.') && !contains(github.ref_name, '-')
+    runs-on: ubuntu-latest
+    environment: stable-release
+    permissions:
+      contents: read
+    steps:
+      - run: echo 'Stable container publication approved by the protected environment reviewer.'
+
   build-and-push:
     name: Build and Push Container
     if: github.event_name == 'pull_request'
@@ -59,7 +69,8 @@ jobs:
 
   build-platform:
     name: Build Container (${{ matrix.arch }})
-    if: github.event_name != 'pull_request'
+    needs: stable-tag-approval
+    if: ${{ always() && github.event_name != 'pull_request' && (needs.stable-tag-approval.result == 'success' || needs.stable-tag-approval.result == 'skipped') }}
     strategy:
       fail-fast: false
       matrix:
@@ -74,6 +85,12 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          fetch-depth: 0
+
+      - name: Validate release tag and main ancestry
+        if: github.ref_type == 'tag'
+        run: python3 scripts/verify_release_ref.py
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
