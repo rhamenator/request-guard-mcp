@@ -536,25 +536,37 @@ pub async fn run_server(app_state: AppState) -> anyhow::Result<()> {
     serve_listener(listener, router, server_state.app.config.limits.clone()).await
 }
 
+#[derive(Clone, Copy, Default)]
+struct Http2Activity {
+    seen: bool,
+    active: usize,
+    requests: usize,
+}
+
+impl Http2Activity {
+    fn admit(&mut self, request_cap: usize) -> bool {
+        self.seen = true;
+        if self.requests >= request_cap {
+            return false;
+        }
+        self.active += 1;
+        self.requests += 1;
+        true
+    }
+}
+
+struct Http2RequestGuard(watch::Sender<Http2Activity>);
+impl Drop for Http2RequestGuard {
+    fn drop(&mut self) {
+        self.0.send_modify(|activity| activity.active -= 1);
+    }
+}
+
 async fn serve_listener(
     listener: tokio::net::TcpListener,
     router: Router,
     limits: LimitsConfig,
 ) -> anyhow::Result<()> {
-    #[derive(Clone, Copy, Default)]
-    struct Http2Activity {
-        seen: bool,
-        active: usize,
-        requests: usize,
-    }
-
-    struct Http2RequestGuard(watch::Sender<Http2Activity>);
-    impl Drop for Http2RequestGuard {
-        fn drop(&mut self) {
-            self.0.send_modify(|activity| activity.active -= 1);
-        }
-    }
-
     let connection_limit = Arc::new(Semaphore::new(limits.max_connections));
     loop {
         let (stream, peer) = listener.accept().await?;
@@ -594,13 +606,7 @@ async fn serve_listener(
                 let mut over_http2_request_cap = false;
                 if is_http2 {
                     activity_tx.send_modify(|activity| {
-                        activity.seen = true;
-                        if activity.requests >= http2_max_requests {
-                            over_http2_request_cap = true;
-                        } else {
-                            activity.active += 1;
-                            activity.requests += 1;
-                        }
+                        over_http2_request_cap = !activity.admit(http2_max_requests);
                     });
                 }
                 let request_guard =
@@ -715,6 +721,19 @@ mod slow_client_tests {
         net::TcpStream,
         time::timeout,
     };
+
+    #[test]
+    fn http2_admission_rejects_request_129_without_dispatch() {
+        let mut activity = Http2Activity::default();
+        for _ in 0..128 {
+            assert!(activity.admit(128));
+        }
+        assert_eq!(activity.requests, 128);
+        assert_eq!(activity.active, 128);
+        assert!(!activity.admit(128));
+        assert_eq!(activity.requests, 128);
+        assert_eq!(activity.active, 128);
+    }
 
     async fn test_server_with_limits(
         max_connections: usize,
@@ -913,7 +932,7 @@ mod slow_client_tests {
                 .windows(b"\"version\":".len())
                 .filter(|part| *part == b"\"version\":")
                 .count()
-                <= 1,
+                == 1,
             "request 129 must not reach the health handler"
         );
         let mut healthy = TcpStream::connect(addr).await.unwrap();
