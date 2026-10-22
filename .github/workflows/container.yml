@@ -19,9 +19,27 @@ env:
   IMAGE_NAME: rhamenator/request-guard-mcp
 
 jobs:
+  verify-container-ref:
+    name: Verify container tag version and source
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          fetch-depth: 0
+      - name: Validate tag and main ancestry
+        # Manual dispatch on a tag is also a publication path. Check it as a
+        # tag, rather than as a private release-candidate dispatch.
+        env:
+          GITHUB_EVENT_NAME: push
+        run: python3 scripts/verify_release_ref.py
+
   stable-tag-approval:
     name: Approve stable container tag
-    if: github.ref_type == 'tag' && !startsWith(github.ref_name, 'v0.') && !contains(github.ref_name, '-')
+    needs: verify-container-ref
+    if: ${{ !cancelled() && github.ref_type == 'tag' && !startsWith(github.ref_name, 'v0.') && !contains(github.ref_name, '-') && needs.verify-container-ref.result == 'success' }}
     runs-on: ubuntu-latest
     environment: stable-release
     permissions:
@@ -69,8 +87,8 @@ jobs:
 
   build-platform:
     name: Build Container (${{ matrix.arch }})
-    needs: stable-tag-approval
-    if: ${{ always() && github.event_name != 'pull_request' && (needs.stable-tag-approval.result == 'success' || needs.stable-tag-approval.result == 'skipped') }}
+    needs: [verify-container-ref, stable-tag-approval]
+    if: ${{ !cancelled() && github.event_name != 'pull_request' && (needs.verify-container-ref.result == 'success' || needs.verify-container-ref.result == 'skipped') && (needs.stable-tag-approval.result == 'success' || needs.stable-tag-approval.result == 'skipped') }}
     strategy:
       fail-fast: false
       matrix:
@@ -85,12 +103,6 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
-        with:
-          fetch-depth: 0
-
-      - name: Validate release tag and main ancestry
-        if: github.ref_type == 'tag'
-        run: python3 scripts/verify_release_ref.py
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1

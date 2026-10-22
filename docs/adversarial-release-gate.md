@@ -5,10 +5,13 @@ Stable releases require a repeatable adversarial run against the packaged server
 The [v1.0 evidence map](releases/v1-gate-evidence-map.md) distinguishes existing experimental-release results from checks that must be repeated on the exact stable candidate.
 
 Stable tag jobs use the GitHub `stable-release` environment, configured with
-`rhamenator` as its required reviewer. The native Release workflow waits for
-that approval before building archives; the Container workflow waits before
-pushing either platform digest. The owner should approve those jobs only after
-issue #125 has the exact-candidate evidence and independent review. A passing
+`rhamenator` as its required reviewer. The native Release workflow validates
+the tag version and main ancestry, then waits for approval before building
+archives. The Container workflow validates the same tag before requesting
+approval and pushing either platform digest. The owner should approve those
+jobs only after issue #125 has the exact-candidate evidence and independent
+review. This is a deliberate owner pause, not an independent approval:
+repository administrators can bypass the environment protection. A passing
 PR or private `workflow_dispatch` candidate does not authorize a stable tag.
 Before a stable release, verify the environment still has the required-reviewer
 protection rule; an unprotected or missing environment does not satisfy this
