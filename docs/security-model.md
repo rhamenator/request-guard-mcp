@@ -100,6 +100,12 @@ All WebSocket connections are authenticated at connection establishment using a 
 - Unknown tool names are rejected before Redis operation bookkeeping and use a
   single `__unknown__` metrics label. Arbitrary caller-chosen names do not
   create unbounded Prometheus series or Redis queue keys.
+- Development main limits each best-effort Redis tool-operation start and
+  completion record to 500 ms. If a record times out, the core tool still
+  runs; queue telemetry can temporarily omit the operation or show a stale
+  active entry until its Redis trim/expiry. Published
+  v0.1.5 does not include this bound. Redis-backed threat lookups and caching
+  have their own availability behavior and are not covered by this limit.
 
 ## Audit Logging
 

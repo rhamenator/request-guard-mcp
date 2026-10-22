@@ -5,13 +5,23 @@ use crate::state::AppState;
 use axum::extract::ws::{CloseFrame, Message, WebSocket};
 use serde_json::Value;
 use std::error::Error as _;
+use std::future::Future;
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use tokio::{sync::OwnedSemaphorePermit, time::timeout};
 use tracing::{error, info, warn, Instrument};
 use tungstenite::error::CapacityError;
 
 const UNKNOWN_TOOL_METRIC_LABEL: &str = "__unknown__";
+// Redis operation records are best-effort. Keep an unavailable backend from
+// delaying the core classifier beyond a short, independent bookkeeping budget.
+const REDIS_BOOKKEEPING_TIMEOUT: Duration = Duration::from_millis(500);
+
+async fn bounded_redis_record<T>(
+    future: impl Future<Output = T>,
+) -> Result<T, tokio::time::error::Elapsed> {
+    timeout(REDIS_BOOKKEEPING_TIMEOUT, future).await
+}
 pub const SUPPORTED_PROTOCOL_VERSION: &str = "2025-06-18";
 
 /// Handle a single WebSocket connection lifecycle.
@@ -294,14 +304,20 @@ pub(crate) async fn process_message(
     let state_arc = Arc::clone(state);
 
     let operation_id = if state.redis.is_available() {
-        match state
-            .redis
-            .record_tool_started(&tool_name, tool_timeout.as_secs().max(1))
-            .await
+        match bounded_redis_record(
+            state
+                .redis
+                .record_tool_started(&tool_name, tool_timeout.as_secs().max(1)),
+        )
+        .await
         {
-            Ok(id) => Some(id),
-            Err(error) => {
+            Ok(Ok(id)) => Some(id),
+            Ok(Err(error)) => {
                 warn!(tool = %tool_name, %error, "failed to record Redis operation start");
+                None
+            }
+            Err(_) => {
+                warn!(tool = %tool_name, "Redis operation start exceeded bookkeeping deadline");
                 None
             }
         }
@@ -319,12 +335,16 @@ pub(crate) async fn process_message(
     .await;
 
     if let Some(operation_id) = operation_id {
-        if let Err(error) = state
-            .redis
-            .record_tool_finished(&tool_name, &operation_id)
+        match bounded_redis_record(state.redis.record_tool_finished(&tool_name, &operation_id))
             .await
         {
-            warn!(tool = %tool_name, %error, "failed to record Redis operation completion");
+            Ok(Ok(())) => {}
+            Ok(Err(error)) => {
+                warn!(tool = %tool_name, %error, "failed to record Redis operation completion");
+            }
+            Err(_) => {
+                warn!(tool = %tool_name, "Redis operation completion exceeded bookkeeping deadline");
+            }
         }
     }
 
@@ -406,6 +426,12 @@ fn invalid_params(id: Value, message: &str) -> Option<String> {
 mod tests {
     use super::*;
     use crate::{config::Config, mcp::tool_registry::build_registry};
+
+    #[tokio::test]
+    async fn redis_record_deadline_cancels_a_stalled_record() {
+        let result = bounded_redis_record(std::future::pending::<anyhow::Result<()>>()).await;
+        assert!(result.is_err());
+    }
 
     fn test_context() -> (Arc<AppState>, Arc<ToolRegistry>) {
         (

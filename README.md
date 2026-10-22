@@ -31,6 +31,7 @@ To package the skill for a directory listing, run `python3 scripts/package_skill
 - **Two-level classification cache** (in-process Moka + shared Redis)
 - **Structured JSON logging** via `tracing`
 - **Redis-backed** threat reputation, canary registry, queue telemetry, and distributed cache
+- Development main bounds best-effort Redis tool-operation bookkeeping to 500 ms before and after dispatch, so a stalled optional Redis connection does not hold a core response on those records. Timed-out records may temporarily be absent or remain active in `queue_status` until Redis trim/expiry. Published v0.1.5 lacks this bound; Redis-dependent tools still require a healthy backend.
 - **Caller-isolated PostgreSQL** decision replay, feedback, drift, and calibration reports with automatic schema setup; configure a stable `CACHE_SCOPE_HMAC_KEY` when PostgreSQL is enabled
 - **PostgreSQL TLS trust in v0.1.4** uses the host operating system's CA store. With `sslmode=verify-full`, a private database CA can instead be supplied through `sslrootcert` in `MCP__POSTGRES__URL`. In that verification mode, an untrusted issuer or hostname mismatch prevents startup when PostgreSQL is configured; `sslmode=require` encrypts without certificate verification.
 - **HMAC-attested JA3/JA4 rules** with known-bad sets, UA/TLS mismatch detection, and verified cache partitioning
