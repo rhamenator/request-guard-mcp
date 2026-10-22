@@ -24,11 +24,15 @@ use hyper_util::{
     rt::{TokioExecutor, TokioIo, TokioTimer},
     server::conn::auto::Builder,
 };
-use std::{sync::Arc, time::Duration};
+use std::{
+    io,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 use tokio::sync::{watch, Notify, Semaphore};
 use tower::Service;
 use tower_http::limit::RequestBodyLimitLayer;
-use tracing::info;
+use tracing::{info, warn};
 
 #[derive(Clone)]
 pub struct ServerState {
@@ -572,6 +576,49 @@ impl Drop for Http2RequestGuard {
 
 const HTTP_CONNECTION_MAX_LIFETIME: Duration = Duration::from_secs(120);
 
+#[derive(Debug, PartialEq, Eq)]
+enum AcceptErrorAction {
+    RetryImmediately,
+    RetryWithBackoff,
+    Fatal,
+}
+
+fn accept_error_action(error: &io::Error) -> AcceptErrorAction {
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    if matches!(
+        error.raw_os_error(),
+        // Linux accept(2) reports these pending-connection network errors as
+        // accept failures; retrying permits the next peer to proceed.
+        Some(1 | 64 | 71 | 92 | 95 | 100 | 101 | 112 | 113)
+    ) {
+        return AcceptErrorAction::RetryImmediately;
+    }
+    match error.kind() {
+        io::ErrorKind::Interrupted
+        | io::ErrorKind::ConnectionAborted
+        | io::ErrorKind::ConnectionReset => AcceptErrorAction::RetryImmediately,
+        io::ErrorKind::OutOfMemory => AcceptErrorAction::RetryWithBackoff,
+        _ => {
+            // These resource errors are not all represented by ErrorKind.
+            // Keep this narrow: a permanently invalid listener must fail.
+            let resource_error = match error.raw_os_error() {
+                #[cfg(any(target_os = "linux", target_os = "android"))]
+                Some(12 | 23 | 24 | 105) => true, // ENOMEM, ENFILE, EMFILE, ENOBUFS
+                #[cfg(target_os = "macos")]
+                Some(12 | 23 | 24 | 55) => true,
+                #[cfg(windows)]
+                Some(4 | 10024 | 10055) => true,
+                _ => false,
+            };
+            if resource_error {
+                AcceptErrorAction::RetryWithBackoff
+            } else {
+                AcceptErrorAction::Fatal
+            }
+        }
+    }
+}
+
 async fn serve_listener(
     listener: tokio::net::TcpListener,
     router: Router,
@@ -587,8 +634,45 @@ async fn serve_listener_with_http1_lifetime(
     http1_max_lifetime: Duration,
 ) -> anyhow::Result<()> {
     let connection_limit = Arc::new(Semaphore::new(limits.max_connections));
+    let mut last_accept_error_log: Option<Instant> = None;
+    let mut last_accept_recovery_log: Option<Instant> = None;
+    let mut accept_error_count = 0_u64;
+    let mut resource_backoff = Duration::from_millis(100);
     loop {
-        let (stream, peer) = listener.accept().await?;
+        let (stream, peer) = match listener.accept().await {
+            Ok(accepted) => {
+                if accept_error_count > 0 {
+                    if last_accept_recovery_log
+                        .is_none_or(|last| last.elapsed() >= Duration::from_secs(60))
+                    {
+                        info!(accept_error_count, "TCP accept recovered");
+                        last_accept_recovery_log = Some(Instant::now());
+                    }
+                    accept_error_count = 0;
+                    resource_backoff = Duration::from_millis(100);
+                }
+                accepted
+            }
+            Err(error) => {
+                match accept_error_action(&error) {
+                    AcceptErrorAction::RetryImmediately => continue,
+                    AcceptErrorAction::Fatal => return Err(error.into()),
+                    AcceptErrorAction::RetryWithBackoff => {}
+                }
+                accept_error_count = accept_error_count.saturating_add(1);
+                if last_accept_error_log
+                    .is_none_or(|last| last.elapsed() >= Duration::from_secs(60))
+                {
+                    warn!(%error, accept_error_count, "TCP accept failed; retrying");
+                    last_accept_error_log = Some(Instant::now());
+                }
+                tokio::time::sleep(resource_backoff).await;
+                resource_backoff = resource_backoff
+                    .saturating_mul(2)
+                    .min(Duration::from_secs(1));
+                continue;
+            }
+        };
         let Ok(permit) = Arc::clone(&connection_limit).try_acquire_owned() else {
             // This path is attacker-reachable; per-rejection logs would turn
             // connection shedding into unbounded log growth.
@@ -745,6 +829,41 @@ mod slow_client_tests {
         net::TcpStream,
         time::timeout,
     };
+
+    #[test]
+    fn accept_error_classification_preserves_fatal_errors() {
+        assert_eq!(
+            accept_error_action(&io::Error::from(io::ErrorKind::ConnectionAborted)),
+            AcceptErrorAction::RetryImmediately
+        );
+        assert_eq!(
+            accept_error_action(&io::Error::from(io::ErrorKind::Interrupted)),
+            AcceptErrorAction::RetryImmediately
+        );
+        assert_eq!(
+            accept_error_action(&io::Error::from(io::ErrorKind::OutOfMemory)),
+            AcceptErrorAction::RetryWithBackoff
+        );
+        assert_eq!(
+            accept_error_action(&io::Error::from(io::ErrorKind::InvalidInput)),
+            AcceptErrorAction::Fatal
+        );
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        {
+            assert_eq!(
+                accept_error_action(&io::Error::from_raw_os_error(24)),
+                AcceptErrorAction::RetryWithBackoff
+            );
+            assert_eq!(
+                accept_error_action(&io::Error::from_raw_os_error(100)),
+                AcceptErrorAction::RetryImmediately
+            );
+            assert_eq!(
+                accept_error_action(&io::Error::from_raw_os_error(9)),
+                AcceptErrorAction::Fatal
+            );
+        }
+    }
 
     #[test]
     fn http2_admission_rejects_request_129_without_dispatch() {
