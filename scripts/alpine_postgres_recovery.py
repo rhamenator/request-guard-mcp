@@ -12,6 +12,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import urllib.error
 import urllib.request
 
 
@@ -71,6 +72,58 @@ def persisted_request_payload(request_id: str) -> dict:
     if not result.stdout.strip():
         raise RuntimeError("persisted decision row was not found")
     return json.loads(result.stdout)
+
+
+def sql_scalar(query: str) -> str:
+    result = subprocess.run(["psql", "-h", "127.0.0.1", "-p", str(PG_PORT),
+                             "-U", "postgres", "-d", "postgres", "-v", "ON_ERROR_STOP=1",
+                             "-tAc", query], capture_output=True, text=True, timeout=5,
+                            check=True)
+    return result.stdout.strip()
+
+
+def require_missing_after_purge(token: str, request_id: str) -> None:
+    try:
+        response = replay(token, request_id)
+    except urllib.error.HTTPError as error:
+        response = json.loads(error.read(4096))
+    error = response.get("error", {})
+    if error.get("code") != -400 or error.get("message") != "INVALID_REQUEST":
+        raise RuntimeError("purged decision remained replayable")
+
+
+def probe_operator_retention(token: str, old_id: str, fresh_id: str) -> None:
+    old_filter = f"response_payload->>'request_id' = '{old_id}'"
+    fresh_filter = f"response_payload->>'request_id' = '{fresh_id}'"
+    internal_id = sql_scalar("SELECT request_id FROM mcp_decisions WHERE " + old_filter + ";")
+    if len(internal_id) != 64 or any(char not in "0123456789abcdef" for char in internal_id):
+        raise RuntimeError("scoped decision key was not a SHA-256 hex digest")
+    # Seed feedback directly so this probe isolates the FK cascade from MCP
+    # feedback-tool behavior and its separate logging policy.
+    sql_scalar("INSERT INTO mcp_feedback "
+               "(feedback_id, request_id, caller_scope, correct_verdict) "
+               "SELECT 'retention-" + old_id + "', request_id, caller_scope, 'allow' "
+               "FROM mcp_decisions WHERE " + old_filter + ";")
+    feedback_count = ("SELECT COUNT(*) FROM mcp_feedback WHERE request_id = '"
+                      + internal_id + "';")
+    if sql_scalar(feedback_count) != "1":
+        raise RuntimeError("linked feedback row was missing before the purge")
+    sql_scalar("UPDATE mcp_decisions SET created_at = "
+               "NOW() - INTERVAL '31 days' WHERE " + old_filter + ";")
+    if sql_scalar("SELECT COUNT(*) FROM mcp_decisions WHERE " + fresh_filter + ";") != "1":
+        raise RuntimeError("fresh control decision was missing before the purge")
+    if sql_scalar("SELECT COUNT(*) FROM mcp_decisions WHERE "
+                  "created_at < NOW() - INTERVAL '30 days';") != "1":
+        raise RuntimeError("retention boundary did not select only the old decision")
+    sql_scalar("DELETE FROM mcp_decisions WHERE "
+               "created_at < NOW() - INTERVAL '30 days';")
+    if (persisted_row(old_id) or not persisted_row(fresh_id)
+            or sql_scalar(feedback_count) != "0"):
+        raise RuntimeError("retention did not preserve fresh data and cascade feedback")
+    require_missing_after_purge(token, old_id)
+    kept = require_success(replay(token, fresh_id), "retained replay")
+    if kept.get("matches_original") is not True:
+        raise RuntimeError("fresh control decision no longer replays after purge")
 
 
 def assert_minimized(payload: dict, sensitive: dict[str, str]) -> None:
@@ -240,6 +293,7 @@ def main() -> None:
             replayed = require_success(replay(token, request_id), "restored replay")
             if replayed.get("matches_original") is not True:
                 raise RuntimeError("restored replay did not match")
+            probe_operator_retention(token, request_id, f"{request_id}-restored")
         finally:
             pending_failure = sys.exc_info()[0] is not None
             try:
@@ -262,7 +316,8 @@ def main() -> None:
                 for secret in (token, cache_key, request_id, marker):
                     if secret.encode() in captured:
                         raise RuntimeError("Alpine MCP server log disclosed a synthetic secret")
-    print("PASS Alpine PostgreSQL: classify/replay, outage -502, ping, recovery, private logs")
+    print("PASS Alpine PostgreSQL: classify/replay, outage -502, recovery, "
+          "operator retention cascade, private logs")
 
 
 if __name__ == "__main__":
