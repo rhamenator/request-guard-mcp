@@ -675,6 +675,7 @@ mod tests {
             "replace_me_with_32_or_more_random_bytes",
             "replace_me_with_the_old_random_key",
             "replace_me_with_32_or_more_random_bytes\n",
+            "replace_me_with_a_strong_token",
         ] {
             config.auth.cache_scope_hmac_key = Some(placeholder.to_string());
             assert!(config.validate().is_err());
@@ -687,9 +688,11 @@ mod tests {
             "replace_me_with_32_or_more_random_bytes",
             "replace_me_with_the_old_random_key",
             "replace_me_with_32_or_more_random_bytes\n",
+            "replace_me_with_a_strong_token",
         ] {
             config.tls_fingerprints.attestation_key = Some(placeholder.to_string());
             assert!(config.validate().is_err());
+            assert!(config.validate_for_transport(true).is_err());
         }
         config.tls_fingerprints.attestation_key =
             Some("a-separate-random-test-attestation-key".to_string());
@@ -699,6 +702,7 @@ mod tests {
             "replace_me_with_32_or_more_random_bytes",
             "replace_me_with_the_old_random_key",
             "replace_me_with_the_old_random_key\n",
+            "replace_me_with_a_strong_token",
         ] {
             config.tls_fingerprints.previous_attestation_key = Some(placeholder.to_string());
             assert!(config.validate().is_err());
