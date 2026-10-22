@@ -56,7 +56,9 @@ def main():
     parser.add_argument("--redis-image", default="redis:7.2-alpine")
     parser.add_argument("--redis-port", type=int)
     parser.add_argument("--mcp-port", type=int)
-    parser.add_argument("--max-seconds", type=float, default=2.25)
+    parser.add_argument("--max-seconds", type=float, default=1.8,
+                        help="maximum median paused-classify latency")
+    parser.add_argument("--max-worst-seconds", type=float, default=2.25)
     parser.add_argument("--repeats", type=int, default=3)
     args = parser.parse_args()
     if not args.binary.is_file():
@@ -89,6 +91,16 @@ def main():
             args.redis_image, "redis-server", "--bind", "127.0.0.1",
             "--port", str(redis_port), "--save", "", "--appendonly", "no",
         )
+        for _ in range(50):
+            try:
+                if docker("exec", name, "redis-cli", "-h", "127.0.0.1",
+                          "-p", str(redis_port), "PING") == "PONG":
+                    break
+            except subprocess.CalledProcessError:
+                pass
+            time.sleep(0.1)
+        else:
+            raise RuntimeError("test Redis did not become ready")
         process = subprocess.Popen(
             [str(args.binary.resolve())], cwd=workdir.name, env=env, stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
@@ -103,8 +115,9 @@ def main():
                     health = json.load(response)
                     if response.status == 200 and health.get("checks", {}).get("redis", {}).get("status") == "healthy":
                         break
-            except (OSError, urllib.error.URLError):
-                time.sleep(0.1)
+            except (OSError, urllib.error.URLError, ValueError):
+                pass
+            time.sleep(0.1)
         else:
             raise RuntimeError("server did not become healthy")
 
@@ -132,8 +145,9 @@ def main():
         }))
         if not (healthy[1:] == (200, False, None)
                 and all(outage[1:] == (200, False, None) for outage in outages)
-                and ping[1] == 200
-                and worst_seconds < args.max_seconds):
+                and ping[1:] == (200, None, None)
+                and median_seconds < args.max_seconds
+                and worst_seconds < args.max_worst_seconds):
             raise RuntimeError("Redis outage exceeded latency or response-shape gate")
     finally:
         if paused:
