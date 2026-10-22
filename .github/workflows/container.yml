@@ -177,7 +177,7 @@ jobs:
 
   publish-container:
     name: Publish Multiarch Container
-    # The skipped stable approval on main/experimental tags is an ancestor of
+    # The skipped stable approval on main, v0 and prerelease tags is an ancestor of
     # build-platform. Override implicit success() so that a successful native
     # matrix can still assemble the index; a skipped/failed matrix cannot.
     if: ${{ !cancelled() && github.event_name != 'pull_request' && needs.build-platform.result == 'success' }}
