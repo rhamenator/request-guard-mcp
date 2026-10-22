@@ -50,6 +50,12 @@ All WebSocket connections are authenticated at connection establishment using a 
   bodies have a 30-second deadline and a 1 MiB size limit by default. Both
   deadlines are configurable with `MCP__LIMITS__HTTP_HEADER_TIMEOUT_SECS` and
   `MCP__LIMITS__HTTP_BODY_TIMEOUT_SECS`. A body timeout returns HTTP 408.
+- Development main closes a non-upgraded HTTP/1 keep-alive connection after
+  128 requests and caps its age at about 120 seconds after the first request,
+  including stalled response writes. The final non-upgrade response carries
+  `Connection: close`; WebSocket upgrades remain subject to their separate
+  limits. Published v0.1.5 lacks these HTTP/1 controls. A peer can reconnect,
+  so use proxy connection, read, and rate limits as another boundary.
 - HTTP/2 connections without a first complete request close after the header
   deadline. After a request completes, an idle HTTP/2 connection closes after
   `MCP__LIMITS__HTTP2_IDLE_TIMEOUT_SECS` (60 seconds by default). Development
