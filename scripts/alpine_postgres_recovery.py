@@ -114,6 +114,14 @@ def probe_operator_retention(token: str, old_id: str, fresh_id: str) -> None:
                       + internal_id + "';")
     if sql_scalar(feedback_count) != "1":
         raise RuntimeError("linked feedback row was missing before the purge")
+    sql_scalar("INSERT INTO mcp_feedback "
+               "(feedback_id, request_id, caller_scope, correct_verdict) "
+               "SELECT 'retention-fresh-control', request_id, caller_scope, 'allow' "
+               "FROM mcp_decisions WHERE request_id = '" + fresh_internal_id + "';")
+    fresh_feedback_count = ("SELECT COUNT(*) FROM mcp_feedback WHERE request_id = '"
+                            + fresh_internal_id + "';")
+    if sql_scalar(fresh_feedback_count) != "1":
+        raise RuntimeError("fresh linked feedback was missing before the purge")
     sql_scalar("UPDATE mcp_decisions SET created_at = "
                "NOW() - INTERVAL '31 days' WHERE " + old_filter + ";")
     if sql_scalar("SELECT COUNT(*) FROM mcp_decisions WHERE " + fresh_filter + ";") != "1":
@@ -146,7 +154,7 @@ def probe_operator_retention(token: str, old_id: str, fresh_id: str) -> None:
         raise RuntimeError("retention boundary did not select the aged cohort")
     if sql_scalar("SELECT COUNT(*) FROM mcp_decisions;") != str(2 * cohort_size + 2):
         raise RuntimeError("decision cohort did not reach its bounded row count")
-    if sql_scalar("SELECT COUNT(*) FROM mcp_feedback;") != str(cohort_size + 1):
+    if sql_scalar("SELECT COUNT(*) FROM mcp_feedback;") != str(cohort_size + 2):
         raise RuntimeError("feedback cohort did not reach its bounded row count")
     sql_scalar("DELETE FROM mcp_decisions WHERE "
                "created_at < NOW() - INTERVAL '30 days';")
@@ -165,8 +173,9 @@ def probe_operator_retention(token: str, old_id: str, fresh_id: str) -> None:
             or sql_scalar(old_cohort) != "0"
             or sql_scalar(fresh_cohort) != str(cohort_size)
             or sql_scalar(feedback_count) != "0"
+            or sql_scalar(fresh_feedback_count) != "1"
             or sql_scalar("SELECT COUNT(*) FROM mcp_decisions;") != str(cohort_size + 1)
-            or sql_scalar("SELECT COUNT(*) FROM mcp_feedback;") != "0"):
+            or sql_scalar("SELECT COUNT(*) FROM mcp_feedback;") != "1"):
         raise RuntimeError("retention did not preserve fresh data and cascade feedback")
     require_missing_after_purge(token, old_id)
     kept = require_success(replay(token, fresh_id), "retained replay")
