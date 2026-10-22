@@ -20,8 +20,10 @@ Windows x64, macOS Intel, and macOS Apple Silicon are also packaged. Verify
 native archive checksums. The skill ZIP contains instructions only. For HTTP
 or custom WebSocket, configure a unique `AUTH_TOKENS` bearer token of at least
 32 characters, start the server, and connect the client to `/mcp` with that
-token. Confirm
-`tools/list` includes `classify` and `explain` before using the skill.
+token. Confirm every example bearer, HMAC, TLS attestation, and backend password has been
+replaced before deployment; published v0.1.5 does not reject the shipped HMAC
+or attestation placeholders. Then confirm `tools/list` includes `classify` and
+`explain` before using the skill.
 The release workflow is configured to run official MCP Inspector 2.11.0 on
 future native bundles. Published v0.1.5 bundles were built with the prior
 2.5.0 smoke; a separate 2.11.0 smoke passed on the exact public Linux x64
