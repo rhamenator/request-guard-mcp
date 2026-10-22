@@ -187,9 +187,20 @@ passed official MCP Inspector initialization, tool listing, `classify`, and
 make docker-build
 make docker-run
 
-# With full stack (Redis, PostgreSQL, Prometheus, Grafana)
+# Local demo stack (Redis, PostgreSQL, Prometheus, Grafana)
+python scripts/configure_credentials.py
 make docker-compose-up
 ```
+
+The Compose example builds development main, uses private generated `.env`
+credentials, and binds the MCP, Prometheus, and Grafana host ports to
+`127.0.0.1` only. Prometheus scrapes the MCP `/metrics` endpoint within the
+Compose network; Grafana at `http://127.0.0.1:3000` has Prometheus provisioned
+as its default datasource (user `admin`, password from `GRAFANA_ADMIN_PASSWORD`
+in `.env`). The monitoring images are pinned to reviewed version digests; update
+them deliberately. `/metrics` is unauthenticated inside this local demo network.
+The backend links in this example are plaintext and are not a production
+networking or secrets-management design. See the [runbook](docs/runbook.md).
 
 ## Kubernetes
 
