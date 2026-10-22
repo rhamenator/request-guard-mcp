@@ -56,6 +56,10 @@ All WebSocket connections are authenticated at connection establishment using a 
   bounded shutdown deadline. HTTP/2 extended CONNECT/WebSocket is not enabled.
 - Per-tool timeouts separately bound tool execution after dispatch. Deploy a
   proxy with connection and read limits as another boundary.
+- Development main bounds each custom WebSocket response or control-frame send
+  to five seconds. A client that stops reading may lose the response and its
+  connection, releasing the WebSocket permit. Published v0.1.5 lacks this
+  send deadline.
 - Caller-supplied JA3/JA4 values are format-validated metadata, not proof of a
   TLS handshake. Only a fresh, context-bound HMAC from a trusted producer sets
   server-derived `tls_fingerprint_verified`; only verified values affect rules
