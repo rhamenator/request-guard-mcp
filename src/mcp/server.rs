@@ -25,8 +25,12 @@ use hyper_util::{
     server::conn::auto::Builder,
 };
 use std::{
+    convert::Infallible,
     io,
-    sync::Arc,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
     time::{Duration, Instant},
 };
 use tokio::sync::{watch, Notify, Semaphore};
@@ -575,6 +579,7 @@ impl Drop for Http2RequestGuard {
 }
 
 const HTTP_CONNECTION_MAX_LIFETIME: Duration = Duration::from_secs(120);
+const HTTP1_MAX_REQUESTS: usize = 128;
 
 #[derive(Debug, PartialEq, Eq)]
 enum AcceptErrorAction {
@@ -703,8 +708,14 @@ async fn serve_listener_with_http1_lifetime(
             let first_request = Arc::new(Notify::new());
             let first_request_for_service = Arc::clone(&first_request);
             let (activity_tx, mut activity_rx) = watch::channel(Http2Activity::default());
+            let http1_requests = Arc::new(AtomicUsize::new(0));
             let service = service_fn(move |request: hyper::Request<Incoming>| {
                 let is_http2 = request.version() == hyper::Version::HTTP_2;
+                let http1_request_number = if is_http2 {
+                    0
+                } else {
+                    http1_requests.fetch_add(1, Ordering::Relaxed) + 1
+                };
                 let activity_tx = activity_tx.clone();
                 let mut over_http2_request_cap = false;
                 if is_http2 {
@@ -719,12 +730,29 @@ async fn serve_listener_with_http1_lifetime(
                 async move {
                     let _request_guard = request_guard;
                     if over_http2_request_cap {
-                        return Ok(
+                        return Ok::<Response, Infallible>(
                             (StatusCode::SERVICE_UNAVAILABLE, "connection request limit")
                                 .into_response(),
                         );
                     }
-                    router.call(request.map(Body::new)).await
+                    if http1_request_number > HTTP1_MAX_REQUESTS {
+                        let mut response =
+                            (StatusCode::SERVICE_UNAVAILABLE, "connection request limit")
+                                .into_response();
+                        response
+                            .headers_mut()
+                            .insert(CONNECTION, HeaderValue::from_static("close"));
+                        return Ok::<Response, Infallible>(response);
+                    }
+                    let mut response = router.call(request.map(Body::new)).await?;
+                    if http1_request_number == HTTP1_MAX_REQUESTS
+                        && response.status() != StatusCode::SWITCHING_PROTOCOLS
+                    {
+                        response
+                            .headers_mut()
+                            .insert(CONNECTION, HeaderValue::from_static("close"));
+                    }
+                    Ok(response)
                 }
             });
             let mut builder = Builder::new(TokioExecutor::new());
@@ -1016,6 +1044,63 @@ mod slow_client_tests {
             .unwrap();
         assert!(reply[..read].starts_with(b"HTTP/1.1 200"));
         assert!(!task.is_finished());
+        task.abort();
+    }
+
+    #[tokio::test]
+    async fn http1_request_budget_closes_busy_keepalive_connection() {
+        let mut limits = crate::config::Config::default().limits;
+        limits.max_connections = 1;
+        // Longer than the read deadline: a header timeout must not make this
+        // test pass if the request-budget close header is missing.
+        limits.http_header_timeout_secs = 30;
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let router = Router::new().route("/health", get(|| async { "ok" }));
+        let task = tokio::spawn(async move {
+            serve_listener_with_http1_lifetime(listener, router, limits, Duration::from_secs(30))
+                .await
+                .unwrap();
+        });
+
+        let mut busy = TcpStream::connect(addr).await.unwrap();
+        let request = b"GET /health HTTP/1.1\r\nHost: localhost\r\n\r\n";
+        let mut pipeline = Vec::with_capacity(request.len() * HTTP1_MAX_REQUESTS);
+        for _ in 0..HTTP1_MAX_REQUESTS {
+            pipeline.extend_from_slice(request);
+        }
+        busy.write_all(&pipeline).await.unwrap();
+        let mut responses = Vec::new();
+        timeout(Duration::from_secs(5), busy.read_to_end(&mut responses))
+            .await
+            .expect("HTTP/1 request budget must close the busy connection")
+            .unwrap();
+        assert_eq!(
+            responses
+                .windows(b"HTTP/1.1 200".len())
+                .filter(|window| *window == b"HTTP/1.1 200")
+                .count(),
+            HTTP1_MAX_REQUESTS
+        );
+        let last_status = responses
+            .windows(b"HTTP/1.1 200".len())
+            .rposition(|window| window == b"HTTP/1.1 200")
+            .unwrap();
+        assert!(responses[last_status..]
+            .windows(b"connection: close".len())
+            .any(|window| window.eq_ignore_ascii_case(b"connection: close")));
+
+        let mut healthy = TcpStream::connect(addr).await.unwrap();
+        healthy
+            .write_all(b"GET /health HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+            .await
+            .unwrap();
+        let mut reply = [0_u8; 256];
+        let read = timeout(Duration::from_secs(2), healthy.read(&mut reply))
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(reply[..read].starts_with(b"HTTP/1.1 200"));
         task.abort();
     }
 
