@@ -40,6 +40,20 @@ All WebSocket connections are authenticated at connection establishment using a 
   bodies have a 30-second deadline and a 1 MiB size limit by default. Both
   deadlines are configurable with `MCP__LIMITS__HTTP_HEADER_TIMEOUT_SECS` and
   `MCP__LIMITS__HTTP_BODY_TIMEOUT_SECS`. A body timeout returns HTTP 408.
+- HTTP/2 connections without a first complete request close after the header
+  deadline. After a request completes, an idle HTTP/2 connection closes after
+  `MCP__LIMITS__HTTP2_IDLE_TIMEOUT_SECS` (60 seconds by default). Development
+  main also ends an HTTP/2 connection after 120 seconds or 128 requests, so
+  repeated health requests and rapid stream resets cannot keep one permit
+  indefinitely. Requests beyond the cap receive a 503 if hyper accepts them
+  during GOAWAY; they are not dispatched to tools. MCP POST body reads and
+  dispatched tools retain their separate
+  deadlines; shutdown waits for GOAWAY completion up to the body deadline plus
+  the larger tool/classify deadline and two seconds. Published v0.1.5 lacks
+  these HTTP/2 protections. A proxy should also set connection and read limits.
+  The idle deadline measures time since a handler returned its response rather
+  than raw frame activity; a slow reader may lose a response body at the
+  bounded shutdown deadline. HTTP/2 extended CONNECT/WebSocket is not enabled.
 - Per-tool timeouts separately bound tool execution after dispatch. Deploy a
   proxy with connection and read limits as another boundary.
 - Caller-supplied JA3/JA4 values are format-validated metadata, not proof of a

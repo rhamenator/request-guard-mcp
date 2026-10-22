@@ -25,7 +25,7 @@ use hyper_util::{
     server::conn::auto::Builder,
 };
 use std::{sync::Arc, time::Duration};
-use tokio::sync::{Notify, Semaphore};
+use tokio::sync::{watch, Notify, Semaphore};
 use tower::Service;
 use tower_http::limit::RequestBodyLimitLayer;
 use tracing::info;
@@ -536,6 +536,32 @@ pub async fn run_server(app_state: AppState) -> anyhow::Result<()> {
     serve_listener(listener, router, server_state.app.config.limits.clone()).await
 }
 
+#[derive(Clone, Copy, Default)]
+struct Http2Activity {
+    seen: bool,
+    active: usize,
+    requests: usize,
+}
+
+impl Http2Activity {
+    fn admit(&mut self, request_cap: usize) -> bool {
+        self.seen = true;
+        if self.requests >= request_cap {
+            return false;
+        }
+        self.active += 1;
+        self.requests += 1;
+        true
+    }
+}
+
+struct Http2RequestGuard(watch::Sender<Http2Activity>);
+impl Drop for Http2RequestGuard {
+    fn drop(&mut self) {
+        self.0.send_modify(|activity| activity.active -= 1);
+    }
+}
+
 async fn serve_listener(
     listener: tokio::net::TcpListener,
     router: Router,
@@ -552,26 +578,58 @@ async fn serve_listener(
         };
         let router = router.clone();
         let header_timeout = Duration::from_secs(limits.http_header_timeout_secs);
+        let http2_idle_timeout = Duration::from_secs(limits.http2_idle_timeout_secs);
+        // Bound a peer that repeatedly sends cheap unauthenticated requests
+        // before each idle deadline, including rapid stream resets.
+        let http2_max_lifetime = Duration::from_secs(120);
+        let http2_max_requests = 128;
+        let http2_drain_timeout = Duration::from_secs(
+            limits
+                .http_body_timeout_secs
+                .saturating_add(
+                    limits
+                        .per_tool_timeout_secs
+                        .max(limits.classify_timeout_secs),
+                )
+                .saturating_add(2),
+        );
         tokio::spawn(async move {
             // Hyper's HTTP/1 header timeout does not cover the auto-protocol
             // sniff or an HTTP/2 connection before its first request. Bound
             // both before they can retain a connection permit indefinitely.
             let first_request = Arc::new(Notify::new());
             let first_request_for_service = Arc::clone(&first_request);
+            let (activity_tx, mut activity_rx) = watch::channel(Http2Activity::default());
             let service = service_fn(move |request: hyper::Request<Incoming>| {
+                let is_http2 = request.version() == hyper::Version::HTTP_2;
+                let activity_tx = activity_tx.clone();
+                let mut over_http2_request_cap = false;
+                if is_http2 {
+                    activity_tx.send_modify(|activity| {
+                        over_http2_request_cap = !activity.admit(http2_max_requests);
+                    });
+                }
+                let request_guard =
+                    (is_http2 && !over_http2_request_cap).then(|| Http2RequestGuard(activity_tx));
                 first_request_for_service.notify_one();
                 let mut router = router.clone();
-                async move { router.call(request.map(Body::new)).await }
+                async move {
+                    let _request_guard = request_guard;
+                    if over_http2_request_cap {
+                        return Ok(
+                            (StatusCode::SERVICE_UNAVAILABLE, "connection request limit")
+                                .into_response(),
+                        );
+                    }
+                    router.call(request.map(Body::new)).await
+                }
             });
             let mut builder = Builder::new(TokioExecutor::new());
             builder
                 .http1()
                 .timer(TokioTimer::new())
                 .header_read_timeout(header_timeout);
-            builder
-                .http2()
-                .enable_connect_protocol()
-                .max_concurrent_streams(16);
+            builder.http2().max_concurrent_streams(16);
             {
                 let connection =
                     builder.serve_connection_with_upgrades(TokioIo::new(stream), service);
@@ -589,6 +647,59 @@ async fn serve_listener(
                 .await;
                 let result = match outcome {
                     Ok(Some(result)) => Some(result),
+                    Ok(None) if activity_rx.borrow().seen => {
+                        // An HTTP/2 connection can stay open after a complete
+                        // request. Idle, age and request-count caps apply;
+                        // in-flight work gets a separate bounded drain.
+                        let lifetime_deadline = tokio::time::sleep(http2_max_lifetime);
+                        tokio::pin!(lifetime_deadline);
+                        let result = loop {
+                            let activity = *activity_rx.borrow_and_update();
+                            if activity.requests >= http2_max_requests {
+                                break None;
+                            }
+                            let active = activity.active;
+                            if active == 0 {
+                                tokio::select! {
+                                    biased;
+                                    result = &mut connection => break Some(result),
+                                    _ = &mut lifetime_deadline => break None,
+                                    changed = activity_rx.changed() => {
+                                        if changed.is_err() { break None; }
+                                    }
+                                    _ = tokio::time::sleep(http2_idle_timeout) => {
+                                        if !activity_rx.has_changed().unwrap_or(false) {
+                                            break None;
+                                        }
+                                    }
+                                }
+                            } else {
+                                tokio::select! {
+                                    result = &mut connection => break Some(result),
+                                    _ = &mut lifetime_deadline => break None,
+                                    changed = activity_rx.changed() => {
+                                        if changed.is_err() { break None; }
+                                    }
+                                }
+                            }
+                        };
+                        if result.is_none() {
+                            connection.as_mut().graceful_shutdown();
+                            let drain_deadline = tokio::time::sleep(http2_drain_timeout);
+                            tokio::pin!(drain_deadline);
+                            // A stream already on the wire at GOAWAY may still
+                            // dispatch, and the response can outlive its handler.
+                            // Wait for hyper's two-phase GOAWAY to finish, with a
+                            // hard cap for peers that never answer its PING.
+                            // Dispatch rejects requests over the cap even if
+                            // hyper accepts them during the first GOAWAY phase.
+                            tokio::select! {
+                                _ = &mut connection => {},
+                                _ = &mut drain_deadline => {},
+                            }
+                        }
+                        result
+                    }
                     Ok(None) => Some(connection.await),
                     Err(_) => None, // Pre-auth timeout is attacker-reachable; do not log each one.
                 };
@@ -611,14 +722,32 @@ mod slow_client_tests {
         time::timeout,
     };
 
-    async fn test_server_with_connections(
+    #[test]
+    fn http2_admission_rejects_request_129_without_dispatch() {
+        let mut activity = Http2Activity::default();
+        for _ in 0..128 {
+            assert!(activity.admit(128));
+        }
+        assert_eq!(activity.requests, 128);
+        assert_eq!(activity.active, 128);
+        assert!(!activity.admit(128));
+        assert_eq!(activity.requests, 128);
+        assert_eq!(activity.active, 128);
+    }
+
+    async fn test_server_with_limits(
         max_connections: usize,
+        body_timeout_secs: u64,
+        http2_idle_timeout_secs: u64,
     ) -> (std::net::SocketAddr, tokio::task::JoinHandle<()>) {
         let mut config = crate::config::Config::default();
         config.auth.enabled = true;
         config.auth.tokens = vec!["test-token-with-at-least-32-characters".to_string()];
         config.limits.http_header_timeout_secs = 1;
-        config.limits.http_body_timeout_secs = 1;
+        config.limits.http_body_timeout_secs = body_timeout_secs;
+        config.limits.per_tool_timeout_secs = 1;
+        config.limits.classify_timeout_secs = 1;
+        config.limits.http2_idle_timeout_secs = http2_idle_timeout_secs;
         config.limits.max_connections = max_connections;
         let limits = config.limits.clone();
         let max_body = limits.max_request_bytes;
@@ -636,7 +765,13 @@ mod slow_client_tests {
     }
 
     async fn test_server() -> (std::net::SocketAddr, tokio::task::JoinHandle<()>) {
-        test_server_with_connections(2).await
+        test_server_with_limits(2, 1, 1).await
+    }
+
+    async fn test_server_with_connections(
+        max_connections: usize,
+    ) -> (std::net::SocketAddr, tokio::task::JoinHandle<()>) {
+        test_server_with_limits(max_connections, 1, 1).await
     }
 
     #[tokio::test]
@@ -698,6 +833,167 @@ mod slow_client_tests {
             .expect("WebSocket must outlive the first-request deadline")
             .unwrap();
         assert_eq!(pong, [0x8a, 0x00]);
+        task.abort();
+    }
+
+    #[tokio::test]
+    async fn idle_http2_after_valid_request_releases_connection_permit() {
+        let (addr, task) = test_server_with_connections(1).await;
+        let mut h2 = TcpStream::connect(addr).await.unwrap();
+        // HTTP/2 client preface, empty SETTINGS, and a static HPACK-encoded
+        // GET /health stream. These bytes are independent of a test client SDK.
+        h2.write_all(b"PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n\0\0\0\x04\0\0\0\0\0")
+            .await
+            .unwrap();
+        h2.write_all(b"\0\0\x11\x01\x05\0\0\0\x01\x82\x44\x85\x62\x72\x8e\x84\xcf\x86\x41\x86\xa0\xe4\x1d\x13\x9d\x09")
+            .await
+            .unwrap();
+        let mut response = Vec::new();
+        timeout(Duration::from_secs(2), async {
+            loop {
+                let mut chunk = [0_u8; 1024];
+                let read = h2.read(&mut chunk).await.unwrap();
+                assert!(read > 0, "HTTP/2 health response must arrive");
+                response.extend_from_slice(&chunk[..read]);
+                if response
+                    .windows(b"healthy".len())
+                    .any(|part| part == b"healthy")
+                {
+                    break;
+                }
+            }
+        })
+        .await
+        .expect("HTTP/2 health request must complete");
+        timeout(Duration::from_secs(10), h2.read_to_end(&mut response))
+            .await
+            .expect("idle HTTP/2 connection must close")
+            .unwrap();
+        let mut healthy = TcpStream::connect(addr).await.unwrap();
+        healthy
+            .write_all(b"GET /health HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+            .await
+            .unwrap();
+        let mut reply = [0_u8; 256];
+        let read = timeout(Duration::from_secs(2), healthy.read(&mut reply))
+            .await
+            .expect("idle HTTP/2 must release the connection permit")
+            .unwrap();
+        assert!(std::str::from_utf8(&reply[..read])
+            .unwrap()
+            .starts_with("HTTP/1.1 200"));
+        task.abort();
+    }
+
+    #[tokio::test]
+    async fn repeated_http2_health_requests_reach_connection_request_cap() {
+        let (addr, task) = test_server_with_limits(1, 1, 30).await;
+        let mut h2 = TcpStream::connect(addr).await.unwrap();
+        h2.write_all(b"PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n\0\0\0\x04\0\0\0\0\0")
+            .await
+            .unwrap();
+        let headers = b"\x82\x44\x85\x62\x72\x8e\x84\xcf\x86\x41\x86\xa0\xe4\x1d\x13\x9d\x09";
+        timeout(Duration::from_secs(15), async {
+            for stream_number in 0..127_u32 {
+                let stream_id = stream_number * 2 + 1;
+                let mut frame = [0_u8, 0, 17, 1, 5, 0, 0, 0, 0];
+                frame[5..9].copy_from_slice(&stream_id.to_be_bytes());
+                h2.write_all(&frame).await.unwrap();
+                h2.write_all(headers).await.unwrap();
+                let mut response = Vec::new();
+                loop {
+                    let mut chunk = [0_u8; 1024];
+                    let read = h2.read(&mut chunk).await.unwrap();
+                    assert!(read > 0, "HTTP/2 connection closed before request cap");
+                    response.extend_from_slice(&chunk[..read]);
+                    if response.windows(7).any(|part| part == b"healthy") {
+                        break;
+                    }
+                }
+            }
+        })
+        .await
+        .expect("bounded health requests must complete");
+        // Send the 128th and 129th streams before reading GOAWAY. Only the
+        // former may reach the health handler even if hyper accepts both.
+        for stream_id in [255_u32, 257_u32] {
+            let mut frame = [0_u8, 0, 17, 1, 5, 0, 0, 0, 0];
+            frame[5..9].copy_from_slice(&stream_id.to_be_bytes());
+            h2.write_all(&frame).await.unwrap();
+            h2.write_all(headers).await.unwrap();
+        }
+        let mut response = Vec::new();
+        timeout(Duration::from_secs(10), h2.read_to_end(&mut response))
+            .await
+            .expect("request cap must close the HTTP/2 connection")
+            .unwrap();
+        assert!(
+            response
+                .windows(b"\"version\":".len())
+                .filter(|part| *part == b"\"version\":")
+                .count()
+                == 1,
+            "request 129 must not reach the health handler"
+        );
+        let mut healthy = TcpStream::connect(addr).await.unwrap();
+        healthy
+            .write_all(b"GET /health HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+            .await
+            .unwrap();
+        let mut reply = [0_u8; 256];
+        let read = timeout(Duration::from_secs(2), healthy.read(&mut reply))
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(std::str::from_utf8(&reply[..read])
+            .unwrap()
+            .starts_with("HTTP/1.1 200"));
+        task.abort();
+    }
+
+    #[tokio::test]
+    async fn reset_http2_stream_does_not_leak_active_request_count() {
+        let (addr, task) = test_server_with_limits(1, 3, 1).await;
+        let mut h2 = TcpStream::connect(addr).await.unwrap();
+        h2.write_all(b"PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n\0\0\0\x04\0\0\0\0\0")
+            .await
+            .unwrap();
+        // HPACK headers for an authenticated POST /mcp stream with a declared
+        // 100-byte body that never arrives. RST_STREAM cancels the service.
+        let headers = "000042010400000001834483629257864186a0e41d139d091f089fba51d85b14495095927ea5a96f064ceb0d2b5051a12b32258938ec19125b115f8b1d75d0620d263d4c7441ea5c820801";
+        let headers: Vec<u8> = (0..headers.len())
+            .step_by(2)
+            .map(|index| u8::from_str_radix(&headers[index..index + 2], 16).unwrap())
+            .collect();
+        h2.write_all(&headers).await.unwrap();
+        tokio::time::sleep(Duration::from_millis(1300)).await;
+        let mut response = Vec::new();
+        assert!(
+            timeout(Duration::from_millis(100), h2.read_to_end(&mut response))
+                .await
+                .is_err(),
+            "an in-flight body must outlive the idle deadline"
+        );
+        h2.write_all(b"\0\0\x04\x03\0\0\0\0\x01\0\0\0\0")
+            .await
+            .unwrap();
+        timeout(Duration::from_secs(10), h2.read_to_end(&mut response))
+            .await
+            .expect("reset stream must not disable the HTTP/2 idle deadline")
+            .unwrap();
+        let mut healthy = TcpStream::connect(addr).await.unwrap();
+        healthy
+            .write_all(b"GET /health HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+            .await
+            .unwrap();
+        let mut reply = [0_u8; 256];
+        let read = timeout(Duration::from_secs(2), healthy.read(&mut reply))
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(std::str::from_utf8(&reply[..read])
+            .unwrap()
+            .starts_with("HTTP/1.1 200"));
         task.abort();
     }
 

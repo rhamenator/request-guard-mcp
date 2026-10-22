@@ -26,7 +26,7 @@ To package the skill for a directory listing, run `python3 scripts/package_skill
 - **WebSocket and HTTP POST transports** for implemented MCP methods; see the [current protocol limits](docs/inspector-interoperability.md#current-client-limits)
 - **Token-based authentication** (Bearer scheme) before HTTP POST body buffering and at WebSocket connection establishment
 - **Global concurrency control** with fail-fast tool rejection when capacity is full
-- **HTTP/1 header and body read deadlines**, a whole-connection cap, and per-tool execution timeouts; development main also bounds protocol detection and HTTP/2 before the first request, which published v0.1.5 does not. Deploy proxy read and connection timeouts as an additional boundary
+- **HTTP/1 header and body read deadlines**, a whole-connection cap, and per-tool execution timeouts; development main also bounds HTTP/2 setup, idle time (default 60 seconds), connection age (120 seconds), and requests per connection (128), which published v0.1.5 does not. Deploy proxy read and connection timeouts as an additional boundary
 - **Prometheus metrics** at `/metrics` with p50/p95/p99 histograms
 - **Two-level classification cache** (in-process Moka + shared Redis)
 - **Structured JSON logging** via `tracing`
@@ -46,6 +46,8 @@ WebSocket upgrades remain available. The HTTP and custom WebSocket JSON-RPC
 envelopes have [packaged-binary regression evidence](docs/releases/v0.1.4-ws-envelope-matrix.md)
 for the supported flows. Optional streaming transports and a broader client
 matrix are tracked in [issue #121](https://github.com/rhamenator/request-guard-mcp/issues/121).
+Development main serves custom WebSocket over HTTP/1 upgrade and does not
+enable HTTP/2 extended CONNECT.
 
 Run the native executable with `--stdio` for a local process MCP client. It
 uses newline-delimited JSON-RPC on stdin/stdout, sends diagnostics to
