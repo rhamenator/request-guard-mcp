@@ -638,31 +638,12 @@ async fn serve_listener(
                                             let drain_deadline = tokio::time::sleep(http2_drain_timeout);
                                             tokio::pin!(drain_deadline);
                                             // A stream already on the wire at GOAWAY may still
-                                            // dispatch. Give it its body/tool deadline before
-                                            // closing, while bounding a peer that never PONGs.
-                                            loop {
-                                                let active = activity_rx.borrow_and_update().active;
-                                                if active == 0 {
-                                                    tokio::select! {
-                                                        biased;
-                                                        _ = &mut connection => break,
-                                                        changed = activity_rx.changed() => {
-                                                            if changed.is_err() { break; }
-                                                        }
-                                                        _ = tokio::time::sleep(Duration::from_secs(1)) => {
-                                                            if !activity_rx.has_changed().unwrap_or(false) { break; }
-                                                        }
-                                                        _ = &mut drain_deadline => break,
-                                                    }
-                                                } else {
-                                                    tokio::select! {
-                                                        _ = &mut connection => break,
-                                                        changed = activity_rx.changed() => {
-                                                            if changed.is_err() { break; }
-                                                        }
-                                                        _ = &mut drain_deadline => break,
-                                                    }
-                                                }
+                                            // dispatch, and the response can outlive its handler.
+                                            // Wait for hyper's two-phase GOAWAY to finish, with a
+                                            // hard cap for peers that never answer its PING.
+                                            tokio::select! {
+                                                _ = &mut connection => {},
+                                                _ = &mut drain_deadline => {},
                                             }
                                             break None;
                                         }
@@ -709,6 +690,7 @@ mod slow_client_tests {
         config.auth.tokens = vec!["test-token-with-at-least-32-characters".to_string()];
         config.limits.http_header_timeout_secs = 1;
         config.limits.http_body_timeout_secs = body_timeout_secs;
+        config.limits.per_tool_timeout_secs = 1;
         config.limits.http2_idle_timeout_secs = 1;
         config.limits.max_connections = max_connections;
         let limits = config.limits.clone();
@@ -827,7 +809,7 @@ mod slow_client_tests {
         })
         .await
         .expect("HTTP/2 health request must complete");
-        timeout(Duration::from_secs(3), h2.read_to_end(&mut response))
+        timeout(Duration::from_secs(6), h2.read_to_end(&mut response))
             .await
             .expect("idle HTTP/2 connection must close")
             .unwrap();
@@ -849,7 +831,7 @@ mod slow_client_tests {
 
     #[tokio::test]
     async fn reset_http2_stream_does_not_leak_active_request_count() {
-        let (addr, task) = test_server_with_limits(1, 10).await;
+        let (addr, task) = test_server_with_limits(1, 3).await;
         let mut h2 = TcpStream::connect(addr).await.unwrap();
         h2.write_all(b"PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n\0\0\0\x04\0\0\0\0\0")
             .await
@@ -873,7 +855,7 @@ mod slow_client_tests {
         h2.write_all(b"\0\0\x04\x03\0\0\0\0\x01\0\0\0\0")
             .await
             .unwrap();
-        timeout(Duration::from_secs(3), h2.read_to_end(&mut response))
+        timeout(Duration::from_secs(7), h2.read_to_end(&mut response))
             .await
             .expect("reset stream must not disable the HTTP/2 idle deadline")
             .unwrap();
