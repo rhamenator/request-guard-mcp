@@ -168,6 +168,36 @@ jobs:
           python3 scripts/smoke_native_container.py \
             --image "$REGISTRY/$IMAGE_NAME@$DIGEST" --arch "$ARCH"
 
+      - name: Record resolved inputs from immutable platform digest
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          [[ "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
+          image="$REGISTRY/$IMAGE_NAME@$DIGEST"
+          mkdir -p build-inputs
+          for stage in builder runtime toolchain; do
+            filename="${stage}-packages.txt"
+            if test "$stage" = toolchain; then filename='toolchain.txt'; fi
+            docker run --rm --network none --read-only --pids-limit 32 \
+              --entrypoint cat "$image" \
+              "/usr/share/request-guard-mcp/${filename}" \
+              > "build-inputs/${stage}.txt"
+            test -s "build-inputs/${stage}.txt"
+            printf '%s published digest %s %s input SHA256: %s\n' \
+              "$ARCH" "$DIGEST" "$stage" \
+              "$(sha256sum "build-inputs/${stage}.txt" | cut -d ' ' -f 1)" \
+              >> "$GITHUB_STEP_SUMMARY"
+          done
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: container-inputs-${{ matrix.arch }}
+          path: build-inputs/
+          if-no-files-found: error
+          retention-days: 14
+
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: container-digest-${{ matrix.arch }}
