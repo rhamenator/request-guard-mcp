@@ -833,15 +833,34 @@ mod slow_client_tests {
 
     #[tokio::test]
     async fn http1_slow_reader_releases_connection_permit_at_lifetime() {
-        let (addr, task) = test_server_with_limits(1, 1, 1, Duration::from_secs(3)).await;
+        // A single response larger than a normal kernel send buffer makes the
+        // non-reading peer hold the connection in the response-write path.
+        let router = Router::new()
+            .route(
+                "/large",
+                get(|| async { axum::body::Bytes::from(vec![b'x'; 16 * 1024 * 1024]) }),
+            )
+            .route("/health", get(|| async { "ok" }));
+        let mut limits = LimitsConfig::default();
+        limits.max_connections = 1;
+        limits.http_header_timeout_secs = 1;
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let task = tokio::spawn(async move {
+            serve_listener_with_http1_lifetime(listener, router, limits, Duration::from_secs(6))
+                .await
+                .unwrap();
+        });
         let socket = tokio::net::TcpSocket::new_v4().unwrap();
         socket.set_recv_buffer_size(1024).unwrap();
         let mut slow_reader = socket.connect(addr).await.unwrap();
-        let requests = b"GET /metrics HTTP/1.1\r\nHost: localhost\r\n\r\n".repeat(800);
-        timeout(Duration::from_secs(2), slow_reader.write_all(&requests))
-            .await
-            .expect("bounded pipelined requests should fit the sender buffer")
-            .unwrap();
+        timeout(
+            Duration::from_secs(2),
+            slow_reader.write_all(b"GET /large HTTP/1.1\r\nHost: localhost\r\n\r\n"),
+        )
+        .await
+        .expect("request should fit the sender buffer")
+        .unwrap();
 
         tokio::time::sleep(Duration::from_millis(1500)).await;
         let mut blocked = TcpStream::connect(addr).await.unwrap();
@@ -856,7 +875,7 @@ mod slow_client_tests {
             "a non-reading peer should still hold the only slot before its lifetime"
         );
 
-        tokio::time::sleep(Duration::from_secs(3)).await;
+        tokio::time::sleep(Duration::from_secs(6)).await;
         let mut healthy = TcpStream::connect(addr).await.unwrap();
         healthy
             .write_all(b"GET /health HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
@@ -867,13 +886,13 @@ mod slow_client_tests {
             .expect("HTTP/1 lifetime must release the connection permit")
             .unwrap();
         assert!(reply[..read].starts_with(b"HTTP/1.1 200"));
-        assert_eq!(task.is_finished(), false);
+        assert!(!task.is_finished());
         task.abort();
     }
 
     #[tokio::test]
     async fn first_request_does_not_limit_websocket_lifetime() {
-        let (addr, task) = test_server().await;
+        let (addr, task) = test_server_with_limits(2, 1, 1, Duration::from_secs(2)).await;
         let mut stream = TcpStream::connect(addr).await.unwrap();
         stream.write_all(b"GET /mcp HTTP/1.1\r\nHost: localhost\r\nAuthorization: Bearer test-token-with-at-least-32-characters\r\nConnection: Upgrade\r\nUpgrade: websocket\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n\r\n").await.unwrap();
         let mut response = [0_u8; 512];
@@ -884,7 +903,7 @@ mod slow_client_tests {
         assert!(std::str::from_utf8(&response[..read])
             .unwrap()
             .starts_with("HTTP/1.1 101"));
-        tokio::time::sleep(Duration::from_millis(1500)).await;
+        tokio::time::sleep(Duration::from_millis(2500)).await;
         stream.write_all(b"\x89\x80\x00\x00\x00\x00").await.unwrap();
         let mut pong = [0_u8; 2];
         timeout(Duration::from_secs(2), stream.read_exact(&mut pong))
