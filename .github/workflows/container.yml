@@ -19,6 +19,34 @@ env:
   IMAGE_NAME: rhamenator/request-guard-mcp
 
 jobs:
+  verify-container-ref:
+    name: Verify container tag version and source
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          fetch-depth: 0
+      - name: Validate tag and main ancestry
+        # Manual dispatch on a tag is also a publication path. Check it as a
+        # tag, rather than as a private release-candidate dispatch.
+        env:
+          GITHUB_EVENT_NAME: push
+        run: python3 scripts/verify_release_ref.py
+
+  stable-tag-approval:
+    name: Approve stable container tag
+    needs: verify-container-ref
+    if: ${{ !cancelled() && github.ref_type == 'tag' && !startsWith(github.ref_name, 'v0.') && !contains(github.ref_name, '-') && needs.verify-container-ref.result == 'success' }}
+    runs-on: ubuntu-latest
+    environment: stable-release
+    permissions:
+      contents: read
+    steps:
+      - run: echo 'Stable container publication approved by the protected environment reviewer.'
+
   build-and-push:
     name: Build and Push Container
     if: github.event_name == 'pull_request'
@@ -59,7 +87,10 @@ jobs:
 
   build-platform:
     name: Build Container (${{ matrix.arch }})
-    if: github.event_name != 'pull_request'
+    needs: [verify-container-ref, stable-tag-approval]
+    # Manual branch dispatch is allowed only on main; a version-named branch
+    # must never create a public image tag without the stable-tag gate.
+    if: ${{ !cancelled() && github.event_name != 'pull_request' && (github.ref_type == 'tag' || github.ref == 'refs/heads/main') && (needs.verify-container-ref.result == 'success' || needs.verify-container-ref.result == 'skipped') && (needs.stable-tag-approval.result == 'success' || needs.stable-tag-approval.result == 'skipped') }}
     strategy:
       fail-fast: false
       matrix:

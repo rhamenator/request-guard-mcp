@@ -4,6 +4,28 @@ Stable releases require a repeatable adversarial run against the packaged server
 
 The [v1.0 evidence map](releases/v1-gate-evidence-map.md) distinguishes existing experimental-release results from checks that must be repeated on the exact stable candidate.
 
+Stable tag jobs use the GitHub `stable-release` environment, configured with
+`rhamenator` as its required reviewer. The native Release workflow validates
+the tag version and main ancestry, then waits for approval before building
+archives. The Container workflow validates the same tag before requesting
+approval and pushing either platform digest. The owner should approve those
+jobs only after issue #125 has the exact-candidate evidence and independent
+review. This is a deliberate owner pause, not an independent approval:
+repository administrators can bypass the environment protection. A passing
+PR or private `workflow_dispatch` candidate does not authorize a stable tag.
+The active repository tag ruleset `owner-only version tag creation` (ID
+`25603144`) restricts creation, update, and deletion of `v*` tags to repository
+administrators. This prevents other writers from pointing a version tag at a
+commit with altered workflow gates. The owner can still bypass this ruleset;
+review the exact tagged commit and its workflows before approval. Manual
+Container dispatch on a branch publishes only from `main`; version-named
+branches cannot publish a GHCR tag.
+The tag verifier rejects SemVer build metadata (`+...`) because its suffix
+could otherwise make a stable tag appear to be a prerelease to the workflow.
+Before a stable release, verify the environment still has the required-reviewer
+protection rule and the tag ruleset is still active; missing protection does
+not satisfy this gate. Experimental and private-candidate paths remain automatic.
+
 At minimum, exercise authentication boundaries, malformed JSON-RPC and MCP frames, invalid and oversized inputs, prompt-injection text treated as request data, bot-evasion variations, concurrency and slow clients, backend failure and recovery, and logging of sensitive fields. Use Kali and Ubuntu lab VMs when available; scope scanners to the owned test endpoint, record their request counts, and bound runtime and rate to preserve shared host responsiveness. Confirm each exploit or anomaly with a regression test, rerun the affected probe, then rerun the full gate. Reconcile independent Claude Code and Codex reviews with the observed runtime results and document remaining limits before a release.
 
 The HTTP transport regression suite checks that valid JSON with an invalid JSON-RPC

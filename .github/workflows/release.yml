@@ -35,9 +35,21 @@ jobs:
       - name: Verify Windows icon resource matches source
         run: python3 scripts/verify_icon_resource.py
 
+  stable-tag-approval:
+    name: Approve stable release tag
+    needs: verify-release-ref
+    if: github.event_name == 'push' && github.ref_type == 'tag' && !startsWith(github.ref_name, 'v0.') && !contains(github.ref_name, '-')
+    runs-on: ubuntu-latest
+    environment: stable-release
+    permissions:
+      contents: read
+    steps:
+      - run: echo 'Stable release approved by the protected environment reviewer.'
+
   build-release:
     name: Build ${{ matrix.platform }} binary
-    needs: verify-release-ref
+    needs: [verify-release-ref, stable-tag-approval]
+    if: ${{ !cancelled() && needs.verify-release-ref.result == 'success' && (needs.stable-tag-approval.result == 'success' || needs.stable-tag-approval.result == 'skipped') }}
     env:
       # Override rust-toolchain.toml's moving stable channel for the musl lane.
       RUSTUP_TOOLCHAIN: ${{ matrix.target == 'x86_64-unknown-linux-musl' && '1.99.1' || 'stable' }}
@@ -219,7 +231,7 @@ jobs:
 
   create-release:
     name: Create GitHub Release
-    if: github.ref_type == 'tag'
+    if: github.event_name == 'push' && github.ref_type == 'tag'
     needs: [verify-release-ref, build-release]
     runs-on: ubuntu-latest
     permissions:
