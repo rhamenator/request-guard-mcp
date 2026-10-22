@@ -23,10 +23,12 @@ All WebSocket connections are authenticated at connection establishment using a 
 - Development main minimizes new PostgreSQL replay request JSON to a subset
   of current rule inputs and header-name presence; it does not persist caller-provided
   header values, body snippets, arbitrary extra data, IPs, referrers,
-  timestamps or TLS attestation material in that request JSON. Stored verdicts
-  and signals remain. Paths, user agents, request IDs and feedback can still
+  timestamps, request IDs or TLS attestation material in that request JSON. Stored verdicts,
+  signals and response request IDs remain. Paths, user agents, request IDs and feedback can still
   contain personal data. The schema has no automatic retention; operators must
-  schedule deletion, and upgrading does not rewrite older full-payload rows.
+  schedule deletion. Upgrading does not automatically rewrite older full-payload
+  rows; a reviewed, one-time operator migration is available at
+  `scripts/postgres_minimize_legacy.sql`.
   Published v0.1.5 still stores full classification requests.
 
 ## Transport Security

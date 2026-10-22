@@ -54,7 +54,7 @@ def pg_running() -> bool:
 def persisted_row(request_id: str) -> bool:
     # request_id is generated solely from a fixed prefix and hexadecimal bytes.
     query = ("SELECT COUNT(*) FROM mcp_decisions WHERE "
-             f"request_payload->>'request_id' = '{request_id}'")
+             f"response_payload->>'request_id' = '{request_id}'")
     result = subprocess.run(["psql", "-h", "127.0.0.1", "-p", str(PG_PORT),
                              "-U", "postgres", "-d", "postgres", "-tAc", query],
                             capture_output=True, text=True, timeout=5, check=True)
@@ -64,11 +64,51 @@ def persisted_row(request_id: str) -> bool:
 def persisted_request_payload(request_id: str) -> dict:
     # request_id is generated solely from a fixed prefix and hexadecimal bytes.
     query = ("SELECT request_payload::text FROM mcp_decisions WHERE "
-             f"request_payload->>'request_id' = '{request_id}'")
+             f"response_payload->>'request_id' = '{request_id}'")
     result = subprocess.run(["psql", "-h", "127.0.0.1", "-p", str(PG_PORT),
                              "-U", "postgres", "-d", "postgres", "-tAc", query],
                             capture_output=True, text=True, timeout=5, check=True)
+    if not result.stdout.strip():
+        raise RuntimeError("persisted decision row was not found")
     return json.loads(result.stdout)
+
+
+def assert_minimized(payload: dict, sensitive: dict[str, str]) -> None:
+    if payload.get("headers") != {"accept": ""}:
+        raise RuntimeError("persisted header presence did not match reduced snapshot")
+    if any(payload.get(name) is not None for name in
+           ("ip", "body_snippet", "extra", "referer", "accept", "timestamp",
+            "request_id", "tls_ja3", "tls_ja4", "tls_fingerprint_source")):
+        raise RuntimeError("persisted replay request retained an excluded field")
+    if any(value in json.dumps(payload) for value in sensitive.values()):
+        raise RuntimeError("persisted replay request retained a synthetic secret")
+
+
+def simulate_legacy_row_and_migrate(request_id: str, marker: str,
+                                    sensitive: dict[str, str]) -> dict:
+    legacy = {"request_id": request_id, "ip": "192.0.2.44",
+              "user_agent": "Mozilla/5.0", "method": "GET", "path": f"/{marker}",
+              "headers": {"ACCEPT": "application/json", "Cookie": sensitive["header"]},
+              "body_snippet": sensitive["body"],
+              "extra": {"token": sensitive["extra"]},
+              "referer": sensitive["referer"], "accept": sensitive["accept"],
+              "timestamp": sensitive["timestamp"]}
+    raw = json.dumps(legacy)
+    if "'" in raw:
+        raise RuntimeError("synthetic legacy fixture contains a SQL quote")
+    query = ("UPDATE mcp_decisions SET request_payload = "
+             f"'{raw}'::jsonb WHERE response_payload->>'request_id' = '{request_id}';")
+    subprocess.run(["psql", "-h", "127.0.0.1", "-p", str(PG_PORT),
+                    "-U", "postgres", "-d", "postgres", "-v", "ON_ERROR_STOP=1"],
+                   input=query, capture_output=True, text=True, timeout=5, check=True)
+    legacy_payload = persisted_request_payload(request_id)
+    if not any(value in json.dumps(legacy_payload) for value in sensitive.values()):
+        raise RuntimeError("legacy fixture did not contain synthetic sensitive data")
+    subprocess.run(["psql", "-h", "127.0.0.1", "-p", str(PG_PORT),
+                    "-U", "postgres", "-d", "postgres", "-v", "ON_ERROR_STOP=1",
+                    "-f", "/test/postgres_minimize_legacy.sql"],
+                   capture_output=True, text=True, timeout=30, check=True)
+    return persisted_request_payload(request_id)
 
 
 def rpc(token: str, method: str, params: dict | None = None) -> dict:
@@ -175,18 +215,15 @@ def main() -> None:
                                     "initial classify")
             if first.get("request_id") != request_id:
                 raise RuntimeError("initial classification request id mismatch")
-            stored = persisted_request_payload(request_id)
-            if stored.get("headers") != {"accept": ""}:
-                raise RuntimeError("persisted header presence did not match reduced snapshot")
-            if any(stored.get(name) is not None for name in
-                   ("ip", "body_snippet", "extra", "referer", "accept", "timestamp",
-                    "tls_ja3", "tls_ja4", "tls_fingerprint_source")):
-                raise RuntimeError("persisted replay request retained an excluded field")
-            if any(value in json.dumps(stored) for value in sensitive.values()):
-                raise RuntimeError("persisted replay request retained a synthetic secret")
+            assert_minimized(persisted_request_payload(request_id), sensitive)
             replayed = require_success(replay(token, request_id), "initial replay")
             if replayed.get("matches_original") is not True:
                 raise RuntimeError("initial replay did not match")
+            migrated = simulate_legacy_row_and_migrate(request_id, marker, sensitive)
+            assert_minimized(migrated, sensitive)
+            migrated_replay = require_success(replay(token, request_id), "migrated replay")
+            if migrated_replay.get("matches_original") is not True:
+                raise RuntimeError("migrated replay did not match")
             stop_pg()
             require_upstream(classify(token, f"{request_id}-outage", marker), "outage classify")
             require_upstream(replay(token, request_id), "outage replay")

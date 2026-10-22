@@ -20,6 +20,7 @@ def main() -> None:
     args = parser.parse_args()
     binary = args.binary.resolve(strict=True)
     probe = Path(__file__).with_name("alpine_postgres_recovery.py").resolve(strict=True)
+    migration = Path(__file__).with_name("postgres_minimize_legacy.sql").resolve(strict=True)
     name = f"request-guard-alpine-pg-{os.getpid()}-{secrets.token_hex(4)}"
     command = [
         "docker", "run", "--rm", "--init", "--name", name,
@@ -27,6 +28,7 @@ def main() -> None:
         "--tmpfs", "/tmp:rw,size=256m",
         "-v", f"{binary}:/test/request-guard-mcp:ro",
         "-v", f"{probe}:/test/alpine_postgres_recovery.py:ro",
+        "-v", f"{migration}:/test/postgres_minimize_legacy.sql:ro",
         ALPINE_IMAGE, "sh", "-ec",
         "apk add --no-cache python3 postgresql18 >/dev/null; "
         "python3 /test/alpine_postgres_recovery.py /test/request-guard-mcp \"$1\"",

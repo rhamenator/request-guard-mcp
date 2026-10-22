@@ -42,7 +42,9 @@ fn replay_feature_snapshot(request: &ClassifyRequest) -> ClassifyRequest {
         body_snippet: None,
         referer: None,
         accept: None,
-        request_id: request.request_id.clone(),
+        // The response payload already retains the ID for caller-scoped
+        // lookup; replay assigns a fresh ID before classification.
+        request_id: None,
         timestamp: None,
         // Attested TLS provenance is intentionally not persisted. Replay of
         // an attested fingerprint cannot reproduce the original trusted TLS
@@ -540,7 +542,7 @@ mod scoped_key_tests {
             "body_snippet": "synthetic-body-secret",
             "referer": "https://example.test/synthetic-referer-secret",
             "accept": "synthetic-accept-secret",
-            "request_id": "safe-id",
+            "request_id": "synthetic-request-id-secret",
             "timestamp": "synthetic-timestamp-secret",
             "extra": {"token": "synthetic-extra-secret"}
         }))
@@ -556,6 +558,7 @@ mod scoped_key_tests {
             "synthetic-accept-secret",
             "synthetic-timestamp-secret",
             "synthetic-extra-secret",
+            "synthetic-request-id-secret",
             "198.51.100.42",
         ] {
             assert!(
