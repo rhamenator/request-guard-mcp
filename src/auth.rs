@@ -2,7 +2,6 @@ use crate::error::AppError;
 use crate::util::hashing::hmac_sha256_hex;
 use axum::http::HeaderMap;
 use std::sync::OnceLock;
-use tracing::warn;
 
 /// Process-local random fallback for the cache-scope HMAC key. Configure
 /// `auth.cache_scope_hmac_key` (`CACHE_SCOPE_HMAC_KEY`) to keep scopes stable
@@ -33,12 +32,10 @@ pub fn authenticated_cache_scope_with_key(
     hmac_key: Option<&[u8]>,
 ) -> Result<String, AppError> {
     let Some(auth_header) = headers.get("authorization") else {
-        warn!("request missing authorization header");
         return Err(AppError::Unauthenticated);
     };
 
     let Ok(auth_str) = auth_header.to_str() else {
-        warn!("authorization header contains invalid bytes");
         return Err(AppError::Unauthenticated);
     };
 
@@ -47,7 +44,6 @@ pub fn authenticated_cache_scope_with_key(
     } else if let Some(stripped) = auth_str.strip_prefix("bearer ") {
         stripped
     } else {
-        warn!("authorization header not in expected scheme format");
         return Err(AppError::Unauthenticated);
     };
 
@@ -58,7 +54,6 @@ pub fn authenticated_cache_scope_with_key(
         let key = hmac_key.unwrap_or(ephemeral_scope_key());
         Ok(format!("caller:{}", hmac_sha256_hex(key, token.as_bytes())))
     } else {
-        warn!("invalid bearer token presented");
         Err(AppError::Forbidden)
     }
 }
