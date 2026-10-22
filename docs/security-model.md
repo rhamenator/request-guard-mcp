@@ -45,7 +45,9 @@ All WebSocket connections are authenticated at connection establishment using a 
   `MCP__LIMITS__HTTP2_IDLE_TIMEOUT_SECS` (60 seconds by default). Development
   main also ends an HTTP/2 connection after 120 seconds or 128 requests, so
   repeated health requests and rapid stream resets cannot keep one permit
-  indefinitely. MCP POST body reads and dispatched tools retain their separate
+  indefinitely. Up to one 16-stream window already on the wire can dispatch
+  during GOAWAY before the connection is forcibly closed. MCP POST body reads
+  and dispatched tools retain their separate
   deadlines; shutdown waits for GOAWAY completion up to the body deadline plus
   the larger tool/classify deadline and two seconds. Published v0.1.5 lacks
   these HTTP/2 protections. A proxy should also set connection and read limits.

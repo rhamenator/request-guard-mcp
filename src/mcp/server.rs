@@ -673,9 +673,21 @@ async fn serve_listener(
                             // dispatch, and the response can outlive its handler.
                             // Wait for hyper's two-phase GOAWAY to finish, with a
                             // hard cap for peers that never answer its PING.
-                            tokio::select! {
-                                _ = &mut connection => {},
-                                _ = &mut drain_deadline => {},
+                            // The first GOAWAY can admit already-sent streams;
+                            // allow one concurrent-stream window beyond the
+                            // request cap, then close even during the drain.
+                            loop {
+                                let activity = *activity_rx.borrow_and_update();
+                                if activity.requests > http2_max_requests + 16 {
+                                    break;
+                                }
+                                tokio::select! {
+                                    _ = &mut connection => break,
+                                    _ = &mut drain_deadline => break,
+                                    changed = activity_rx.changed() => {
+                                        if changed.is_err() { break; }
+                                    }
+                                }
                             }
                         }
                         result
