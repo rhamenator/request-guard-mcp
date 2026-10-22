@@ -21,7 +21,7 @@ native archive checksums. The skill ZIP contains instructions only. For HTTP
 or custom WebSocket, configure a unique `AUTH_TOKENS` bearer token of at least
 32 characters, start the server, and connect the client to `/mcp` with that
 token. Confirm
-`tools/list` includes `classify` and `explain` before using the skill. Release
+`tools/list` includes `classify` and `explain` before using the skill.
 The release workflow is configured to run official MCP Inspector 2.11.0 on
 future native bundles. Published v0.1.5 bundles were built with the prior
 2.5.0 smoke; a separate 2.11.0 smoke passed on the exact public Linux x64
@@ -77,7 +77,7 @@ authenticate and set the upstream bearer header. Origin is not authentication.
 - Starting with v0.1.4, PostgreSQL TLS verification uses the operating system CA store. For a private database CA, the operator can install it there or set `sslrootcert=/path/to/ca.pem` in `MCP__POSTGRES__URL` and use `sslmode=verify-full` for chain and hostname verification. Minimal container and Alpine hosts need a populated CA store unless that private CA is supplied. With `sslmode=verify-full`, an untrusted certificate or hostname mismatch prevents server startup. `sslmode=require` encrypts without certificate verification.
 - Configuration snapshots are redacted. Do not request `redact_secrets:false`; the server rejects unredacted snapshots.
 - If a tool call returns `RATE_LIMIT_EXCEEDED`, treat it as temporary capacity pressure; retry later with bounded backoff rather than assuming the request is safe or sending a burst of retries.
-- Incomplete or slow HTTP requests can receive HTTP 408, and new sockets can be closed when the server's connection cap is full. Treat either as an availability signal, not an allow verdict.
+- Incomplete or slow HTTP/1 requests can receive HTTP 408, and new sockets can be closed when the server's connection cap is full. Development main also closes connections that send no complete first request by the configured header deadline, including incomplete protocol detection or HTTP/2 setup; published v0.1.5 does not have that protection. Treat these as availability signals, not allow verdicts. Use proxy connection and read deadlines as an additional boundary.
 - On v0.1.2 and newer builds, WebSocket close code 1009 means a frame or fragmented message exceeded the configured request limit. Published v0.1.1 may instead close that connection without a close frame.
 
 Record the returned request ID, verdict, confidence, and contributing signals. User-agent strings are self-declared, so a bot-name signal is a heuristic rather than proof of identity. TLS fingerprints supplied by an ordinary caller are unverified without the server's attestation path; never invent that provenance. The result supports a site owner's policy decision. A website must explicitly send requests to the classifier and enforce its own response; this skill cannot route live traffic or block a visitor by itself.
