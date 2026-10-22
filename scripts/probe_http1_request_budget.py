@@ -72,7 +72,7 @@ def main() -> None:
                             raise RuntimeError("HTTP/1 budget response exceeded 256 KiB")
                 responses = b"".join(chunks)
                 parts = responses.split(b"HTTP/1.1 200")
-                if len(parts) - 1 != REQUESTS:
+                if len(parts) - 1 != REQUESTS or responses.count(b"HTTP/1.1 ") != REQUESTS:
                     raise RuntimeError("HTTP/1 budget did not serve exactly 128 responses")
                 final_headers = parts[-1].split(b"\r\n\r\n", 1)[0].lower()
                 if b"connection: close" not in final_headers:
