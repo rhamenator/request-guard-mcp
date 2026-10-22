@@ -47,12 +47,6 @@ pub async fn run_scoped(
         )
         .await
         .map_err(|error| AppError::Upstream(error.to_string()))?;
-    tracing::info!(
-        request_id = %req.request_id,
-        correct_verdict = %req.correct_verdict,
-        feedback_id = %feedback_id,
-        "feedback received"
-    );
     Ok(FeedbackResponse {
         accepted: true,
         feedback_id,

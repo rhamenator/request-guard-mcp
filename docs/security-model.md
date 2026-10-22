@@ -87,8 +87,9 @@ All WebSocket connections are authenticated at connection establishment using a 
 - `AppError` variants carry non-leaky messages for clients.
 - Development main logs categorical tool error codes rather than rendered
   `AppError` text, which can include caller-supplied request IDs. Published
-  v0.1.5 may log those IDs on tool errors; keep request IDs nonsecret. Other
-  backend and transport diagnostics can still contain implementation details.
+  v0.1.5 may log those IDs on tool errors and successful feedback; keep request
+  IDs nonsecret. Other backend and transport diagnostics can still contain
+  implementation details.
 - `config_snapshot` never returns an OTLP endpoint or its embedded credentials;
   requests with `redact_secrets:false` are rejected.
 
@@ -97,7 +98,8 @@ All WebSocket connections are authenticated at connection establishment using a 
 - The `redact_preview` tool and `util::json::redact_fields` can redact known
   sensitive fields when called. They are not a global log-redaction filter.
 - Authorization headers and token values are never logged.
-- IP addresses are logged at DEBUG level only; production uses `LOG_LEVEL=info`.
+- Classification IP addresses are logged at DEBUG level only; production uses
+  `LOG_LEVEL=info`. Other integration logs are not a global redaction boundary.
 
 ## Dependency Security
 
@@ -130,12 +132,15 @@ All WebSocket connections are authenticated at connection establishment using a 
   v0.1.5 does not include this bound. Redis-backed threat lookups and caching
   have their own availability behavior and are not covered by this limit.
 
-## Audit Logging
+## Metrics and diagnostic logs
 
-Every tool invocation logs:
-- `tool` name
-- `latency_ms`
-- `outcome` (ok / error / timeout)
-- `error_code` (on failure)
-
-Request IDs are propagated through the response for correlation.
+Tool dispatch increments aggregate Prometheus counters by registered tool and
+outcome (`ok`, `error`, or `timeout`) and observes a per-tool latency histogram.
+Successful calls do **not** emit a per-invocation log entry. Tool errors emit a
+categorical warning with the tool name and error code; timeouts emit an error
+with the tool name and elapsed milliseconds. Request IDs are returned in
+JSON-RPC responses but are not logged as caller identities. These metrics and
+limited diagnostic events are **not** an audit trail and cannot reconstruct
+which caller invoked a tool. Operators who need an audit trail must implement
+one at their trusted ingress with explicit identity, access, redaction and
+retention controls; do not log bearer tokens or raw request bodies.

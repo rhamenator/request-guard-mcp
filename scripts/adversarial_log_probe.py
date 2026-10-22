@@ -2,6 +2,7 @@
 """Check bounded loopback MCP calls do not write synthetic secrets to server logs."""
 
 import argparse
+import http.client
 import json
 import os
 from pathlib import Path
@@ -65,6 +66,7 @@ def main():
                     {"missing": len(missing_statuses), "wrong": len(wrong_statuses),
                      "auth_log_bytes": auth_log_bytes},
                 ))
+                tool_log_bytes_before = os.fstat(log.fileno()).st_size
                 status, body = post(base, token, rpc("tools/call", {
                     "name": "classify",
                     "arguments": {
@@ -77,6 +79,20 @@ def main():
                     "log_probe_classify", status == 200
                     and value.get("result", {}).get("isError") is False,
                     status,
+                ))
+                tool_log_bytes = os.fstat(log.fileno()).st_size - tool_log_bytes_before
+                connection = http.client.HTTPConnection("127.0.0.1", port, timeout=3)
+                try:
+                    connection.request("GET", "/metrics")
+                    metrics_response = connection.getresponse()
+                    metrics = metrics_response.read(1024 * 1024 + 1)
+                finally:
+                    connection.close()
+                results.append(check(
+                    "aggregate_metric_without_success_audit_log",
+                    tool_log_bytes == 0 and metrics_response.status == 200
+                    and b'mcp_requests_total{status="ok",tool="classify"}' in metrics,
+                    {"tool_log_bytes": tool_log_bytes, "metrics_status": metrics_response.status},
                 ))
             finally:
                 process.terminate()
