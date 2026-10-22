@@ -20,6 +20,13 @@ commit with altered workflow gates. The owner can still bypass this ruleset;
 review the exact tagged commit and its workflows before approval. Manual
 Container dispatch on a branch publishes only from `main`; version-named
 branches cannot publish a GHCR tag.
+Automatic `main` GHCR images publish only while Cargo has a `0.x` version.
+After the version reaches `1.x`, the Container workflow retains its PR build
+check and versioned tag publication, but a main push does not publish an
+unreviewed `1.x` binary under `main` or `git-<sha>`.
+Existing `:main` and `:git-<sha>` tags may continue pointing at an older
+experimental image; install reviewed `1.x` images by immutable version tag or
+digest instead of treating `:main` as a stable update channel.
 The tag verifier rejects SemVer build metadata (`+...`) because its suffix
 could otherwise make a stable tag appear to be a prerelease to the workflow.
 Before a stable release, verify the environment still has the required-reviewer
