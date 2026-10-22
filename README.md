@@ -122,6 +122,12 @@ wscat -H "Authorization: $(echo -n 'Bearer ')$YOUR_TOKEN" -c ws://localhost:8085
 > {"jsonrpc":"2.0","id":1,"method":"classify","params":{"user_agent":"GPTBot/1.0","path":"/"}}
 ```
 
+Development main bounds concurrent Redis and PostgreSQL pings on the
+unauthenticated `/health` and `/ready` endpoints to one second per request.
+A stalled backend makes `/health` return HTTP 200 with `"status":"unhealthy"`
+in its JSON body and `/ready` return HTTP 503. Published v0.1.5 lacks this
+explicit handler deadline. Restrict these endpoints at the proxy.
+
 ## Client Configuration
 
 Use these variables from any MCP-capable client that supports `MODEL_URI`-style provider routing:

@@ -34,6 +34,10 @@ Development main bounds best-effort Redis operation records to 500 ms each;
 published v0.1.5 can wait longer when configured Redis stalls. A timed-out
 record may be absent from `queue_status` or show as active until Redis
 trim/expiry; Redis-dependent tools still need a healthy backend.
+Development main also bounds concurrent Redis/PostgreSQL pings on the unauthenticated
+`/health` and `/ready` endpoints to one second per request. A stalled backend
+makes `/health` return HTTP 200 with an unhealthy JSON status, and `/ready` return HTTP 503.
+Published v0.1.5 does not have this bound. Restrict those endpoints at a proxy.
 For a local stdio client on v0.1.5, set the client's command to the installed
 native executable and its arguments to
 `["--stdio"]`, then verify
