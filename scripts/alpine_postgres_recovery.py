@@ -93,11 +93,17 @@ def require_missing_after_purge(token: str, request_id: str) -> None:
 
 
 def probe_operator_retention(token: str, old_id: str, fresh_id: str) -> None:
+    cohort_size = 16
     old_filter = f"response_payload->>'request_id' = '{old_id}'"
     fresh_filter = f"response_payload->>'request_id' = '{fresh_id}'"
     internal_id = sql_scalar("SELECT request_id FROM mcp_decisions WHERE " + old_filter + ";")
     if len(internal_id) != 64 or any(char not in "0123456789abcdef" for char in internal_id):
         raise RuntimeError("scoped decision key was not a SHA-256 hex digest")
+    fresh_internal_id = sql_scalar("SELECT request_id FROM mcp_decisions WHERE "
+                                   + fresh_filter + ";")
+    if (len(fresh_internal_id) != 64
+            or any(char not in "0123456789abcdef" for char in fresh_internal_id)):
+        raise RuntimeError("fresh scoped decision key was not a SHA-256 hex digest")
     # Seed feedback directly so this probe isolates the FK cascade from MCP
     # feedback-tool behavior and its separate logging policy.
     sql_scalar("INSERT INTO mcp_feedback "
@@ -112,13 +118,55 @@ def probe_operator_retention(token: str, old_id: str, fresh_id: str) -> None:
                "NOW() - INTERVAL '31 days' WHERE " + old_filter + ";")
     if sql_scalar("SELECT COUNT(*) FROM mcp_decisions WHERE " + fresh_filter + ";") != "1":
         raise RuntimeError("fresh control decision was missing before the purge")
+    # Seed a bounded cohort from the real MCP-created rows with distinct
+    # response IDs. This measures logical row growth and purge behavior
+    # without many client calls or claims about physical byte reclamation.
+    for age, source_id in (("old", internal_id), ("fresh", fresh_internal_id)):
+        source_filter = "request_id = '" + source_id + "'"
+        key = ("md5('retention-" + age + "-' || n::text) || "
+               "md5('retention-" + age + "-key-' || n::text)")
+        sql_scalar("INSERT INTO mcp_decisions "
+                   "(request_id, caller_scope, request_payload, response_payload, "
+                   "verdict, score, created_at) "
+                   "SELECT " + key + ", caller_scope, request_payload, "
+                   "jsonb_set(response_payload, '{request_id}', "
+                   "to_jsonb('retention-" + age + "-' || n::text)), "
+                   "verdict, score, created_at "
+                   "FROM mcp_decisions CROSS JOIN generate_series(1, "
+                   + str(cohort_size) + ") AS g(n) WHERE " + source_filter + ";")
+        if age == "old":
+            sql_scalar("INSERT INTO mcp_feedback "
+                       "(feedback_id, request_id, caller_scope, correct_verdict) "
+                       "SELECT 'retention-cohort-' || n::text, " + key + ", "
+                       "caller_scope, 'allow' FROM mcp_decisions "
+                       "CROSS JOIN generate_series(1, " + str(cohort_size)
+                       + ") AS g(n) WHERE " + source_filter + ";")
     if sql_scalar("SELECT COUNT(*) FROM mcp_decisions WHERE "
-                  "created_at < NOW() - INTERVAL '30 days';") != "1":
-        raise RuntimeError("retention boundary did not select only the old decision")
+                  "created_at < NOW() - INTERVAL '30 days';") != str(cohort_size + 1):
+        raise RuntimeError("retention boundary did not select the aged cohort")
+    if sql_scalar("SELECT COUNT(*) FROM mcp_decisions;") != str(2 * cohort_size + 2):
+        raise RuntimeError("decision cohort did not reach its bounded row count")
+    if sql_scalar("SELECT COUNT(*) FROM mcp_feedback;") != str(cohort_size + 1):
+        raise RuntimeError("feedback cohort did not reach its bounded row count")
     sql_scalar("DELETE FROM mcp_decisions WHERE "
                "created_at < NOW() - INTERVAL '30 days';")
-    if (persisted_row(old_id) or not persisted_row(fresh_id)
-            or sql_scalar(feedback_count) != "0"):
+    old_cohort = ("SELECT COUNT(*) FROM mcp_decisions WHERE request_id IN "
+                  "(SELECT md5('retention-old-' || n::text) || "
+                  "md5('retention-old-key-' || n::text) FROM generate_series(1, "
+                  + str(cohort_size) + ") AS g(n));")
+    fresh_cohort = ("SELECT COUNT(*) FROM mcp_decisions WHERE request_id IN "
+                    "(SELECT md5('retention-fresh-' || n::text) || "
+                    "md5('retention-fresh-key-' || n::text) FROM generate_series(1, "
+                    + str(cohort_size) + ") AS g(n));")
+    if (sql_scalar("SELECT COUNT(*) FROM mcp_decisions WHERE request_id = '"
+                   + internal_id + "';") != "0"
+            or sql_scalar("SELECT COUNT(*) FROM mcp_decisions WHERE request_id = '"
+                          + fresh_internal_id + "';") != "1"
+            or sql_scalar(old_cohort) != "0"
+            or sql_scalar(fresh_cohort) != str(cohort_size)
+            or sql_scalar(feedback_count) != "0"
+            or sql_scalar("SELECT COUNT(*) FROM mcp_decisions;") != str(cohort_size + 1)
+            or sql_scalar("SELECT COUNT(*) FROM mcp_feedback;") != "0"):
         raise RuntimeError("retention did not preserve fresh data and cascade feedback")
     require_missing_after_purge(token, old_id)
     kept = require_success(replay(token, fresh_id), "retained replay")
