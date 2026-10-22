@@ -12,6 +12,7 @@ This change removes per-request authorization failure logs. The HTTP
 those responses without exposing bearer values in the application log. The
 existing `adversarial_log_probe.py` now also sends 64 missing-token and 64
 wrong-token requests at debug level. It requires the expected HTTP statuses,
-nonempty bounded output, no authorization failure lines, and no synthetic
+no more than 1 KiB of log growth during that burst, nonempty bounded output,
+no authorization failure lines, and no synthetic
 token or request marker. The release candidate must be rebuilt and this check
 replayed against its exact packaged binary before a stable approval.

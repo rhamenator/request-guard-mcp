@@ -53,13 +53,17 @@ def main():
                 base = f"http://127.0.0.1:{port}"
                 wrong_status, _ = post(base, token + "wrong", rpc("ping"))
                 results.append(check("log_probe_rejected_auth", wrong_status == 403, wrong_status))
+                auth_log_bytes_before = os.fstat(log.fileno()).st_size
                 missing_statuses = [post(base, token, rpc("ping"), authorize=False)[0] for _ in range(64)]
                 wrong_statuses = [post(base, token + "wrong", rpc("ping"))[0] for _ in range(64)]
+                auth_log_bytes = os.fstat(log.fileno()).st_size - auth_log_bytes_before
                 results.append(check(
                     "bounded_auth_flood_rejected",
                     all(status == 401 for status in missing_statuses)
-                    and all(status == 403 for status in wrong_statuses),
-                    {"missing": len(missing_statuses), "wrong": len(wrong_statuses)},
+                    and all(status == 403 for status in wrong_statuses)
+                    and auth_log_bytes <= 1024,
+                    {"missing": len(missing_statuses), "wrong": len(wrong_statuses),
+                     "auth_log_bytes": auth_log_bytes},
                 ))
                 status, body = post(base, token, rpc("tools/call", {
                     "name": "classify",
