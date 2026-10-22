@@ -13,9 +13,16 @@ jobs only after issue #125 has the exact-candidate evidence and independent
 review. This is a deliberate owner pause, not an independent approval:
 repository administrators can bypass the environment protection. A passing
 PR or private `workflow_dispatch` candidate does not authorize a stable tag.
+The active repository tag ruleset `owner-only version tag creation` (ID
+`25603144`) restricts creation, update, and deletion of `v*` tags to repository
+administrators. This prevents other writers from pointing a version tag at a
+commit with altered workflow gates. The owner can still bypass this ruleset;
+review the exact tagged commit and its workflows before approval. Manual
+Container dispatch on a branch publishes only from `main`; version-named
+branches cannot publish a GHCR tag.
 Before a stable release, verify the environment still has the required-reviewer
-protection rule; an unprotected or missing environment does not satisfy this
-gate. Experimental and private-candidate paths remain automatic.
+protection rule and the tag ruleset is still active; missing protection does
+not satisfy this gate. Experimental and private-candidate paths remain automatic.
 
 At minimum, exercise authentication boundaries, malformed JSON-RPC and MCP frames, invalid and oversized inputs, prompt-injection text treated as request data, bot-evasion variations, concurrency and slow clients, backend failure and recovery, and logging of sensitive fields. Use Kali and Ubuntu lab VMs when available; scope scanners to the owned test endpoint, record their request counts, and bound runtime and rate to preserve shared host responsiveness. Confirm each exploit or anomaly with a regression test, rerun the affected probe, then rerun the full gate. Reconcile independent Claude Code and Codex reviews with the observed runtime results and document remaining limits before a release.
 

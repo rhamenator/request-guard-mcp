@@ -88,7 +88,9 @@ jobs:
   build-platform:
     name: Build Container (${{ matrix.arch }})
     needs: [verify-container-ref, stable-tag-approval]
-    if: ${{ !cancelled() && github.event_name != 'pull_request' && (needs.verify-container-ref.result == 'success' || needs.verify-container-ref.result == 'skipped') && (needs.stable-tag-approval.result == 'success' || needs.stable-tag-approval.result == 'skipped') }}
+    # Manual branch dispatch is allowed only on main; a version-named branch
+    # must never create a public image tag without the stable-tag gate.
+    if: ${{ !cancelled() && github.event_name != 'pull_request' && (github.ref_type == 'tag' || github.ref == 'refs/heads/main') && (needs.verify-container-ref.result == 'success' || needs.verify-container-ref.result == 'skipped') && (needs.stable-tag-approval.result == 'success' || needs.stable-tag-approval.result == 'skipped') }}
     strategy:
       fail-fast: false
       matrix:
