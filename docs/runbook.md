@@ -34,12 +34,21 @@ unreserved characters. Redis and
 PostgreSQL data are stored in named volumes. The MCP server creates its
 PostgreSQL tables and indexes idempotently at startup.
 
+This is a local demo: the Redis connection uses plaintext `redis://` even
+when it has a password. Keep it on a trusted isolated network; do not expose
+it across an untrusted link or publish the demo Redis service externally.
+For a production PostgreSQL server across a
+network, use `sslmode=verify-full` and a trusted CA rather than the demo URL.
+
 ### Kubernetes
 ```bash
 # Create the namespace first
 kubectl apply -f deploy/k8s/namespace.yaml
 
-# Create consistent backend/application secrets. This example uses URL-safe passwords.
+# Create consistent backend/application secrets. This local demo uses URL-safe
+# passwords and plaintext in-cluster Redis/PostgreSQL links. Isolate the Redis
+# link; for production PostgreSQL across a network use sslmode=verify-full
+# with a trusted CA. This server build does not support rediss://.
 kubectl create secret generic mcp-secrets \
   --namespace request-guard \
   --from-literal=auth_tokens=your_strong_token \
