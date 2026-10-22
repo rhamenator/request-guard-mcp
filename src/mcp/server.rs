@@ -562,10 +562,21 @@ impl Drop for Http2RequestGuard {
     }
 }
 
+const HTTP_CONNECTION_MAX_LIFETIME: Duration = Duration::from_secs(120);
+
 async fn serve_listener(
     listener: tokio::net::TcpListener,
     router: Router,
     limits: LimitsConfig,
+) -> anyhow::Result<()> {
+    serve_listener_with_http1_lifetime(listener, router, limits, HTTP_CONNECTION_MAX_LIFETIME).await
+}
+
+async fn serve_listener_with_http1_lifetime(
+    listener: tokio::net::TcpListener,
+    router: Router,
+    limits: LimitsConfig,
+    http1_max_lifetime: Duration,
 ) -> anyhow::Result<()> {
     let connection_limit = Arc::new(Semaphore::new(limits.max_connections));
     loop {
@@ -581,7 +592,7 @@ async fn serve_listener(
         let http2_idle_timeout = Duration::from_secs(limits.http2_idle_timeout_secs);
         // Bound a peer that repeatedly sends cheap unauthenticated requests
         // before each idle deadline, including rapid stream resets.
-        let http2_max_lifetime = Duration::from_secs(120);
+        let http2_max_lifetime = HTTP_CONNECTION_MAX_LIFETIME;
         let http2_max_requests = 128;
         let http2_drain_timeout = Duration::from_secs(
             limits
@@ -700,7 +711,12 @@ async fn serve_listener(
                         }
                         result
                     }
-                    Ok(None) => Some(connection.await),
+                    // Header timeouts do not release a permit when a peer stops
+                    // reading a response. Bound the whole HTTP/1 connection,
+                    // including writes and repeated cheap utility requests.
+                    Ok(None) => tokio::time::timeout(http1_max_lifetime, &mut connection)
+                        .await
+                        .ok(),
                     Err(_) => None, // Pre-auth timeout is attacker-reachable; do not log each one.
                 };
                 if let Some(Err(error)) = result {
@@ -739,6 +755,7 @@ mod slow_client_tests {
         max_connections: usize,
         body_timeout_secs: u64,
         http2_idle_timeout_secs: u64,
+        http1_max_lifetime: Duration,
     ) -> (std::net::SocketAddr, tokio::task::JoinHandle<()>) {
         let mut config = crate::config::Config::default();
         config.auth.enabled = true;
@@ -759,19 +776,21 @@ mod slow_client_tests {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
         let task = tokio::spawn(async move {
-            serve_listener(listener, router, limits).await.unwrap();
+            serve_listener_with_http1_lifetime(listener, router, limits, http1_max_lifetime)
+                .await
+                .unwrap();
         });
         (addr, task)
     }
 
     async fn test_server() -> (std::net::SocketAddr, tokio::task::JoinHandle<()>) {
-        test_server_with_limits(2, 1, 1).await
+        test_server_with_limits(2, 1, 1, HTTP_CONNECTION_MAX_LIFETIME).await
     }
 
     async fn test_server_with_connections(
         max_connections: usize,
     ) -> (std::net::SocketAddr, tokio::task::JoinHandle<()>) {
-        test_server_with_limits(max_connections, 1, 1).await
+        test_server_with_limits(max_connections, 1, 1, HTTP_CONNECTION_MAX_LIFETIME).await
     }
 
     #[tokio::test]
@@ -809,6 +828,46 @@ mod slow_client_tests {
         assert!(std::str::from_utf8(&response[..read])
             .unwrap()
             .starts_with("HTTP/1.1 200"));
+        task.abort();
+    }
+
+    #[tokio::test]
+    async fn http1_slow_reader_releases_connection_permit_at_lifetime() {
+        let (addr, task) = test_server_with_limits(1, 1, 1, Duration::from_secs(3)).await;
+        let socket = tokio::net::TcpSocket::new_v4().unwrap();
+        socket.set_recv_buffer_size(1024).unwrap();
+        let mut slow_reader = socket.connect(addr).await.unwrap();
+        let requests = b"GET /metrics HTTP/1.1\r\nHost: localhost\r\n\r\n".repeat(800);
+        timeout(Duration::from_secs(2), slow_reader.write_all(&requests))
+            .await
+            .expect("bounded pipelined requests should fit the sender buffer")
+            .unwrap();
+
+        tokio::time::sleep(Duration::from_millis(1500)).await;
+        let mut blocked = TcpStream::connect(addr).await.unwrap();
+        blocked
+            .write_all(b"GET /health HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+            .await
+            .unwrap();
+        let mut reply = [0_u8; 256];
+        let before_deadline = timeout(Duration::from_secs(1), blocked.read(&mut reply)).await;
+        assert!(
+            !matches!(before_deadline, Ok(Ok(n)) if reply[..n].starts_with(b"HTTP/1.1 200")),
+            "a non-reading peer should still hold the only slot before its lifetime"
+        );
+
+        tokio::time::sleep(Duration::from_secs(3)).await;
+        let mut healthy = TcpStream::connect(addr).await.unwrap();
+        healthy
+            .write_all(b"GET /health HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+            .await
+            .unwrap();
+        let read = timeout(Duration::from_secs(2), healthy.read(&mut reply))
+            .await
+            .expect("HTTP/1 lifetime must release the connection permit")
+            .unwrap();
+        assert!(reply[..read].starts_with(b"HTTP/1.1 200"));
+        assert_eq!(task.is_finished(), false);
         task.abort();
     }
 
@@ -887,7 +946,7 @@ mod slow_client_tests {
 
     #[tokio::test]
     async fn repeated_http2_health_requests_reach_connection_request_cap() {
-        let (addr, task) = test_server_with_limits(1, 1, 30).await;
+        let (addr, task) = test_server_with_limits(1, 1, 30, HTTP_CONNECTION_MAX_LIFETIME).await;
         let mut h2 = TcpStream::connect(addr).await.unwrap();
         h2.write_all(b"PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n\0\0\0\x04\0\0\0\0\0")
             .await
@@ -953,7 +1012,7 @@ mod slow_client_tests {
 
     #[tokio::test]
     async fn reset_http2_stream_does_not_leak_active_request_count() {
-        let (addr, task) = test_server_with_limits(1, 3, 1).await;
+        let (addr, task) = test_server_with_limits(1, 3, 1, HTTP_CONNECTION_MAX_LIFETIME).await;
         let mut h2 = TcpStream::connect(addr).await.unwrap();
         h2.write_all(b"PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n\0\0\0\x04\0\0\0\0\0")
             .await
