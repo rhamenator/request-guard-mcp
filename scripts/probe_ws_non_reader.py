@@ -60,6 +60,18 @@ def health(port):
         return None
 
 
+def wait_for_upgrade(port, token, seconds):
+    deadline = time.monotonic() + seconds
+    status = None
+    while time.monotonic() < deadline:
+        sock, status = upgrade(port, token)
+        sock.close()
+        if status == 101:
+            return status
+        time.sleep(0.25)
+    return status
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("binary", type=Path)
@@ -74,11 +86,13 @@ def main():
                MCP__HOST="127.0.0.1", MCP__PORT=str(port),
                MCP__LIMITS__MAX_CONNECTIONS="2",
                MCP__LIMITS__WEBSOCKET_IDLE_TIMEOUT_SECS="2",
-               LOG_LEVEL="error")
+               LOG_LEVEL="warn")
     sockets = []
     with tempfile.TemporaryDirectory() as working_dir:
+        log_path = Path(working_dir) / "server.log"
+        server_log = log_path.open("wb")
         process = subprocess.Popen([str(binary)], cwd=working_dir, env=env,
-                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                                   stdout=subprocess.DEVNULL, stderr=server_log)
         try:
             for _ in range(40):
                 if health(port) == 200:
@@ -92,9 +106,7 @@ def main():
                 sock, status = upgrade(port, token)
                 assert status == 101, status
                 sockets.append(sock)
-            time.sleep(4)
-            control, control_status = upgrade(port, token)
-            control.close()
+            control_status = wait_for_upgrade(port, token, 6)
             assert control_status == 101, control_status
             for sock in sockets:
                 sock.close()
@@ -116,13 +128,14 @@ def main():
                     except (socket.timeout, OSError):
                         break
                 counts.append(sent)
-            time.sleep(10)
-            recovered, recovered_status = upgrade(port, token)
-            recovered.close()
+            recovered_status = wait_for_upgrade(port, token, 12)
             assert min(counts) >= 100, counts
             assert process.poll() is None
             assert health(port) == 200
             assert recovered_status == 101, recovered_status
+            # An available slot alone could result from an unrelated close.
+            # Confirm the non-reading client exercised the send deadline.
+            assert "WebSocket send deadline exceeded" in log_path.read_text()
             print(json.dumps({"case": "non_reading_websocket_recovery",
                               "passed": True, "sent": counts,
                               "idle_control": control_status,
@@ -136,6 +149,7 @@ def main():
             except subprocess.TimeoutExpired:
                 process.kill()
                 process.wait()
+            server_log.close()
 
 
 if __name__ == "__main__":
