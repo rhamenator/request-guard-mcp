@@ -65,6 +65,10 @@ def main() -> None:
     migration = args.output / args.folder / "scripts/postgres_minimize_legacy.sql"
     if not migration.is_file():
         raise ValueError("release archive is missing the PostgreSQL legacy migration")
+    if migration.read_text(encoding="utf-8") != Path(
+        "scripts/postgres_minimize_legacy.sql"
+    ).read_text(encoding="utf-8"):
+        raise ValueError("packaged PostgreSQL legacy migration differs from source")
     print(f"PASS verified archive and extracted binary: {extracted}")
 
 
