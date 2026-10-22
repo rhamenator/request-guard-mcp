@@ -53,6 +53,14 @@ def main():
                 base = f"http://127.0.0.1:{port}"
                 wrong_status, _ = post(base, token + "wrong", rpc("ping"))
                 results.append(check("log_probe_rejected_auth", wrong_status == 403, wrong_status))
+                missing_statuses = [post(base, token, rpc("ping"), authorize=False)[0] for _ in range(64)]
+                wrong_statuses = [post(base, token + "wrong", rpc("ping"))[0] for _ in range(64)]
+                results.append(check(
+                    "bounded_auth_flood_rejected",
+                    all(status == 401 for status in missing_statuses)
+                    and all(status == 403 for status in wrong_statuses),
+                    {"missing": len(missing_statuses), "wrong": len(wrong_statuses)},
+                ))
                 status, body = post(base, token, rpc("tools/call", {
                     "name": "classify",
                     "arguments": {
@@ -76,10 +84,13 @@ def main():
             log.seek(0)
             output = log.read(1024 * 1024 + 1)
             full_capture = len(output) <= 1024 * 1024
-            observable = b"request-guard-mcp starting" in output and b"invalid bearer token presented" in output
+            observable = b"request-guard-mcp starting" in output
+            no_auth_logs = (b"request missing authorization header" not in output
+                            and b"invalid bearer token presented" not in output)
             clean = token.encode() not in output and marker.encode() not in output
-            results.append(check("synthetic_secrets_absent_from_logs", full_capture and observable and clean, {
-                "bounded": full_capture, "observed_start_and_rejection": observable,
+            results.append(check("synthetic_secrets_absent_from_logs", full_capture and observable and clean and no_auth_logs, {
+                "bounded": full_capture, "observed_start": observable,
+                "no_per_request_auth_logs": no_auth_logs,
                 "secret_or_marker_found": not clean,
             }))
     print(json.dumps({"passed": sum(results), "total": len(results)}))
