@@ -127,6 +127,12 @@ spec:
                 configMapKeyRef:
                   name: mcp-config
                   key: websocket_idle_timeout_secs
+            - name: MCP__LIMITS__HTTP2_IDLE_TIMEOUT_SECS
+              valueFrom:
+                configMapKeyRef:
+                  name: mcp-config
+                  key: http2_idle_timeout_secs
+                  optional: true
             - name: MCP__LIMITS__PER_TOOL_TIMEOUT_SECS
               valueFrom:
                 configMapKeyRef:

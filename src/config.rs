@@ -63,6 +63,8 @@ pub struct LimitsConfig {
     pub http_header_timeout_secs: u64,
     #[serde(default = "defaults::http_body_timeout_secs")]
     pub http_body_timeout_secs: u64,
+    #[serde(default = "defaults::http2_idle_timeout_secs")]
+    pub http2_idle_timeout_secs: u64,
     #[serde(default = "defaults::websocket_idle_timeout_secs")]
     pub websocket_idle_timeout_secs: u64,
     #[serde(default = "defaults::per_tool_timeout_secs")]
@@ -377,6 +379,7 @@ impl Config {
             || self.limits.max_connections == 0
             || self.limits.http_header_timeout_secs == 0
             || self.limits.http_body_timeout_secs == 0
+            || self.limits.http2_idle_timeout_secs == 0
             || self.limits.websocket_idle_timeout_secs == 0
             || self.limits.per_tool_timeout_secs == 0
             || self.limits.classify_timeout_secs == 0
@@ -473,6 +476,9 @@ mod defaults {
     pub fn http_body_timeout_secs() -> u64 {
         30
     }
+    pub fn http2_idle_timeout_secs() -> u64 {
+        60
+    }
     pub fn websocket_idle_timeout_secs() -> u64 {
         60
     }
@@ -540,6 +546,7 @@ impl Default for LimitsConfig {
             max_connections: defaults::max_connections(),
             http_header_timeout_secs: defaults::http_header_timeout_secs(),
             http_body_timeout_secs: defaults::http_body_timeout_secs(),
+            http2_idle_timeout_secs: defaults::http2_idle_timeout_secs(),
             websocket_idle_timeout_secs: defaults::websocket_idle_timeout_secs(),
             per_tool_timeout_secs: defaults::per_tool_timeout_secs(),
             classify_timeout_secs: defaults::classify_timeout_secs(),
