@@ -177,7 +177,10 @@ jobs:
 
   publish-container:
     name: Publish Multiarch Container
-    if: github.event_name != 'pull_request'
+    # The skipped stable approval on main, v0 and prerelease tags is an ancestor of
+    # build-platform. Override implicit success() so that a successful native
+    # matrix can still assemble the index; a skipped/failed matrix cannot.
+    if: ${{ !cancelled() && github.event_name != 'pull_request' && needs.build-platform.result == 'success' }}
     needs: build-platform
     runs-on: ubuntu-24.04
     permissions:
