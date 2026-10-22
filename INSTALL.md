@@ -82,6 +82,44 @@ backend manifests are local demo configurations, not encrypted Redis examples.
 For a production PostgreSQL server on a network, set
 `sslmode=verify-full` and configure a trusted CA as described above; the
 shipped in-cluster PostgreSQL URL example is local demo configuration.
+
+When PostgreSQL is enabled, development main stores a reduced replay snapshot:
+user agent, path, method, and whether the request supplied Accept
+or Accept-Language headers. It discards header values, bodies, arbitrary
+`extra`, IP, referrer, timestamp, request ID and TLS fingerprint/attestation
+material before storing the request JSON. The stored response still contains
+the request ID, original verdict and signals. Replay of an attested TLS fingerprint may differ because the
+short-lived trusted provenance cannot be reconstructed. Paths and user agents
+may still contain personal data; do not forward secrets in them. Published
+v0.1.5 stores the full classify request, and upgrading does not rewrite older
+rows. PostgreSQL has no automatic decision expiry. Set an operator retention
+period appropriate to your data policy and schedule a purge, for example:
+
+```sql
+DELETE FROM mcp_decisions WHERE created_at < NOW() - INTERVAL '30 days';
+```
+
+Deleting decisions also deletes linked feedback through the schema's foreign
+key cascade and removes those decisions from replay and historical reports.
+Back up or export records you must retain before purging. To reduce older
+full-payload rows without deleting their linked feedback, review and run
+[`scripts/postgres_minimize_legacy.sql`](scripts/postgres_minimize_legacy.sql)
+as a one-time operator migration, including rows with an old NULL caller
+scope. It rewrites every decision row and generates WAL, so schedule a
+maintenance window for large tables. For example, after configuring `psql`
+connection credentials outside shell history:
+
+```sh
+psql -v ON_ERROR_STOP=1 -f scripts/postgres_minimize_legacy.sql
+```
+
+The migration preserves current non-attested replay signals, but old
+attested-TLS decisions may already replay differently. Confirm the desired
+retention period and purge older rows separately.
+An upsert of the same request ID resets `created_at`, so the retention clock
+starts again. Deletion does not immediately erase old bytes from PostgreSQL
+dead tuples, WAL, replicas or backups: arrange vacuum and backup/WAL expiry
+under your data policy.
 Starting with v0.1.4, MCP HTTP POST and WebSocket requests carrying `Origin`
 must match an exact entry in `MCP_ALLOWED_ORIGINS`; for example,
 `MCP_ALLOWED_ORIGINS=https://console.example`. List the public browser origin
