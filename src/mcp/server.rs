@@ -25,6 +25,7 @@ use hyper_util::{
     server::conn::auto::Builder,
 };
 use std::{
+    convert::Infallible,
     io,
     sync::{
         atomic::{AtomicUsize, Ordering},
@@ -729,7 +730,7 @@ async fn serve_listener_with_http1_lifetime(
                 async move {
                     let _request_guard = request_guard;
                     if over_http2_request_cap {
-                        return Ok(
+                        return Ok::<Response, Infallible>(
                             (StatusCode::SERVICE_UNAVAILABLE, "connection request limit")
                                 .into_response(),
                         );
@@ -741,7 +742,7 @@ async fn serve_listener_with_http1_lifetime(
                         response
                             .headers_mut()
                             .insert(CONNECTION, HeaderValue::from_static("close"));
-                        return Ok(response);
+                        return Ok::<Response, Infallible>(response);
                     }
                     let mut response = router.call(request.map(Body::new)).await?;
                     if http1_request_number == HTTP1_MAX_REQUESTS
