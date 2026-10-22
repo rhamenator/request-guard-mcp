@@ -144,3 +144,9 @@ limited diagnostic events are **not** an audit trail and cannot reconstruct
 which caller invoked a tool. Operators who need an audit trail must implement
 one at their trusted ingress with explicit identity, access, redaction and
 retention controls; do not log bearer tokens or raw request bodies.
+
+The local Compose demo binds MCP, Prometheus and Grafana host ports to loopback.
+Prometheus reads the unauthenticated MCP `/metrics` endpoint over the Compose
+network. The demo backend links are plaintext and its pinned monitoring images
+must be updated deliberately; do not expose this stack as a production network
+boundary.

@@ -50,10 +50,11 @@ docker-run: docker-build
 		request-guard-mcp:local
 
 docker-compose-up:
-	docker compose -f docker/docker-compose.yml up -d
+	@test -f .env || (echo "Run python scripts/configure_credentials.py first"; exit 1)
+	docker compose --env-file .env -f docker/docker-compose.yml up -d
 
 docker-compose-down:
-	docker compose -f docker/docker-compose.yml down
+	docker compose --env-file .env -f docker/docker-compose.yml down
 
 # ─── Kubernetes ──────────────────────────────────────────────────────────────
 k8s-apply:

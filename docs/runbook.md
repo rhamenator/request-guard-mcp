@@ -19,24 +19,32 @@ docker run --rm \
   ghcr.io/rhamenator/request-guard-mcp:latest
 ```
 
-### Docker Compose (with Redis + PostgreSQL)
+### Docker Compose (local demo with Redis, PostgreSQL, Prometheus and Grafana)
 ```bash
-cd docker
-AUTH_TOKENS=your_token \
-REDIS_PASSWORD=your_url_safe_redis_password \
-POSTGRES_PASSWORD=your_url_safe_postgres_password \
-GRAFANA_ADMIN_PASSWORD=your_grafana_password \
-docker compose up -d
+# From the repository root; this writes a private .env with all six required
+# application and backing-service values.
+python scripts/configure_credentials.py
+make docker-compose-up
+curl -fsS http://127.0.0.1:8085/health
+curl -fsS 'http://127.0.0.1:9090/api/v1/query?query=up%7Bjob%3D%22request-guard-mcp%22%7D'
 ```
 
-For this Compose shorthand, use strong URL-safe passwords containing only URI
-unreserved characters. Redis and
-PostgreSQL data are stored in named volumes. The MCP server creates its
-PostgreSQL tables and indexes idempotently at startup.
+Open `http://127.0.0.1:3000` for Grafana. Log in as `admin` with
+`GRAFANA_ADMIN_PASSWORD` from your private `.env`; the default Prometheus
+datasource points to the local MCP scrape. The three published host ports bind
+to loopback only. Redis and PostgreSQL data are stored in named volumes. The
+MCP server creates its PostgreSQL tables and indexes idempotently at startup.
+If a local port is occupied, set `MCP_HOST_PORT`, `PROMETHEUS_HOST_PORT`, or
+`GRAFANA_HOST_PORT` in `.env` and use those ports for the local checks.
+Use `make docker-compose-down` to stop the stack; `down --volumes` also deletes
+the demo data.
 
 This is a local demo: the Redis connection uses plaintext `redis://` even
 when it has a password. Keep it on a trusted isolated network; do not expose
 it across an untrusted link or publish the demo Redis service externally.
+The MCP `/metrics` endpoint is unauthenticated within the Compose network.
+The pinned Prometheus and Grafana image digests are reviewed inputs for this
+example; update them when applying security patches.
 For a production PostgreSQL server across a
 network, use `sslmode=verify-full` and a trusted CA rather than the demo URL.
 
