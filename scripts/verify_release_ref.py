@@ -28,6 +28,11 @@ def main():
             fail(f"private candidate label must be v{version}-<suffix>")
         print(f"Private candidate {candidate} matches package {version}")
         return
+    # The workflow approval predicate treats '-' as prerelease. A '+' build
+    # metadata suffix may itself contain '-', so disallow it rather than risk
+    # a stable version reaching publication through the prerelease path.
+    if "+" in name or "+" in version:
+        fail("release tags with SemVer build metadata are not supported")
     if kind != "tag" or name != f"v{version}":
         fail(f"release tag must be v{version}; got {name!r} ({kind})")
     subprocess.run(["git", "fetch", "origin", "main", "--no-tags"], check=True)

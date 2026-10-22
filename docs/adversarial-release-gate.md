@@ -20,6 +20,8 @@ commit with altered workflow gates. The owner can still bypass this ruleset;
 review the exact tagged commit and its workflows before approval. Manual
 Container dispatch on a branch publishes only from `main`; version-named
 branches cannot publish a GHCR tag.
+The tag verifier rejects SemVer build metadata (`+...`) because its suffix
+could otherwise make a stable tag appear to be a prerelease to the workflow.
 Before a stable release, verify the environment still has the required-reviewer
 protection rule and the tag ruleset is still active; missing protection does
 not satisfy this gate. Experimental and private-candidate paths remain automatic.
