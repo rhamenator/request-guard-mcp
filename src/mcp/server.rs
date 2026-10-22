@@ -678,7 +678,7 @@ async fn serve_listener(
                             // request cap, then close even during the drain.
                             loop {
                                 let activity = *activity_rx.borrow_and_update();
-                                if activity.requests > http2_max_requests + 16 {
+                                if activity.requests >= http2_max_requests + 16 {
                                     break;
                                 }
                                 tokio::select! {
