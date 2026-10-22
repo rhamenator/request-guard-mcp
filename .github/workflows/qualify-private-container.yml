@@ -1,0 +1,130 @@
+name: Qualify Private Container Candidate
+
+# Native candidate images stay on ephemeral GitHub runners. This workflow
+# neither logs in to GHCR nor pushes an image or creates a release.
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_version:
+        description: Private candidate label matching Cargo (for example v1.0.0-rc.6)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  native-candidate:
+    name: Private candidate container (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Verify private candidate version and runner architecture
+        env:
+          INPUT_CANDIDATE_VERSION: ${{ inputs.candidate_version }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          python3 scripts/verify_release_ref.py
+          case "$ARCH:$(uname -m)" in
+            amd64:x86_64|arm64:aarch64) ;;
+            *) echo 'Unexpected runner architecture' >&2; exit 1 ;;
+          esac
+          printf 'Private candidate %s at commit %s on %s\n' \
+            "$INPUT_CANDIDATE_VERSION" "$GITHUB_SHA" "$ARCH" >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Build native candidate without publishing
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: docker/Dockerfile
+          platforms: linux/${{ matrix.arch }}
+          load: true
+          push: false
+          no-cache: true
+          tags: request-guard-mcp:private-${{ matrix.arch }}
+
+      - name: Bounded authenticated MCP client matrix
+        run: |
+          set -euo pipefail
+          python3 scripts/smoke_native_container.py \
+            --private-image request-guard-mcp:private-${{ matrix.arch }} \
+            --arch '${{ matrix.arch }}'
+
+      - name: Two-slot exhaustion, recovery, and private logs
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          name="request-guard-private-${ARCH}-${GITHUB_RUN_ID}"
+          directory="$(mktemp -d)"
+          chmod 700 "$directory"
+          trap 'docker rm -f "$name" >/dev/null 2>&1 || true; rm -r -- "$directory"' EXIT
+          python3 -c 'import secrets; print(secrets.token_urlsafe(36))' > "$directory/token"
+          chmod 600 "$directory/token"
+          printf 'AUTH_TOKENS=%s\n' "$(cat "$directory/token")" > "$directory/server.env"
+          chmod 600 "$directory/server.env"
+          docker run -d --name "$name" --network bridge \
+            --env-file "$directory/server.env" \
+            --memory 512m --cpus 2 --pids-limit 128 \
+            --security-opt no-new-privileges \
+            -e MCP__HOST=0.0.0.0 -e MCP__PORT=8085 \
+            -e MCP__LIMITS__MAX_REQUEST_BYTES=4096 \
+            -e MCP__LIMITS__MAX_CONNECTIONS=2 \
+            -e MCP__LIMITS__HTTP_HEADER_TIMEOUT_SECS=10 \
+            "request-guard-mcp:private-${ARCH}" >/dev/null
+          host="$(docker inspect --format '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$name")"
+          pid="$(docker inspect --format '{{.State.Pid}}' "$name")"
+          test -n "$host"
+          test "$pid" -gt 1
+          for attempt in $(seq 1 50); do
+            if curl -fsS --max-time 1 "http://${host}:8085/health" >/dev/null 2>&1; then
+              break
+            fi
+            if test "$attempt" -eq 50; then
+              echo 'Private candidate listener did not become ready' >&2
+              exit 1
+            fi
+            sleep 0.2
+          done
+          probe_status=0
+          python3 scripts/adversarial_container_saturation_probe.py \
+            --host "$host" --port 8085 --pid "$pid" \
+            < "$directory/token" > "$directory/saturation.json" || probe_status=$?
+          if test "$probe_status" -eq 0; then
+            python3 - "$directory/saturation.json" <<'PY' || probe_status=$?
+          import json, sys
+          result = json.load(open(sys.argv[1], encoding="utf-8"))
+          assert result["pass"] and len(result["cycles"]) == 12
+          assert sum(row["shed"] for row in result["cycles"]) == 384
+          assert all(row["recovered"] for row in result["cycles"])
+          print("Private container saturation: 384/384 shed; 12/12 recoveries; "
+                f"RSS {result['rss_before_kib']} -> {result['rss_after_kib']} KiB")
+          PY
+          fi
+          test "$(docker inspect --format '{{.State.Running}}' "$name")" = true || probe_status=1
+          test "$(docker inspect --format '{{.State.OOMKilled}}' "$name")" = false || probe_status=1
+          test "$(docker inspect --format '{{.RestartCount}}' "$name")" = 0 || probe_status=1
+          docker logs "$name" > "$directory/server.log" 2>&1
+          test -s "$directory/server.log" || probe_status=1
+          test "$(wc -c < "$directory/server.log")" -le 65536 || probe_status=1
+          if grep -F -q -f "$directory/token" "$directory/server.log"; then
+            echo 'Synthetic bearer appeared in private container log' >&2
+            probe_status=1
+          fi
+          test "$probe_status" -eq 0
+          printf 'Native %s private candidate: MCP client matrix passed, 384 shed, 12 recoveries; no OOM, restart or bearer log match\n' "$ARCH" >> "$GITHUB_STEP_SUMMARY"
