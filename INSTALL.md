@@ -28,6 +28,10 @@ MaxMind data are not needed for the core `classify` and `explain` tools.
    `http://127.0.0.1:8085/mcp` with `Authorization: Bearer <your token>`, then
    confirm `tools/list` includes `classify` and `explain`.
 
+Use nonsecret request IDs. Published v0.1.5 can include a caller-supplied ID
+in a tool-error warning; development main logs only the categorical tool
+error code. This does not redact other server or backend diagnostics.
+
 For v0.1.4 HTTP clients, send `Content-Type: application/json` and
 `Accept: application/json, text/event-stream` on POST. After initialization,
 send `MCP-Protocol-Version: 2025-06-18`. A client notification or response

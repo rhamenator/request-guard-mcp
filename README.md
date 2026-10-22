@@ -171,6 +171,8 @@ image is also published to `ghcr.io/rhamenator/request-guard-mcp`. For a
 long-running service deployment, use the container deployment examples. Package the
 companion skill locally with `python3 scripts/package_skill.py` if you need a
 directory listing ZIP; GitHub releases do not include that ZIP.
+Keep request IDs nonsecret: published v0.1.5 can include a caller-supplied ID
+in tool-error warnings. Development main logs categorical tool error codes.
 
 The [`request-guard-mcp` npm package](https://www.npmjs.com/package/request-guard-mcp)
 is a separate native installation option. A fresh registry install of 0.1.5
