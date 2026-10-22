@@ -61,6 +61,16 @@ def persisted_row(request_id: str) -> bool:
     return result.stdout.strip() == "1"
 
 
+def persisted_request_payload(request_id: str) -> dict:
+    # request_id is generated solely from a fixed prefix and hexadecimal bytes.
+    query = ("SELECT request_payload::text FROM mcp_decisions WHERE "
+             f"request_payload->>'request_id' = '{request_id}'")
+    result = subprocess.run(["psql", "-h", "127.0.0.1", "-p", str(PG_PORT),
+                             "-U", "postgres", "-d", "postgres", "-tAc", query],
+                            capture_output=True, text=True, timeout=5, check=True)
+    return json.loads(result.stdout)
+
+
 def rpc(token: str, method: str, params: dict | None = None) -> dict:
     payload = {"jsonrpc": "2.0", "id": 1, "method": method}
     if params is not None:
@@ -74,10 +84,20 @@ def rpc(token: str, method: str, params: dict | None = None) -> dict:
         return json.load(response)
 
 
-def classify(token: str, request_id: str, marker: str) -> dict:
-    return rpc(token, "tools/call", {"name": "classify", "arguments": {
+def classify(token: str, request_id: str, marker: str,
+             sensitive: dict[str, str] | None = None) -> dict:
+    arguments = {
         "request_id": request_id, "ip": "192.0.2.44", "user_agent": "Mozilla/5.0",
-        "method": "GET", "path": f"/{marker}"}})
+        "method": "GET", "path": f"/{marker}"}
+    if sensitive is not None:
+        arguments.update({"headers": {"ACCEPT": "application/json",
+                                      "Cookie": sensitive["header"]},
+                          "body_snippet": sensitive["body"],
+                          "extra": {"token": sensitive["extra"]},
+                          "referer": sensitive["referer"],
+                          "accept": sensitive["accept"],
+                          "timestamp": sensitive["timestamp"]})
+    return rpc(token, "tools/call", {"name": "classify", "arguments": arguments})
 
 
 def replay(token: str, request_id: str) -> dict:
@@ -118,6 +138,8 @@ def main() -> None:
     cache_key = secrets.token_hex(32)
     request_id = f"pg-ci-{secrets.token_hex(8)}"
     marker = f"pg-{secrets.token_hex(8)}"
+    sensitive = {name: f"synthetic-{name}-{secrets.token_hex(8)}" for name in
+                 ("header", "body", "extra", "referer", "accept", "timestamp")}
     PG_DIR.mkdir(mode=0o700)
     os.chown(PG_DIR, POSTGRES_USER.pw_uid, POSTGRES_USER.pw_gid)
     pg("initdb", "-D", str(PG_DIR), "-A", "trust", "--no-instructions")
@@ -149,9 +171,19 @@ def main() -> None:
                                                    "clientInfo": {"name": "alpine-postgres-ci", "version": "1"}})
             if initialized["result"]["serverInfo"]["version"] != expected_version:
                 raise RuntimeError("packaged server version mismatch")
-            first = require_success(classify(token, request_id, marker), "initial classify")
+            first = require_success(classify(token, request_id, marker, sensitive),
+                                    "initial classify")
             if first.get("request_id") != request_id:
                 raise RuntimeError("initial classification request id mismatch")
+            stored = persisted_request_payload(request_id)
+            if stored.get("headers") != {"accept": ""}:
+                raise RuntimeError("persisted header presence did not match reduced snapshot")
+            if any(stored.get(name) is not None for name in
+                   ("ip", "body_snippet", "extra", "referer", "accept", "timestamp",
+                    "tls_ja3", "tls_ja4", "tls_fingerprint_source")):
+                raise RuntimeError("persisted replay request retained an excluded field")
+            if any(value in json.dumps(stored) for value in sensitive.values()):
+                raise RuntimeError("persisted replay request retained a synthetic secret")
             replayed = require_success(replay(token, request_id), "initial replay")
             if replayed.get("matches_original") is not True:
                 raise RuntimeError("initial replay did not match")

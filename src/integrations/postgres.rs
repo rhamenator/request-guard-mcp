@@ -12,6 +12,50 @@ fn scoped_decision_key(caller_scope: &str, request_id: &str) -> String {
     crate::util::hashing::sha256_hex(&input)
 }
 
+/// Store only the inputs used by today's replayable rules. Header values,
+/// bodies, arbitrary extra data, IPs, referrers and timestamps are not needed
+/// to recompute those rules and may contain credentials or personal data.
+/// Keep the presence of a header map: None and Some(empty) produce different
+/// missing-header signals in the current rule engine.
+fn replay_feature_snapshot(request: &ClassifyRequest) -> ClassifyRequest {
+    let headers = request.headers.as_ref().map(|original| {
+        let mut names = HashMap::new();
+        for name in original.keys() {
+            match name.to_ascii_lowercase().as_str() {
+                "accept" => {
+                    names.insert("accept".to_string(), String::new());
+                }
+                "accept-language" => {
+                    names.insert("accept-language".to_string(), String::new());
+                }
+                _ => {}
+            }
+        }
+        names
+    });
+    ClassifyRequest {
+        ip: None,
+        user_agent: request.user_agent.clone(),
+        path: request.path.clone(),
+        method: request.method.clone(),
+        headers,
+        body_snippet: None,
+        referer: None,
+        accept: None,
+        request_id: request.request_id.clone(),
+        timestamp: None,
+        // Attested TLS provenance is intentionally not persisted. Replay of
+        // an attested fingerprint cannot reproduce the original trusted TLS
+        // signals after the short-lived attestation has expired.
+        tls_ja3: None,
+        tls_ja4: None,
+        tls_fingerprint_source: None,
+        tls_fingerprint_attestation: None,
+        tls_fingerprint_verified: false,
+        extra: None,
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct PersistedDecision {
     pub request: ClassifyRequest,
@@ -161,7 +205,7 @@ mod inner {
             response: &ClassifyResponse,
         ) -> Result<()> {
             let pool = self.pool()?;
-            let request_payload = serde_json::to_value(request)?;
+            let request_payload = serde_json::to_value(replay_feature_snapshot(request))?;
             let response_payload = serde_json::to_value(response)?;
             sqlx::query(
                 r#"
@@ -469,7 +513,8 @@ pub use inner::PostgresClient;
 
 #[cfg(test)]
 mod scoped_key_tests {
-    use super::scoped_decision_key;
+    use super::{replay_feature_snapshot, scoped_decision_key};
+    use crate::{engines::RuleEngine, models::request::ClassifyRequest};
 
     #[test]
     fn identical_request_ids_have_distinct_persistence_keys_per_caller() {
@@ -478,5 +523,65 @@ mod scoped_key_tests {
         assert_ne!(first, second);
         assert_eq!(first, scoped_decision_key("caller:first", "same-id"));
         assert!(!first.contains("same-id"));
+    }
+
+    #[test]
+    fn replay_snapshot_drops_sensitive_values_without_changing_current_rule_signals() {
+        let request: ClassifyRequest = serde_json::from_value(serde_json::json!({
+            "ip": "198.51.100.42",
+            "user_agent": "Nikto",
+            "path": "/internal",
+            "method": "GET",
+            "headers": {
+                "ACCEPT": "application/json; synthetic-header-secret",
+                "Cookie": "synthetic-cookie-secret",
+                "Authorization": "synthetic-auth-secret"
+            },
+            "body_snippet": "synthetic-body-secret",
+            "referer": "https://example.test/synthetic-referer-secret",
+            "accept": "synthetic-accept-secret",
+            "request_id": "safe-id",
+            "timestamp": "synthetic-timestamp-secret",
+            "extra": {"token": "synthetic-extra-secret"}
+        }))
+        .unwrap();
+        let snapshot = replay_feature_snapshot(&request);
+        let payload = serde_json::to_string(&snapshot).unwrap();
+        for marker in [
+            "synthetic-header-secret",
+            "synthetic-cookie-secret",
+            "synthetic-auth-secret",
+            "synthetic-body-secret",
+            "synthetic-referer-secret",
+            "synthetic-accept-secret",
+            "synthetic-timestamp-secret",
+            "synthetic-extra-secret",
+            "198.51.100.42",
+        ] {
+            assert!(
+                !payload.contains(marker),
+                "persisted replay payload contains {marker}"
+            );
+        }
+        assert_eq!(
+            snapshot.headers.unwrap().get("accept"),
+            Some(&String::new())
+        );
+        let original_signals = RuleEngine::new().evaluate(&request);
+        let replayed: ClassifyRequest = serde_json::from_str(&payload).unwrap();
+        let replayed_signals = RuleEngine::new().evaluate(&replayed);
+        assert_eq!(
+            serde_json::to_value(original_signals).unwrap(),
+            serde_json::to_value(replayed_signals).unwrap()
+        );
+    }
+
+    #[test]
+    fn replay_snapshot_preserves_absent_versus_empty_header_map() {
+        let absent: ClassifyRequest = serde_json::from_value(serde_json::json!({})).unwrap();
+        let empty: ClassifyRequest =
+            serde_json::from_value(serde_json::json!({"headers": {}})).unwrap();
+        assert!(replay_feature_snapshot(&absent).headers.is_none());
+        assert!(replay_feature_snapshot(&empty).headers.unwrap().is_empty());
     }
 }

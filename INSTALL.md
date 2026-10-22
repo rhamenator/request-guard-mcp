@@ -82,6 +82,27 @@ backend manifests are local demo configurations, not encrypted Redis examples.
 For a production PostgreSQL server on a network, set
 `sslmode=verify-full` and configure a trusted CA as described above; the
 shipped in-cluster PostgreSQL URL example is local demo configuration.
+
+When PostgreSQL is enabled, development main stores a reduced replay snapshot:
+user agent, path, method, request ID, and whether the request supplied Accept
+or Accept-Language headers. It discards header values, bodies, arbitrary
+`extra`, IP, referrer, timestamp, and TLS fingerprint/attestation material before storing
+the request JSON. The original verdict and signals remain in the stored
+response. Replay of an attested TLS fingerprint may differ because the
+short-lived trusted provenance cannot be reconstructed. Paths and user agents
+may still contain personal data; do not forward secrets in them. Published
+v0.1.5 stores the full classify request, and upgrading does not rewrite older
+rows. PostgreSQL has no automatic decision expiry. Set an operator retention
+period appropriate to your data policy and schedule a purge, for example:
+
+```sql
+DELETE FROM mcp_decisions WHERE created_at < NOW() - INTERVAL '30 days';
+```
+
+Deleting decisions also deletes linked feedback through the schema's foreign
+key cascade and removes those decisions from replay and historical reports.
+Back up or export records you must retain before purging. Review and remove
+older full-payload rows from pre-minimization releases under the same policy.
 Starting with v0.1.4, MCP HTTP POST and WebSocket requests carrying `Origin`
 must match an exact entry in `MCP_ALLOWED_ORIGINS`; for example,
 `MCP_ALLOWED_ORIGINS=https://console.example`. List the public browser origin

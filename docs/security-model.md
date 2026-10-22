@@ -20,6 +20,14 @@ All WebSocket connections are authenticated at connection establishment using a 
   Existing records created before this partitioning are retained in the
   database but are not exposed through caller-scoped tools; migrate or archive
   them offline before relying on historical reports.
+- Development main minimizes new PostgreSQL replay request JSON to a subset
+  of current rule inputs and header-name presence; it does not persist caller-provided
+  header values, body snippets, arbitrary extra data, IPs, referrers,
+  timestamps or TLS attestation material in that request JSON. Stored verdicts
+  and signals remain. Paths, user agents, request IDs and feedback can still
+  contain personal data. The schema has no automatic retention; operators must
+  schedule deletion, and upgrading does not rewrite older full-payload rows.
+  Published v0.1.5 still stores full classification requests.
 
 ## Transport Security
 
