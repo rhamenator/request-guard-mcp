@@ -25,7 +25,7 @@ use hyper_util::{
     server::conn::auto::Builder,
 };
 use std::{sync::Arc, time::Duration};
-use tokio::sync::Semaphore;
+use tokio::sync::{Notify, Semaphore};
 use tower::Service;
 use tower_http::limit::RequestBodyLimitLayer;
 use tracing::info;
@@ -553,7 +553,13 @@ async fn serve_listener(
         let router = router.clone();
         let header_timeout = Duration::from_secs(limits.http_header_timeout_secs);
         tokio::spawn(async move {
+            // Hyper's HTTP/1 header timeout does not cover the auto-protocol
+            // sniff or an HTTP/2 connection before its first request. Bound
+            // both before they can retain a connection permit indefinitely.
+            let first_request = Arc::new(Notify::new());
+            let first_request_for_service = Arc::clone(&first_request);
             let service = service_fn(move |request: hyper::Request<Incoming>| {
+                first_request_for_service.notify_one();
                 let mut router = router.clone();
                 async move { router.call(request.map(Body::new)).await }
             });
@@ -566,12 +572,31 @@ async fn serve_listener(
                 .http2()
                 .enable_connect_protocol()
                 .max_concurrent_streams(16);
-            if let Err(error) = builder
-                .serve_connection_with_upgrades(TokioIo::new(stream), service)
-                .await
             {
-                tracing::debug!(%peer, %error, "HTTP connection closed");
+                let connection =
+                    builder.serve_connection_with_upgrades(TokioIo::new(stream), service);
+                tokio::pin!(connection);
+                // Give Hyper's HTTP/1 timer a small chance to send 408 before
+                // our transport-neutral first-request deadline closes the socket.
+                let first_request_deadline =
+                    header_timeout.saturating_add(Duration::from_millis(250));
+                let outcome = tokio::time::timeout(first_request_deadline, async {
+                    tokio::select! {
+                        result = &mut connection => Some(result),
+                        _ = first_request.notified() => None,
+                    }
+                })
+                .await;
+                let result = match outcome {
+                    Ok(Some(result)) => Some(result),
+                    Ok(None) => Some(connection.await),
+                    Err(_) => None, // Pre-auth timeout is attacker-reachable; do not log each one.
+                };
+                if let Some(Err(error)) = result {
+                    tracing::debug!(%peer, %error, "HTTP connection closed");
+                }
             }
+            // Close the connection before freeing its permit.
             drop(permit);
         });
     }
@@ -586,12 +611,15 @@ mod slow_client_tests {
         time::timeout,
     };
 
-    async fn test_server() -> (std::net::SocketAddr, tokio::task::JoinHandle<()>) {
+    async fn test_server_with_connections(
+        max_connections: usize,
+    ) -> (std::net::SocketAddr, tokio::task::JoinHandle<()>) {
         let mut config = crate::config::Config::default();
         config.auth.enabled = true;
         config.auth.tokens = vec!["test-token-with-at-least-32-characters".to_string()];
         config.limits.http_header_timeout_secs = 1;
         config.limits.http_body_timeout_secs = 1;
+        config.limits.max_connections = max_connections;
         let limits = config.limits.clone();
         let max_body = limits.max_request_bytes;
         let state = ServerState {
@@ -605,6 +633,72 @@ mod slow_client_tests {
             serve_listener(listener, router, limits).await.unwrap();
         });
         (addr, task)
+    }
+
+    async fn test_server() -> (std::net::SocketAddr, tokio::task::JoinHandle<()>) {
+        test_server_with_connections(2).await
+    }
+
+    #[tokio::test]
+    async fn partial_protocol_prefaces_release_connection_permits() {
+        let (addr, task) = test_server_with_connections(3).await;
+        let mut sockets = Vec::new();
+        for preface in [
+            b"".as_slice(),
+            b"P".as_slice(),
+            b"PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n".as_slice(),
+        ] {
+            let mut stream = TcpStream::connect(addr).await.unwrap();
+            stream.write_all(preface).await.unwrap();
+            sockets.push(stream);
+        }
+        tokio::time::sleep(Duration::from_millis(1500)).await;
+        for socket in &mut sockets {
+            let mut response = Vec::new();
+            timeout(Duration::from_secs(2), socket.read_to_end(&mut response))
+                .await
+                .expect("partial preface must be closed")
+                .unwrap();
+            assert!(response.len() < 2048);
+        }
+        let mut healthy = TcpStream::connect(addr).await.unwrap();
+        healthy
+            .write_all(b"GET /health HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+            .await
+            .unwrap();
+        let mut response = [0_u8; 256];
+        let read = timeout(Duration::from_secs(2), healthy.read(&mut response))
+            .await
+            .expect("pre-request timeout must release a connection permit")
+            .unwrap();
+        assert!(std::str::from_utf8(&response[..read])
+            .unwrap()
+            .starts_with("HTTP/1.1 200"));
+        task.abort();
+    }
+
+    #[tokio::test]
+    async fn first_request_does_not_limit_websocket_lifetime() {
+        let (addr, task) = test_server().await;
+        let mut stream = TcpStream::connect(addr).await.unwrap();
+        stream.write_all(b"GET /mcp HTTP/1.1\r\nHost: localhost\r\nAuthorization: Bearer test-token-with-at-least-32-characters\r\nConnection: Upgrade\r\nUpgrade: websocket\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n\r\n").await.unwrap();
+        let mut response = [0_u8; 512];
+        let read = timeout(Duration::from_secs(2), stream.read(&mut response))
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(std::str::from_utf8(&response[..read])
+            .unwrap()
+            .starts_with("HTTP/1.1 101"));
+        tokio::time::sleep(Duration::from_millis(1500)).await;
+        stream.write_all(b"\x89\x80\x00\x00\x00\x00").await.unwrap();
+        let mut pong = [0_u8; 2];
+        timeout(Duration::from_secs(2), stream.read_exact(&mut pong))
+            .await
+            .expect("WebSocket must outlive the first-request deadline")
+            .unwrap();
+        assert_eq!(pong, [0x8a, 0x00]);
+        task.abort();
     }
 
     #[tokio::test]
