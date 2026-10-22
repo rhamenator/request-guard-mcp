@@ -44,6 +44,8 @@ def main() -> None:
     shutil.copy2("LICENSE", stage / "LICENSE")
     shutil.copy2(".env.example", stage / ".env.example")
     shutil.copy2("Cargo.lock", stage / "Cargo.lock")
+    (stage / "scripts").mkdir(exist_ok=True)
+    shutil.copy2("scripts/postgres_minimize_legacy.sql", stage / "scripts/postgres_minimize_legacy.sql")
 
     if args.platform.startswith("windows-"):
         archive = artifacts / f"{prefix}.zip"
