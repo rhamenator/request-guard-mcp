@@ -23,13 +23,14 @@ def main() -> None:
     migration = Path(__file__).with_name("postgres_minimize_legacy.sql").resolve(strict=True)
     install = Path(__file__).resolve().parent.parent / "INSTALL.md"
     retention_sql = "DELETE FROM mcp_decisions WHERE created_at < NOW() - INTERVAL '30 days';"
-    if retention_sql not in install.read_text(encoding="utf-8"):
+    if f"```sql\n{retention_sql}\n```" not in install.read_text(encoding="utf-8"):
         raise RuntimeError("packaged PostgreSQL probe no longer matches the INSTALL retention SQL")
     name = f"request-guard-alpine-pg-{os.getpid()}-{secrets.token_hex(4)}"
     command = [
         "docker", "run", "--rm", "--init", "--name", name,
         "--memory", "1g", "--cpus", "2", "--pids-limit", "128",
         "--tmpfs", "/tmp:rw,size=256m",
+        "-e", f"RETENTION_DELETE_SQL={retention_sql}",
         "-v", f"{binary}:/test/request-guard-mcp:ro",
         "-v", f"{probe}:/test/alpine_postgres_recovery.py:ro",
         "-v", f"{migration}:/test/postgres_minimize_legacy.sql:ro",

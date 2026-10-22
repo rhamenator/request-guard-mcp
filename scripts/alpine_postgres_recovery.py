@@ -156,8 +156,7 @@ def probe_operator_retention(token: str, old_id: str, fresh_id: str) -> None:
         raise RuntimeError("decision cohort did not reach its bounded row count")
     if sql_scalar("SELECT COUNT(*) FROM mcp_feedback;") != str(cohort_size + 2):
         raise RuntimeError("feedback cohort did not reach its bounded row count")
-    sql_scalar("DELETE FROM mcp_decisions WHERE "
-               "created_at < NOW() - INTERVAL '30 days';")
+    sql_scalar(os.environ["RETENTION_DELETE_SQL"])
     old_cohort = ("SELECT COUNT(*) FROM mcp_decisions WHERE request_id IN "
                   "(SELECT md5('retention-old-' || n::text) || "
                   "md5('retention-old-key-' || n::text) FROM generate_series(1, "
