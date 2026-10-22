@@ -69,6 +69,7 @@ supplies the private CA. With `sslmode=verify-full`, an untrusted certificate
 or mismatched hostname prevents server startup; the core tools do not become
 available in that configuration. Published v0.1.3 predates the
 native-root change.
+
 The optional Redis integration in v0.1.5 and development main accepts
 plaintext `redis://` only. An attempted `rediss://` URL fails startup with a
 TLS-feature error; it does not fall back to plaintext. A password in a

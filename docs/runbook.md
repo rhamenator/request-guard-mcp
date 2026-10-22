@@ -33,9 +33,11 @@ For this Compose shorthand, use strong URL-safe passwords containing only URI
 unreserved characters. Redis and
 PostgreSQL data are stored in named volumes. The MCP server creates its
 PostgreSQL tables and indexes idempotently at startup.
+
 This is a local demo: the Redis connection uses plaintext `redis://` even
 when it has a password. Keep it on a trusted isolated network; do not expose
-it across an untrusted link. For a production PostgreSQL server across a
+it across an untrusted link or publish the demo Redis service externally.
+For a production PostgreSQL server across a
 network, use `sslmode=verify-full` and a trusted CA rather than the demo URL.
 
 ### Kubernetes
