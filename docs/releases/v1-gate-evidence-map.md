@@ -12,3 +12,8 @@ This is a review map for [issue #125](https://github.com/rhamenator/request-guar
 | Independent review and approval | Individual PR reviews and CI are linked from the evidence above | Reconcile independent reviews of the **complete candidate gate**, record unresolved limits, pass exact-head and tag CI/security checks, and obtain owner approval before stable publication. A review service outage is a documented gap, not a passing review. |
 
 For the required probe scope and safety limits, use the [adversarial release gate](../adversarial-release-gate.md). Put candidate commands, hashes, tool versions, counts, host observations, findings and fixes in a new versioned evidence record. Update this map and issue #125 with links to that record before requesting owner review.
+
+The [private v1.0.0-rc.1 host adversarial subset](v1.0.0-rc.1-host-adversarial.md)
+passes bounded glibc loopback and resource probes only. That unmerged candidate
+predates the stable-tag safeguard; it does not complete any full stable gate row
+above. Rebuild and repeat against the final candidate from safeguarded main.
