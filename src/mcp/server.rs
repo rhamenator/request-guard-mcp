@@ -496,8 +496,16 @@ async fn metrics_handler() -> impl IntoResponse {
 
 async fn readiness_handler(State(state): State<ServerState>) -> impl IntoResponse {
     let capacity_available = state.app.semaphore.available_permits() > 0;
-    let redis_ready = state.app.config.redis.url.is_none() || state.app.redis.ping().await;
-    let postgres_ready = state.app.config.postgres.url.is_none() || state.app.postgres.ping().await;
+    let (redis_ready, postgres_ready) = tokio::join!(
+        async {
+            state.app.config.redis.url.is_none()
+                || crate::tools::health::bounded_backend_ping(state.app.redis.ping()).await
+        },
+        async {
+            state.app.config.postgres.url.is_none()
+                || crate::tools::health::bounded_backend_ping(state.app.postgres.ping()).await
+        },
+    );
     let geoip_configured = state.app.config.geoip.mmdb_path.is_some()
         || state.app.config.geoip.city_mmdb_path.is_some()
         || state.app.config.geoip.asn_mmdb_path.is_some()
