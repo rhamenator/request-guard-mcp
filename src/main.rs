@@ -1,6 +1,36 @@
 use anyhow::Result;
 use request_guard_mcp::{config, mcp, state, telemetry};
 
+#[cfg(unix)]
+async fn wait_for_network_signal(terminate: &mut tokio::signal::unix::Signal) {
+    let mut term_available = true;
+    let mut interrupt_available = true;
+    loop {
+        tokio::select! {
+            result = terminate.recv(), if term_available => match result {
+                Some(()) => return,
+                None => term_available = false,
+            },
+            result = tokio::signal::ctrl_c(), if interrupt_available => match result {
+                Ok(()) => return,
+                Err(error) => {
+                    tracing::warn!(%error, "cannot listen for Ctrl-C; retaining SIGTERM handler");
+                    interrupt_available = false;
+                }
+            },
+            else => std::future::pending::<()>().await,
+        }
+    }
+}
+
+#[cfg(not(unix))]
+async fn wait_for_network_signal() {
+    if let Err(error) = tokio::signal::ctrl_c().await {
+        tracing::warn!(%error, "cannot listen for Ctrl-C");
+        std::future::pending::<()>().await;
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let stdio = match std::env::args().skip(1).collect::<Vec<_>>().as_slice() {
@@ -58,8 +88,28 @@ async fn main() -> Result<()> {
         std::process::exit(0);
     }
 
-    // Run the network MCP server (blocks until shutdown).
-    let result = mcp::server::run_server(app_state).await;
+    // Register SIGTERM before entering the accept loop. The first signal
+    // starts a bounded drain; a second signal forces immediate termination.
+    #[cfg(unix)]
+    let mut terminate = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())?;
+    let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel();
+    let signal_monitor = tokio::spawn(async move {
+        #[cfg(unix)]
+        wait_for_network_signal(&mut terminate).await;
+        #[cfg(not(unix))]
+        wait_for_network_signal().await;
+        let _ = shutdown_tx.send(());
+        #[cfg(unix)]
+        wait_for_network_signal(&mut terminate).await;
+        #[cfg(not(unix))]
+        wait_for_network_signal().await;
+        std::process::exit(1);
+    });
+    let result = mcp::server::run_server(app_state, async {
+        let _ = shutdown_rx.await;
+    })
+    .await;
+    signal_monitor.abort();
     if let Some(provider) = tracer_provider {
         provider
             .shutdown()

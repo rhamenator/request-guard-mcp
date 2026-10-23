@@ -10,6 +10,8 @@ services:
         aliases:
           - ai-scraping-defense-mcp
     restart: unless-stopped
+    # Development main can drain active HTTP work for about 62s at default limits.
+    stop_grace_period: 75s
     ports:
       - "127.0.0.1:${MCP_HOST_PORT:-8085}:8085"
     environment:
