@@ -696,7 +696,7 @@ async fn serve_listener_with_http1_lifetime(
         // before each idle deadline, including rapid stream resets.
         let http2_max_lifetime = HTTP_CONNECTION_MAX_LIFETIME;
         let http2_max_requests = 128;
-        let http2_drain_timeout = Duration::from_secs(
+        let http_drain_timeout = Duration::from_secs(
             limits
                 .http_body_timeout_secs
                 .saturating_add(
@@ -821,7 +821,7 @@ async fn serve_listener_with_http1_lifetime(
                         };
                         if result.is_none() {
                             connection.as_mut().graceful_shutdown();
-                            let drain_deadline = tokio::time::sleep(http2_drain_timeout);
+                            let drain_deadline = tokio::time::sleep(http_drain_timeout);
                             tokio::pin!(drain_deadline);
                             // A stream already on the wire at GOAWAY may still
                             // dispatch, and the response can outlive its handler.
@@ -836,12 +836,20 @@ async fn serve_listener_with_http1_lifetime(
                         }
                         result
                     }
-                    // Header timeouts do not release a permit when a peer stops
-                    // reading a response. Bound the whole HTTP/1 connection,
-                    // including writes and repeated cheap utility requests.
-                    Ok(None) => tokio::time::timeout(http1_max_lifetime, &mut connection)
+                    // Stop accepting work at the HTTP/1 age cap while giving
+                    // an in-flight request a bounded chance to finish. A peer
+                    // that stops reading still loses its permit at the drain
+                    // deadline.
+                    Ok(None) => match tokio::time::timeout(http1_max_lifetime, &mut connection)
                         .await
-                        .ok(),
+                    {
+                        Ok(result) => Some(result),
+                        Err(_) => {
+                            connection.as_mut().graceful_shutdown();
+                            let _ = tokio::time::timeout(http_drain_timeout, &mut connection).await;
+                            None
+                        }
+                    },
                     Err(_) => None, // Pre-auth timeout is attacker-reachable; do not log each one.
                 };
                 if let Some(Err(error)) = result {
@@ -992,6 +1000,51 @@ mod slow_client_tests {
     }
 
     #[tokio::test]
+    async fn http1_lifetime_drains_inflight_response() {
+        let router = Router::new().route(
+            "/slow",
+            get(|| async {
+                tokio::time::sleep(Duration::from_millis(600)).await;
+                "completed after connection age deadline"
+            }),
+        );
+        let limits = LimitsConfig {
+            http_header_timeout_secs: 1,
+            http_body_timeout_secs: 1,
+            per_tool_timeout_secs: 1,
+            classify_timeout_secs: 1,
+            ..LimitsConfig::default()
+        };
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let task = tokio::spawn(async move {
+            serve_listener_with_http1_lifetime(
+                listener,
+                router,
+                limits,
+                Duration::from_millis(200),
+            )
+            .await
+            .unwrap();
+        });
+        let mut client = TcpStream::connect(addr).await.unwrap();
+        client
+            .write_all(b"GET /slow HTTP/1.1\r\nHost: localhost\r\n\r\n")
+            .await
+            .unwrap();
+        let mut response = Vec::new();
+        timeout(Duration::from_secs(2), client.read_to_end(&mut response))
+            .await
+            .expect("in-flight response should drain before its deadline")
+            .unwrap();
+        assert!(response.starts_with(b"HTTP/1.1 200"));
+        assert!(response
+            .windows(b"completed after connection age deadline".len())
+            .any(|window| window == b"completed after connection age deadline"));
+        task.abort();
+    }
+
+    #[tokio::test]
     async fn http1_slow_reader_releases_connection_permit_at_lifetime() {
         // A single response larger than a normal kernel send buffer makes the
         // non-reading peer hold the connection in the response-write path.
@@ -1004,12 +1057,15 @@ mod slow_client_tests {
         let limits = LimitsConfig {
             max_connections: 1,
             http_header_timeout_secs: 1,
+            http_body_timeout_secs: 1,
+            per_tool_timeout_secs: 1,
+            classify_timeout_secs: 1,
             ..LimitsConfig::default()
         };
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
         let task = tokio::spawn(async move {
-            serve_listener_with_http1_lifetime(listener, router, limits, Duration::from_secs(6))
+            serve_listener_with_http1_lifetime(listener, router, limits, Duration::from_secs(2))
                 .await
                 .unwrap();
         });
@@ -1024,14 +1080,14 @@ mod slow_client_tests {
         .expect("request should fit the sender buffer")
         .unwrap();
 
-        tokio::time::sleep(Duration::from_millis(1500)).await;
+        tokio::time::sleep(Duration::from_millis(250)).await;
         let mut blocked = TcpStream::connect(addr).await.unwrap();
         blocked
             .write_all(b"GET /health HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
             .await
             .unwrap();
         let mut reply = [0_u8; 256];
-        let before_deadline = timeout(Duration::from_secs(1), blocked.read(&mut reply)).await;
+        let before_deadline = timeout(Duration::from_millis(500), blocked.read(&mut reply)).await;
         assert!(
             !matches!(before_deadline, Ok(Ok(n)) if reply[..n].starts_with(b"HTTP/1.1 200")),
             "a non-reading peer should still hold the only slot before its lifetime"
