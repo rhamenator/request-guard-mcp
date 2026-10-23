@@ -60,10 +60,12 @@ signature. Published v0.1.5 predates native attestations.
 
 "Private" describes publication status, not confidentiality: signed-in readers
 with access to this public repository can download the Actions candidate
-archives and sidecars; new runs retain them for seven days. Candidate artifacts
-must contain no credentials or sensitive lab evidence. Reviewers who need an
-expired candidate should rerun the private workflow from the exact source
-commit and reverify the new archive digests.
+archives and sidecars; new candidate and tagged runs retain them for up to
+seven days. Candidate artifacts must contain no credentials or sensitive lab
+evidence. Reviewers who need an expired candidate should rerun the private
+workflow from the exact source commit and reverify the new archive digests.
+Build timestamps and hosted runner inputs mean those digests need not match the
+expired candidate's digests.
 
 This pins the Rust toolchain and main musl-specific inputs; hosted runner
 images, the Ubuntu apt repository, and platform SDKs can still change. Review
