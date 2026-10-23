@@ -2,12 +2,23 @@
 
 ## Authentication
 
-All WebSocket connections are authenticated at connection establishment using a bearer token in the HTTP `Authorization` header.
+With `auth.enabled=true` (the default), the network MCP endpoint `/mcp`
+requires a bearer token in the HTTP `Authorization` header for both JSON POST
+requests and custom WebSocket GET upgrades. Tokens are configured via the
+comma-separated `AUTH_TOKENS` environment variable. A missing token
+gets HTTP 401; an invalid token gets HTTP 403. Both are rejected before POST
+dispatch or WebSocket upgrade, so no WebSocket session or JSON-RPC message is
+established. If an operator disables authentication, `/mcp` accepts
+unauthenticated requests under a shared
+`public` cache scope; restrict network access accordingly. Process-local
+`--stdio` does not use bearer tokens or start a network listener. The local
+client process and its access to the executable and configuration form its
+trust boundary.
 
-- The `Authorization` header (`Bearer <token>`) must be present on the WebSocket upgrade request.
-- Tokens are configured via the `AUTH_TOKENS` environment variable (comma-separated).
-- An unauthenticated connection receives a JSON-RPC error and the connection is closed.
-- Authentication is enforced before any tool dispatch occurs.
+- With authentication enabled, it is enforced before any `/mcp` tool dispatch.
+- `/health`, `/ready`, and the configured metrics endpoint are reachable without
+  a bearer token. Limit access to these operational endpoints at the network
+  or reverse proxy boundary.
 - Classification caches are partitioned by a server-derived, HMAC-SHA256-keyed
   digest of the authenticated credential; raw bearer tokens are never used in
   cache keys, and the keyed digest cannot be dictionary-attacked from Redis key
@@ -124,8 +135,13 @@ All WebSocket connections are authenticated at connection establishment using a 
 - The `redact_preview` tool and `util::json::redact_fields` can redact known
   sensitive fields when called. They are not a global log-redaction filter.
 - Authorization headers and token values are never logged.
-- Classification IP addresses are logged at DEBUG level only; production uses
-  `LOG_LEVEL=info`. Other integration logs are not a global redaction boundary.
+- A DEBUG transport diagnostic can include the TCP peer socket address when
+  an HTTP connection closes. That address is distinct from the client IP in a
+  classification request; no classification-IP log is asserted for this path.
+  `LOG_LEVEL=info` suppresses this DEBUG diagnostic. The blocklist's `add_ip`
+  method has an INFO-level IP log if invoked; other integration logs are not a
+  global redaction boundary. Keep submitted IPs and other metadata within your
+  deployment's log/privacy policy.
 
 ## Dependency Security
 
