@@ -48,6 +48,7 @@ pub async fn handle_ws_connection(
     registry: Arc<ToolRegistry>,
     caller_scope: String,
     _connection_permit: OwnedSemaphorePermit,
+    _caller_permit: OwnedSemaphorePermit,
 ) {
     state.metrics.active_connections.inc();
     info!("WebSocket connection established");

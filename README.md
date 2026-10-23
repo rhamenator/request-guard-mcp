@@ -57,6 +57,15 @@ enable HTTP/2 extended CONNECT.
 Development main also limits each WebSocket response or control-frame send to
 five seconds so a non-reading client cannot retain a connection permit during
 an unbounded write. Published v0.1.5 lacks that send deadline.
+When two or more distinct bearer tokens are configured on development main,
+one bearer can hold at most `max_connections - 1` concurrent WebSocket slots
+(or one slot if the global cap is one). With at least two global slots, a
+second bearer can therefore connect when one bearer keeps sending Ping frames.
+This does not allocate a guaranteed
+slot to every bearer or protect against several cooperating tokens, reconnect
+floods, or distributed load. A same-bearer upgrade over that cap receives HTTP
+503 and may retry with bounded backoff. Single-token deployments retain the
+configured global WebSocket cap. Published v0.1.5 has no per-bearer cap.
 
 Run the native executable with `--stdio` for a local process MCP client. It
 uses newline-delimited JSON-RPC on stdin/stdout, sends diagnostics to

@@ -135,6 +135,8 @@ jobs:
       - run: python3 scripts/probe_sigterm_shutdown.py target/release/request-guard-mcp
       - run: python3 scripts/probe_accept_recovery.py target/release/request-guard-mcp
       - run: python3 scripts/probe_ws_non_reader.py target/release/request-guard-mcp
+      - run: python3 -m venv /tmp/ws-caller-probe && /tmp/ws-caller-probe/bin/pip install websockets==15.0.1
+      - run: /tmp/ws-caller-probe/bin/python scripts/probe_ws_caller_fairness.py --binary target/release/request-guard-mcp
       - run: python3 scripts/probe_http1_request_budget.py target/release/request-guard-mcp
       - run: python3 scripts/probe_json_complexity.py target/release/request-guard-mcp
       - run: python3 scripts/probe_unsupported_redis_tls.py target/release/request-guard-mcp
