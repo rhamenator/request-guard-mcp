@@ -13,6 +13,13 @@ This is a review map for [issue #125](https://github.com/rhamenator/request-guar
 
 For the required probe scope and safety limits, use the [adversarial release gate](../adversarial-release-gate.md). Put candidate commands, hashes, tool versions, counts, host observations, findings and fixes in a new versioned evidence record. Update this map and issue #125 with links to that record before requesting owner review.
 
+The [private rc.16 cross-VM and PostgreSQL TLS record](v1.0.0-rc.16-kali-ubuntu-gate.md)
+repeats bounded HTTP, WebSocket, classifier, malformed-envelope, slow-client,
+PostgreSQL and Redis recovery, and musl PostgreSQL TLS trust probes against
+the same private candidate as draft PR #149. This remains candidate evidence:
+the scanner capture, approved-tag publication/attestation, public registry
+install, complete adversarial LLM review, and owner approval are still open.
+
 The [private v1.0.0-rc.1 host adversarial subset](v1.0.0-rc.1-host-adversarial.md)
 passes bounded glibc loopback and resource probes only. That unmerged candidate
 predates the stable-tag safeguard; it does not complete any full stable gate row
