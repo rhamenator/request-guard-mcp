@@ -97,6 +97,10 @@ mod inner {
     use tracing::info;
     use uuid::Uuid;
 
+    // Fixed project namespace for schema DDL. PostgreSQL advisory locks are
+    // scoped to a database, so independent installations do not contend.
+    const SCHEMA_INIT_LOCK_KEY: i64 = 0x5251_474d_4350_5343;
+
     pub struct PostgresClient {
         pool: Option<PgPool>,
     }
@@ -147,7 +151,12 @@ mod inner {
                 .begin()
                 .await
                 .context("failed to begin PostgreSQL schema initialization")?;
-            sqlx::query("SELECT pg_advisory_xact_lock(5931894178911636291)")
+            sqlx::query("SET LOCAL lock_timeout = '30s'")
+                .execute(&mut *transaction)
+                .await
+                .context("failed to bound PostgreSQL schema lock wait")?;
+            sqlx::query("SELECT pg_advisory_xact_lock($1)")
+                .bind(SCHEMA_INIT_LOCK_KEY)
                 .execute(&mut *transaction)
                 .await
                 .context("failed to lock PostgreSQL schema initialization")?;

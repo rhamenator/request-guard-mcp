@@ -290,7 +290,7 @@ async fn redis_and_postgres_backed_tools_complete_real_round_trip() {
     assert_eq!(health.status, "healthy");
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn concurrent_postgres_schema_initialization_completes() {
     let Ok(postgres_url) = std::env::var("TEST_POSTGRES_URL") else {
         assert!(
@@ -300,9 +300,19 @@ async fn concurrent_postgres_schema_initialization_completes() {
         return;
     };
 
+    // Isolate the first-run DDL race from the other parallel backend tests.
+    let schema = format!("request_guard_{}", Uuid::new_v4().simple());
+    let admin = sqlx::PgPool::connect(&postgres_url).await.unwrap();
+    sqlx::query(&format!("CREATE SCHEMA {schema}"))
+        .execute(&admin)
+        .await
+        .unwrap();
+    let separator = if postgres_url.contains('?') { '&' } else { '?' };
+    let scoped_url = format!("{postgres_url}{separator}options[search_path]={schema}");
+
     let initialize = || {
         let mut config = Config::default();
-        config.postgres.url = Some(postgres_url.clone());
+        config.postgres.url = Some(scoped_url.clone());
         AppState::initialize(config)
     };
     let result = tokio::time::timeout(std::time::Duration::from_secs(30), async {
@@ -315,6 +325,11 @@ async fn concurrent_postgres_schema_initialization_completes() {
     assert!(b.postgres.ping().await);
     assert!(c.postgres.ping().await);
     assert!(d.postgres.ping().await);
+    drop((a, b, c, d));
+    sqlx::query(&format!("DROP SCHEMA {schema} CASCADE"))
+        .execute(&admin)
+        .await
+        .unwrap();
 }
 
 #[tokio::test]
