@@ -80,11 +80,13 @@ error, then verifies `classify` still succeeds on the same server. This proves
 one optional-backend failure path and core-tool recovery; it does not prove
 recovery from a live Redis or PostgreSQL outage. See
 `adversarial-evidence-backend-2026-10-19.md`.
-The CI wrapper also starts an isolated debug-log server, sends a rejected
-synthetic bearer token and an authenticated `classify` call containing a
-synthetic request marker, then confirms expected log events occurred without
-either value appearing in a bounded capture. This checks direct log leakage
-for those calls, not every tool, proxy, collector, or encoding. See
+The CI wrapper also starts an isolated debug-log server, bounds log growth for
+128 rejected authentication requests, and checks that successful `classify`
+records an aggregate metric without a per-request audit log. An invalid
+authenticated `tools/call` carries a synthetic marker in its request ID and
+arguments; its categorical tool-error warning must appear without the marker
+or bearer token in the bounded capture. This checks those HTTP paths, not
+WebSocket or backend error logs, every tool, proxy, collector, or encoding. See
 `adversarial-evidence-logs-2026-10-19.md`.
 CI also sends 128 deterministic malformed JSON-RPC and tool-call envelopes,
 requires the specific error code and response ID for each case, and confirms

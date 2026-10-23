@@ -94,6 +94,32 @@ def main():
                     and b'mcp_requests_total{status="ok",tool="classify"}' in metrics,
                     {"tool_log_bytes": tool_log_bytes, "metrics_status": metrics_response.status},
                 ))
+                warning_start = os.fstat(log.fileno()).st_size
+                status, body = post(base, token, rpc("tools/call", {
+                    "name": "classify",
+                    "arguments": {"user_agent": [], "path": "/private/" + marker},
+                }, request_id=marker))
+                try:
+                    error_code = json.loads(body).get("error", {}).get("code")
+                except (ValueError, TypeError, AttributeError):
+                    error_code = None
+                warning_size = os.fstat(log.fileno()).st_size - warning_start
+                warning = os.pread(log.fileno(), min(warning_size, 4096), warning_start)
+                results.append(check(
+                    "categorical_tool_warning_without_request_marker",
+                    status == 200 and error_code == -400
+                    and 0 < warning_size <= 4096
+                    and b"tool error" in warning
+                    and b"error_code" in warning
+                    and marker.encode() not in warning
+                    and token.encode() not in warning,
+                    {"http": status, "error_code": error_code,
+                     "warning_bytes": warning_size,
+                     "warning_observed": b"tool error" in warning,
+                     "category_observed": b"error_code" in warning,
+                     "marker_absent": marker.encode() not in warning,
+                     "bearer_absent": token.encode() not in warning},
+                ))
             finally:
                 process.terminate()
                 try:
