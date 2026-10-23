@@ -325,6 +325,15 @@ async fn concurrent_postgres_schema_initialization_completes() {
     assert!(b.postgres.ping().await);
     assert!(c.postgres.ping().await);
     assert!(d.postgres.ping().await);
+    let created: (i64,) = sqlx::query_as(
+        "SELECT COUNT(*) FROM information_schema.tables \
+         WHERE table_schema = $1 AND table_name = 'mcp_decisions'",
+    )
+    .bind(&schema)
+    .fetch_one(&admin)
+    .await
+    .unwrap();
+    assert_eq!(created.0, 1, "schema URL did not isolate the first-run DDL");
     drop((a, b, c, d));
     sqlx::query(&format!("DROP SCHEMA {schema} CASCADE"))
         .execute(&admin)
