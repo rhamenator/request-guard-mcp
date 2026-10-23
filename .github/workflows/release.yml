@@ -135,7 +135,9 @@ jobs:
             --version "${RELEASE_VERSION}" \
             --target "${{ matrix.target }}" \
             --platform "${{ matrix.platform }}" \
-            --suffix "${{ matrix.suffix }}"
+            --suffix "${{ matrix.suffix }}" \
+            --source-commit "$(git rev-parse HEAD)" \
+            --repository "${GITHUB_REPOSITORY}"
       - name: Verify checksum and extract release archive
         shell: bash
         run: |
@@ -148,7 +150,10 @@ jobs:
             --staging-binary "artifacts/${folder}/request-guard-mcp${{ matrix.suffix }}" \
             --output verified-release \
             --folder "$folder" \
-            --binary "request-guard-mcp${{ matrix.suffix }}"
+            --binary "request-guard-mcp${{ matrix.suffix }}" \
+            --version "${RELEASE_VERSION}" \
+            --source-commit "$(git rev-parse HEAD)" \
+            --repository "${GITHUB_REPOSITORY}"
       - name: Assert static PIE without interpreter or shared dependencies
         if: matrix.target == 'x86_64-unknown-linux-musl'
         shell: bash
