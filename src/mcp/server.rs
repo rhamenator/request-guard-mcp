@@ -26,14 +26,16 @@ use hyper_util::{
 };
 use std::{
     convert::Infallible,
+    future::Future,
     io,
     sync::{
-        atomic::{AtomicUsize, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
         Arc,
     },
     time::{Duration, Instant},
 };
 use tokio::sync::{watch, Notify, Semaphore};
+use tokio::task::JoinSet;
 use tower::Service;
 use tower_http::limit::RequestBodyLimitLayer;
 use tracing::{info, warn};
@@ -531,7 +533,10 @@ async fn readiness_handler(State(state): State<ServerState>) -> impl IntoRespons
     }
 }
 
-pub async fn run_server(app_state: AppState) -> anyhow::Result<()> {
+pub async fn run_server<F>(app_state: AppState, shutdown: F) -> anyhow::Result<()>
+where
+    F: Future<Output = ()>,
+{
     let registry = Arc::new(crate::mcp::tool_registry::build_registry());
     let bind_addr = app_state.config.bind_addr()?;
     let max_body = app_state.config.limits.max_request_bytes;
@@ -554,7 +559,14 @@ pub async fn run_server(app_state: AppState) -> anyhow::Result<()> {
     let listener = tokio::net::TcpListener::bind(bind_addr).await?;
     info!(addr = %bind_addr, "listening");
 
-    serve_listener(listener, router, server_state.app.config.limits.clone()).await
+    serve_listener_until(
+        listener,
+        router,
+        server_state.app.config.limits.clone(),
+        HTTP_CONNECTION_MAX_LIFETIME,
+        shutdown,
+    )
+    .await
 }
 
 #[derive(Clone, Copy, Default)]
@@ -629,27 +641,59 @@ fn accept_error_action(error: &io::Error) -> AcceptErrorAction {
     }
 }
 
-async fn serve_listener(
-    listener: tokio::net::TcpListener,
-    router: Router,
-    limits: LimitsConfig,
-) -> anyhow::Result<()> {
-    serve_listener_with_http1_lifetime(listener, router, limits, HTTP_CONNECTION_MAX_LIFETIME).await
-}
-
+#[cfg(test)]
 async fn serve_listener_with_http1_lifetime(
     listener: tokio::net::TcpListener,
     router: Router,
     limits: LimitsConfig,
     http1_max_lifetime: Duration,
 ) -> anyhow::Result<()> {
+    serve_listener_until(
+        listener,
+        router,
+        limits,
+        http1_max_lifetime,
+        std::future::pending(),
+    )
+    .await
+}
+
+async fn serve_listener_until<F>(
+    listener: tokio::net::TcpListener,
+    router: Router,
+    limits: LimitsConfig,
+    http1_max_lifetime: Duration,
+    shutdown: F,
+) -> anyhow::Result<()>
+where
+    F: Future<Output = ()>,
+{
     let connection_limit = Arc::new(Semaphore::new(limits.max_connections));
+    let stopping = Arc::new(AtomicBool::new(false));
+    let mut connections = JoinSet::new();
+    let shutdown_drain = Duration::from_secs(
+        limits
+            .http_body_timeout_secs
+            .saturating_add(
+                limits
+                    .per_tool_timeout_secs
+                    .max(limits.classify_timeout_secs),
+            )
+            .saturating_add(2),
+    );
+    tokio::pin!(shutdown);
     let mut last_accept_error_log: Option<Instant> = None;
     let mut last_accept_recovery_log: Option<Instant> = None;
     let mut accept_error_count = 0_u64;
     let mut resource_backoff = Duration::from_millis(100);
     loop {
-        let (stream, peer) = match listener.accept().await {
+        let accepted = tokio::select! {
+            biased;
+            _ = &mut shutdown => break,
+            _ = connections.join_next(), if !connections.is_empty() => continue,
+            accepted = listener.accept() => accepted,
+        };
+        let (stream, peer) = match accepted {
             Ok(accepted) => {
                 if accept_error_count > 0 {
                     if last_accept_recovery_log
@@ -690,6 +734,7 @@ async fn serve_listener_with_http1_lifetime(
             continue;
         };
         let router = router.clone();
+        let stopping = Arc::clone(&stopping);
         let header_timeout = Duration::from_secs(limits.http_header_timeout_secs);
         let http2_idle_timeout = Duration::from_secs(limits.http2_idle_timeout_secs);
         // Bound a peer that repeatedly sends cheap unauthenticated requests
@@ -706,7 +751,7 @@ async fn serve_listener_with_http1_lifetime(
                 )
                 .saturating_add(2),
         );
-        tokio::spawn(async move {
+        connections.spawn(async move {
             // Hyper's HTTP/1 header timeout does not cover the auto-protocol
             // sniff or an HTTP/2 connection before its first request. Bound
             // both before they can retain a connection permit indefinitely.
@@ -734,6 +779,15 @@ async fn serve_listener_with_http1_lifetime(
                 let mut router = router.clone();
                 async move {
                     let _request_guard = request_guard;
+                    if stopping.load(Ordering::Acquire) {
+                        let mut response =
+                            (StatusCode::SERVICE_UNAVAILABLE, "server shutting down")
+                                .into_response();
+                        response
+                            .headers_mut()
+                            .insert(CONNECTION, HeaderValue::from_static("close"));
+                        return Ok::<Response, Infallible>(response);
+                    }
                     if over_http2_request_cap {
                         return Ok::<Response, Infallible>(
                             (StatusCode::SERVICE_UNAVAILABLE, "connection request limit")
@@ -860,6 +914,20 @@ async fn serve_listener_with_http1_lifetime(
             drop(permit);
         });
     }
+    stopping.store(true, Ordering::Release);
+    drop(listener);
+    info!("shutdown signal received; draining active connections");
+    if tokio::time::timeout(shutdown_drain, async {
+        while connections.join_next().await.is_some() {}
+    })
+    .await
+    .is_err()
+    {
+        warn!("connection drain deadline reached; closing remaining connections");
+        connections.abort_all();
+        while connections.join_next().await.is_some() {}
+    }
+    Ok(())
 }
 
 #[cfg(test)]

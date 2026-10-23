@@ -58,8 +58,20 @@ async fn main() -> Result<()> {
         std::process::exit(0);
     }
 
-    // Run the network MCP server (blocks until shutdown).
-    let result = mcp::server::run_server(app_state).await;
+    // Register before entering the accept loop so container SIGTERM and
+    // terminal Ctrl-C both give active requests a bounded drain window.
+    #[cfg(unix)]
+    let mut terminate = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())?;
+    let shutdown = async move {
+        #[cfg(unix)]
+        tokio::select! {
+            _ = terminate.recv() => {},
+            _ = tokio::signal::ctrl_c() => {},
+        }
+        #[cfg(not(unix))]
+        let _ = tokio::signal::ctrl_c().await;
+    };
+    let result = mcp::server::run_server(app_state, shutdown).await;
     if let Some(provider) = tracer_provider {
         provider
             .shutdown()
