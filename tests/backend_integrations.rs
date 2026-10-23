@@ -89,9 +89,15 @@ async fn redis_and_postgres_backed_tools_complete_real_round_trip() {
         std::env::var("TEST_REDIS_URL"),
         std::env::var("TEST_POSTGRES_URL"),
     ) else {
+        assert!(
+            !matches!(std::env::var("REQUIRE_TEST_BACKENDS").as_deref(), Ok("1")),
+            "required Redis/PostgreSQL integration URLs are missing"
+        );
         eprintln!("skipping backend integration test: TEST_REDIS_URL/TEST_POSTGRES_URL not set");
         return;
     };
+
+    eprintln!("running real Redis and PostgreSQL integration round trip");
 
     let suffix = Uuid::new_v4().simple().to_string();
     let mut config = Config::default();
