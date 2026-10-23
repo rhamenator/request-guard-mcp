@@ -777,6 +777,7 @@ where
                     (is_http2 && !over_http2_request_cap).then(|| Http2RequestGuard(activity_tx));
                 first_request_for_service.notify_one();
                 let mut router = router.clone();
+                let stopping = Arc::clone(&stopping);
                 async move {
                     let _request_guard = request_guard;
                     if stopping.load(Ordering::Acquire) {
