@@ -13,7 +13,7 @@ Search existing issues and pull requests before opening a new one. For larger or
 
 ## Development
 
-Use the declared minimum supported Rust version and current stable Rust, and keep changes scoped. Add tests for behavioral changes and update the README, docs, schemas, deployment examples, or configuration references when they are affected.
+Use the declared minimum supported Rust version and the pinned release toolchain in `rust-toolchain.toml`, and keep changes scoped. Add tests for behavioral changes and update the README, docs, schemas, deployment examples, or configuration references when they are affected.
 
 Run the full local validation suite before submitting a pull request:
 
