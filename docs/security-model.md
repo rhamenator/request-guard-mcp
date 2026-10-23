@@ -40,6 +40,14 @@ All WebSocket connections are authenticated at connection establishment using a 
 ## Input Validation
 
 - All request bodies are size-limited (`max_request_bytes`, default 1 MiB).
+- Development main also rejects JSON messages with more than 16,384 structural
+  separators/containers before allocating a `serde_json::Value`. This bounds
+  wide arrays and objects that otherwise amplify memory despite a small byte
+  count. Punctuation inside strings does not count. HTTP returns 413 before
+  parsing; WebSocket and stdio use the existing JSON-RPC `-413` error with a
+  null ID. Published
+  v0.1.5 has only the byte limit; authorized callers should avoid large
+  arbitrary `extra` values.
 - All tool parameters are deserialized into strongly-typed structs via `serde`.
 - Sensitive-path signals inspect up to four rounds of percent decoding and
   backslash separators. This is a heuristic; the deploying origin must still
