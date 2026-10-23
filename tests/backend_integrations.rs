@@ -290,6 +290,57 @@ async fn redis_and_postgres_backed_tools_complete_real_round_trip() {
     assert_eq!(health.status, "healthy");
 }
 
+#[tokio::test(flavor = "multi_thread")]
+async fn concurrent_postgres_schema_initialization_completes() {
+    let Ok(postgres_url) = std::env::var("TEST_POSTGRES_URL") else {
+        assert!(
+            !matches!(std::env::var("REQUIRE_TEST_BACKENDS").as_deref(), Ok("1")),
+            "required PostgreSQL integration URL is missing"
+        );
+        return;
+    };
+
+    // Isolate the first-run DDL race from the other parallel backend tests.
+    let schema = format!("request_guard_{}", Uuid::new_v4().simple());
+    let admin = sqlx::PgPool::connect(&postgres_url).await.unwrap();
+    sqlx::query(&format!("CREATE SCHEMA {schema}"))
+        .execute(&admin)
+        .await
+        .unwrap();
+    let separator = if postgres_url.contains('?') { '&' } else { '?' };
+    let scoped_url = format!("{postgres_url}{separator}options[search_path]={schema}");
+
+    let initialize = || {
+        let mut config = Config::default();
+        config.postgres.url = Some(scoped_url.clone());
+        AppState::initialize(config)
+    };
+    let result = tokio::time::timeout(std::time::Duration::from_secs(30), async {
+        tokio::try_join!(initialize(), initialize(), initialize(), initialize())
+    })
+    .await
+    .expect("concurrent PostgreSQL schema initialization timed out");
+    let (a, b, c, d) = result.expect("concurrent PostgreSQL schema initialization failed");
+    assert!(a.postgres.ping().await);
+    assert!(b.postgres.ping().await);
+    assert!(c.postgres.ping().await);
+    assert!(d.postgres.ping().await);
+    let created: (i64,) = sqlx::query_as(
+        "SELECT COUNT(*) FROM information_schema.tables \
+         WHERE table_schema = $1 AND table_name = 'mcp_decisions'",
+    )
+    .bind(&schema)
+    .fetch_one(&admin)
+    .await
+    .unwrap();
+    assert_eq!(created.0, 1, "schema URL did not isolate the first-run DDL");
+    drop((a, b, c, d));
+    sqlx::query(&format!("DROP SCHEMA {schema} CASCADE"))
+        .execute(&admin)
+        .await
+        .unwrap();
+}
+
 #[tokio::test]
 async fn postgres_decisions_and_reports_are_isolated_by_caller() {
     let Ok(postgres_url) = std::env::var("TEST_POSTGRES_URL") else {
