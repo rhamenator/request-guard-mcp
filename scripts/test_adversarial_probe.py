@@ -89,6 +89,7 @@ class ProbeBoundariesTest(unittest.TestCase):
         self.assertEqual(name, "benign_browser")
         self.assertFalse(adversarial_classifier_probe.signals_match(
             {"ua_scraper"}, required, absent))
+        self.assertFalse(adversarial_classifier_probe.response_id_matches(True, 1))
 
     def test_redirect_is_not_followed_with_bearer_token(self):
         class Destination(ProbeServer):

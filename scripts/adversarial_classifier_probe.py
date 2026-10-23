@@ -35,6 +35,10 @@ def signals_match(names, required, absent):
     return (required is None or required in names) and not (absent & names)
 
 
+def response_id_matches(actual, expected):
+    return type(actual) is int and actual == expected
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--url", default="http://127.0.0.1:8085")
@@ -61,7 +65,7 @@ def main():
             names = {signal["name"] for signal in result["structuredContent"]["signals"]}
             passed = (
                 status == 200
-                and message["id"] == request_id
+                and response_id_matches(message["id"], request_id)
                 and result["isError"] is False
                 and signals_match(names, required, absent)
                 and token.encode() not in body
