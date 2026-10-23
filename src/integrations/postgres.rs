@@ -141,6 +141,16 @@ mod inner {
 
         async fn initialize_schema(&self) -> Result<()> {
             let pool = self.pool()?;
+            // Multiple server replicas may initialize the same database at once.
+            // Serialize DDL across processes; the lock releases on commit or rollback.
+            let mut transaction = pool
+                .begin()
+                .await
+                .context("failed to begin PostgreSQL schema initialization")?;
+            sqlx::query("SELECT pg_advisory_xact_lock(5931894178911636291)")
+                .execute(&mut *transaction)
+                .await
+                .context("failed to lock PostgreSQL schema initialization")?;
             sqlx::raw_sql(
                 r#"
                 CREATE TABLE IF NOT EXISTS mcp_decisions (
@@ -194,9 +204,13 @@ mod inner {
                 END $$;
                 "#,
             )
-            .execute(pool)
+            .execute(&mut *transaction)
             .await
             .context("failed to initialize PostgreSQL persistence schema")?;
+            transaction
+                .commit()
+                .await
+                .context("failed to commit PostgreSQL persistence schema")?;
             Ok(())
         }
 

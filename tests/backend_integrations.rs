@@ -291,6 +291,33 @@ async fn redis_and_postgres_backed_tools_complete_real_round_trip() {
 }
 
 #[tokio::test]
+async fn concurrent_postgres_schema_initialization_completes() {
+    let Ok(postgres_url) = std::env::var("TEST_POSTGRES_URL") else {
+        assert!(
+            !matches!(std::env::var("REQUIRE_TEST_BACKENDS").as_deref(), Ok("1")),
+            "required PostgreSQL integration URL is missing"
+        );
+        return;
+    };
+
+    let initialize = || {
+        let mut config = Config::default();
+        config.postgres.url = Some(postgres_url.clone());
+        AppState::initialize(config)
+    };
+    let result = tokio::time::timeout(std::time::Duration::from_secs(30), async {
+        tokio::try_join!(initialize(), initialize(), initialize(), initialize())
+    })
+    .await
+    .expect("concurrent PostgreSQL schema initialization timed out");
+    let (a, b, c, d) = result.expect("concurrent PostgreSQL schema initialization failed");
+    assert!(a.postgres.ping().await);
+    assert!(b.postgres.ping().await);
+    assert!(c.postgres.ping().await);
+    assert!(d.postgres.ping().await);
+}
+
+#[tokio::test]
 async fn postgres_decisions_and_reports_are_isolated_by_caller() {
     let Ok(postgres_url) = std::env::var("TEST_POSTGRES_URL") else {
         eprintln!("skipping PostgreSQL isolation test: TEST_POSTGRES_URL not set");
