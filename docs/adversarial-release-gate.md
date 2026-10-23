@@ -36,6 +36,11 @@ protection rule and the tag ruleset is still active; missing protection does
 not satisfy this gate. Experimental `v0.*` tags and `0.x` main images remain
 automatic; private `workflow_dispatch` native candidates build without public
 attestation or release publication.
+Here, "private candidate" means unpublished: this public repository's Actions
+artifacts are downloadable by signed-in readers with repository read access.
+New native candidate archives and sidecars expire after seven days. Keep
+secrets and sensitive lab evidence out of those artifacts; a passing private
+candidate still does not authorize publication.
 
 At minimum, exercise authentication boundaries, malformed JSON-RPC and MCP frames, invalid and oversized inputs, prompt-injection text treated as request data, bot-evasion variations, concurrency and slow clients, backend failure and recovery, and logging of sensitive fields. Use Kali and Ubuntu lab VMs when available; scope scanners to the owned test endpoint, record their request counts, and bound runtime and rate to preserve shared host responsiveness. Confirm each exploit or anomaly with a regression test, rerun the affected probe, then rerun the full gate. Reconcile independent Claude Code and Codex reviews with the observed runtime results and document remaining limits before a release.
 
