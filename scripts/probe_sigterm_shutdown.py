@@ -54,7 +54,7 @@ def main() -> None:
     body = b'{"jsonrpc":"2.0","id":1,"method":"ping"}'
     headers = (f"POST /mcp HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\n"
                f"Authorization: Bearer {token}\r\nContent-Type: application/json\r\n"
-               f"Content-Length: {len(body)}\r\nConnection: close\r\n\r\n").encode()
+               f"Content-Length: {len(body)}\r\n\r\n").encode()
 
     with tempfile.TemporaryDirectory(prefix="request-guard-sigterm-") as cwd:
         process = subprocess.Popen([str(binary)], cwd=cwd, env=env,
@@ -109,6 +109,36 @@ def main() -> None:
                 if code != 0 or time.monotonic() - started > 3:
                     raise RuntimeError("idle keep-alive delayed graceful shutdown")
                 print("PASS SIGTERM: idle HTTP keep-alive closed promptly; exit 0")
+        finally:
+            if process.poll() is None:
+                process.kill()
+                process.wait(timeout=5)
+
+    # A second signal is the operator's forced-exit escape hatch if a peer
+    # still holds an active body read during the drain window.
+    port = free_port()
+    env["MCP__PORT"] = str(port)
+    with tempfile.TemporaryDirectory(prefix="request-guard-sigterm-force-") as cwd:
+        process = subprocess.Popen([str(binary)], cwd=cwd, env=env,
+                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        try:
+            wait_for_health(process, port)
+            with socket.create_connection(("127.0.0.1", port), timeout=3) as client:
+                client.sendall((f"POST /mcp HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\n"
+                                f"Authorization: Bearer {token}\r\n"
+                                "Content-Type: application/json\r\n"
+                                f"Content-Length: {len(body)}\r\n\r\n").encode() + body[:-1])
+                time.sleep(0.15)
+                started = time.monotonic()
+                process.send_signal(signal.SIGTERM)
+                time.sleep(0.15)
+                if process.poll() is not None:
+                    raise RuntimeError("first signal did not leave an active drain window")
+                process.send_signal(signal.SIGTERM)
+                code = process.wait(timeout=2)
+                if code != 1 or time.monotonic() - started > 2:
+                    raise RuntimeError(f"second signal did not force exit promptly ({code})")
+                print("PASS SIGTERM: second signal forces exit during active drain")
         finally:
             if process.poll() is None:
                 process.kill()

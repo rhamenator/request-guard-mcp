@@ -1,6 +1,36 @@
 use anyhow::Result;
 use request_guard_mcp::{config, mcp, state, telemetry};
 
+#[cfg(unix)]
+async fn wait_for_network_signal(terminate: &mut tokio::signal::unix::Signal) {
+    let mut term_available = true;
+    let mut interrupt_available = true;
+    loop {
+        tokio::select! {
+            result = terminate.recv(), if term_available => match result {
+                Some(()) => return,
+                None => term_available = false,
+            },
+            result = tokio::signal::ctrl_c(), if interrupt_available => match result {
+                Ok(()) => return,
+                Err(error) => {
+                    tracing::warn!(%error, "cannot listen for Ctrl-C; retaining SIGTERM handler");
+                    interrupt_available = false;
+                }
+            },
+            else => std::future::pending::<()>().await,
+        }
+    }
+}
+
+#[cfg(not(unix))]
+async fn wait_for_network_signal() {
+    if let Err(error) = tokio::signal::ctrl_c().await {
+        tracing::warn!(%error, "cannot listen for Ctrl-C");
+        std::future::pending::<()>().await;
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let stdio = match std::env::args().skip(1).collect::<Vec<_>>().as_slice() {
@@ -65,20 +95,14 @@ async fn main() -> Result<()> {
     let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel();
     let signal_monitor = tokio::spawn(async move {
         #[cfg(unix)]
-        tokio::select! {
-            _ = terminate.recv() => {},
-            _ = tokio::signal::ctrl_c() => {},
-        }
+        wait_for_network_signal(&mut terminate).await;
         #[cfg(not(unix))]
-        let _ = tokio::signal::ctrl_c().await;
+        wait_for_network_signal().await;
         let _ = shutdown_tx.send(());
         #[cfg(unix)]
-        tokio::select! {
-            _ = terminate.recv() => {},
-            _ = tokio::signal::ctrl_c() => {},
-        }
+        wait_for_network_signal(&mut terminate).await;
         #[cfg(not(unix))]
-        let _ = tokio::signal::ctrl_c().await;
+        wait_for_network_signal().await;
         std::process::exit(1);
     });
     let result = mcp::server::run_server(app_state, async {
