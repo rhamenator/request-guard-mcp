@@ -105,18 +105,30 @@ def main():
                     error_code = None
                 warning_size = os.fstat(log.fileno()).st_size - warning_start
                 warning = os.pread(log.fileno(), min(warning_size, 4096), warning_start)
+                try:
+                    warning_events = [json.loads(line) for line in warning.splitlines()]
+                except (ValueError, TypeError):
+                    warning_events = []
+                categorical_warning = any(
+                    isinstance(event, dict)
+                    and event.get("level") == "WARN"
+                    and event.get("target") == "request_guard_mcp::mcp::transport_ws"
+                    and event.get("fields") == {
+                        "message": "tool error", "tool": "classify",
+                        "error_code": "INVALID_REQUEST",
+                    }
+                    for event in warning_events
+                )
                 results.append(check(
                     "categorical_tool_warning_without_request_marker",
                     status == 200 and error_code == -400
                     and 0 < warning_size <= 4096
-                    and b"tool error" in warning
-                    and b"error_code" in warning
+                    and categorical_warning
                     and marker.encode() not in warning
                     and token.encode() not in warning,
                     {"http": status, "error_code": error_code,
                      "warning_bytes": warning_size,
-                     "warning_observed": b"tool error" in warning,
-                     "category_observed": b"error_code" in warning,
+                     "categorical_warning_observed": categorical_warning,
                      "marker_absent": marker.encode() not in warning,
                      "bearer_absent": token.encode() not in warning},
                 ))
