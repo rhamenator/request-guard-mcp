@@ -127,6 +127,41 @@ pub async fn handle_ws_connection(
     state.metrics.active_connections.dec();
 }
 
+// A byte limit alone permits hundreds of thousands of tiny JSON array items.
+// Count structural separators before serde_json allocates Value nodes. This is
+// deliberately a conservative complexity budget, not a JSON validator; serde
+// still validates the accepted input and enforces its nesting-depth limit.
+const MAX_JSON_STRUCTURAL_TOKENS: usize = 16_384;
+
+pub(crate) fn within_json_complexity_budget(text: &str) -> bool {
+    let mut in_string = false;
+    let mut escaped = false;
+    let mut tokens = 0usize;
+    for byte in text.bytes() {
+        if in_string {
+            if escaped {
+                escaped = false;
+            } else if byte == b'\\' {
+                escaped = true;
+            } else if byte == b'"' {
+                in_string = false;
+            }
+        } else {
+            match byte {
+                b'"' => in_string = true,
+                b'{' | b'[' | b',' => {
+                    tokens += 1;
+                    if tokens > MAX_JSON_STRUCTURAL_TOKENS {
+                        return false;
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+    true
+}
+
 pub(crate) async fn process_message(
     text: &str,
     state: &Arc<AppState>,
@@ -137,6 +172,10 @@ pub(crate) async fn process_message(
 
     // Size check
     if text.len() > state.config.limits.max_request_bytes {
+        let err = McpMessage::error(Value::Null, -413, AppError::RequestTooLarge.code());
+        return Some(serialize_message(&err));
+    }
+    if !within_json_complexity_budget(text) {
         let err = McpMessage::error(Value::Null, -413, AppError::RequestTooLarge.code());
         return Some(serialize_message(&err));
     }
@@ -458,6 +497,29 @@ mod tests {
             Arc::new(AppState::new(Config::default())),
             Arc::new(build_registry()),
         )
+    }
+
+    #[test]
+    fn json_complexity_budget_ignores_punctuation_inside_strings() {
+        let text = serde_json::json!({ "extra": "[,{}\\\"".repeat(20_000) }).to_string();
+        assert!(within_json_complexity_budget(&text));
+        let wide = format!("[{}0]", "0,".repeat(MAX_JSON_STRUCTURAL_TOKENS));
+        assert!(!within_json_complexity_budget(&wide));
+    }
+
+    #[tokio::test]
+    async fn wide_json_is_rejected_before_value_allocation() {
+        let (state, registry) = test_context();
+        let request = format!(
+            "{{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"classify\",\"params\":{{\"extra\":[{}0]}}}}",
+            "0,".repeat(MAX_JSON_STRUCTURAL_TOKENS)
+        );
+        let response = process_message(&request, &state, &registry, "test-caller")
+            .await
+            .unwrap();
+        let value: Value = serde_json::from_str(&response).unwrap();
+        assert_eq!(value["error"]["code"], -413);
+        assert!(value["id"].is_null());
     }
 
     #[tokio::test]

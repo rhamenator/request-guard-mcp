@@ -181,6 +181,11 @@ async fn http_mcp_handler(state: ServerState, request: Request, caller_scope: St
         )
             .into_response();
     };
+    // The one-way envelope check below also parses the body. Reject wide
+    // structures before either parser allocates JSON Value nodes.
+    if !super::transport_ws::within_json_complexity_budget(text) {
+        return (StatusCode::PAYLOAD_TOO_LARGE, "Request body exceeds limit").into_response();
+    }
     match process_message(text, &state.app, &state.registry, &caller_scope).await {
         Some(response) => {
             // Rejected notifications and client responses need an HTTP error
