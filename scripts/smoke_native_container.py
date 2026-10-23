@@ -2,6 +2,7 @@
 """Exercise a published digest or private loaded image on a native runner."""
 
 import argparse
+import json
 import os
 import re
 import secrets
@@ -10,6 +11,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import urllib.request
 from pathlib import Path
 
 
@@ -45,13 +47,42 @@ def wait_for_listener(host: str, port: int, name: str, token: str) -> None:
     raise RuntimeError(f"container listener did not become ready: {safe_logs(name, token)}")
 
 
+def verify_build_info(host: str, port: int, token: str, version: str, commit: str) -> None:
+    request = urllib.request.Request(
+        f"http://{host}:{port}/mcp",
+        data=json.dumps({
+            "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+            "params": {"name": "model_info", "arguments": {}},
+        }, separators=(",", ":")).encode(),
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        method="POST",
+    )
+    # The bridge address belongs to this isolated runner, not an environment proxy.
+    with urllib.request.build_opener(urllib.request.ProxyHandler({})).open(request, timeout=8) as response:
+        if response.status != 200:
+            raise RuntimeError(f"model_info returned HTTP {response.status}")
+        result = json.load(response)
+    build = result["result"]["structuredContent"]["build_info"]
+    if (result.get("id") != 1 or build.get("version") != version
+            or build.get("git_commit") != commit
+            or not build.get("rust_version", "").startswith("rustc 1.99.1 (")):
+        raise RuntimeError("running container build_info differs from expected source/toolchain")
+    print(f"running container build_info: version {version}, full source commit and Rust 1.99.1 verified")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     source = parser.add_mutually_exclusive_group(required=True)
     source.add_argument("--image", help="immutable published GHCR index or platform digest")
     source.add_argument("--private-image", help="locally loaded unpublished candidate image")
     parser.add_argument("--arch", required=True, choices=("amd64", "arm64"))
+    parser.add_argument("--expected-version", required=True)
+    parser.add_argument("--expected-commit", required=True)
     args = parser.parse_args()
+    if not re.fullmatch(r"[0-9a-f]{40}", args.expected_commit):
+        parser.error("expected commit must be a full lowercase Git SHA")
+    if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?", args.expected_version):
+        parser.error("expected version must be a Cargo-compatible version")
     if args.image and not IMAGE_RE.fullmatch(args.image):
         parser.error("image must be the immutable Request Guard GHCR sha256 digest")
     if args.private_image and (
@@ -89,6 +120,7 @@ def main() -> None:
             if not host:
                 raise RuntimeError("container bridge address is empty")
             wait_for_listener(host, 8085, name, token)
+            verify_build_info(host, 8085, token, args.expected_version, args.expected_commit)
             probes = (
                 ("adversarial_probe.py", "--url", f"http://{host}:8085", "--max-request-bytes", "4096"),
                 ("adversarial_ws_probe.py", "--host", host, "--port", "8085", "--max-request-bytes", "4096"),

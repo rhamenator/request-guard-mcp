@@ -23,9 +23,11 @@ RUN cargo build --release --locked 2>/dev/null || true
 RUN rm src/main.rs src/lib.rs
 
 # Build the real binary
+ARG SOURCE_COMMIT=unknown
 COPY src ./src
 RUN touch src/main.rs src/lib.rs && \
-    GIT_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown") \
+    (test "$SOURCE_COMMIT" = unknown || printf '%s' "$SOURCE_COMMIT" | grep -Eq '^[0-9a-f]{40}$') && \
+    GIT_COMMIT="$SOURCE_COMMIT" \
     BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ) \
     RUST_VERSION=$(rustc --version) \
     cargo build --release --locked

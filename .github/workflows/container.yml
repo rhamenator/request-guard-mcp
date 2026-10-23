@@ -88,6 +88,7 @@ jobs:
         with:
           context: .
           file: docker/Dockerfile
+          build-args: SOURCE_COMMIT=${{ github.sha }}
           push: false
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -143,6 +144,7 @@ jobs:
         with:
           context: .
           file: docker/Dockerfile
+          build-args: SOURCE_COMMIT=${{ github.sha }}
           platforms: linux/${{ matrix.arch }}
           labels: ${{ steps.meta.outputs.labels }}
           provenance: mode=min
@@ -166,7 +168,9 @@ jobs:
           ARCH: ${{ matrix.arch }}
         run: |
           python3 scripts/smoke_native_container.py \
-            --image "$REGISTRY/$IMAGE_NAME@$DIGEST" --arch "$ARCH"
+            --image "$REGISTRY/$IMAGE_NAME@$DIGEST" --arch "$ARCH" \
+            --expected-commit '${{ github.sha }}' \
+            --expected-version "$(python3 -c 'import tomllib; print(tomllib.load(open("Cargo.toml", "rb"))["package"]["version"])')"
 
       - name: Record resolved inputs from immutable platform digest
         env:
