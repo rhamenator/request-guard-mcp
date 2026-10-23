@@ -1,0 +1,34 @@
+# Request Guard MCP native bundle
+
+Bundle label: `@RELEASE_LABEL@`
+
+Source commit: [`@SOURCE_COMMIT@`](https://github.com/@REPOSITORY@/tree/@SOURCE_COMMIT@)
+
+This archive contains a prebuilt **inbound request classifier**. It does not
+intercept website traffic or control an agent's outbound requests. A site must
+send selected request metadata to the server and enforce its own policy.
+
+Start with the bundled [installation guide](INSTALL.md). It covers checksum
+and, for an approved tagged release, signed-attestation verification; token
+setup; HTTP, custom WebSocket and local stdio clients; optional backends; and
+the limits of each transport. Stable version tags additionally require
+reviewed environment approval before publication. The archive also contains `.env.example`, the
+license, `Cargo.lock` and a PostgreSQL legacy-row migration. It does not
+contain the repository's build scripts, tests, deployment manifests or
+companion skill. The link above points to the exact source commit for those
+files. A private candidate bundle may have no matching public release tag,
+and its source link may require repository access.
+
+For HTTP or WebSocket, replace the example bearer and configure a unique
+`AUTH_TOKENS` value of at least 32 characters. The server speaks plaintext
+HTTP internally; put a trusted TLS proxy in front of remote clients. Local
+`--stdio` relies on operating-system process access rather than a bearer.
+PostgreSQL, Redis and MaxMind are optional for core `classify` and `explain`,
+but individual enrichment, persistence and report tools need their backends.
+Redis supports plaintext `redis://` only: use a trusted isolated link or an
+independently secured loopback tunnel, or leave it unconfigured. For remote
+PostgreSQL use `sslmode=verify-full` with a trusted CA.
+
+The source commit, bundle label and checksums identify this package. Private
+workflow-dispatch candidates are unpublished test artifacts; they do not
+prove a public registry install, tagged provenance or stable release approval.

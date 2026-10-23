@@ -5,9 +5,12 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import re
 from pathlib import Path, PurePosixPath
 import tarfile
 import zipfile
+
+from package_release import render_bundle_readme
 
 
 def digest(path: Path) -> str:
@@ -32,6 +35,9 @@ def main() -> None:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--folder", required=True)
     parser.add_argument("--binary", required=True)
+    parser.add_argument("--version", required=True)
+    parser.add_argument("--source-commit", required=True)
+    parser.add_argument("--repository", required=True)
     args = parser.parse_args()
 
     line = args.sidecar.read_text(encoding="ascii").strip()
@@ -53,6 +59,8 @@ def main() -> None:
         with tarfile.open(args.archive, "r:gz") as package:
             for member in package.getmembers():
                 check_member(member.name, args.folder)
+                if member.issym() or member.islnk():
+                    raise ValueError("release archive must not contain links")
             package.extractall(args.output, filter="data")
     else:
         raise ValueError("expected a .zip or .tar.gz release archive")
@@ -62,6 +70,31 @@ def main() -> None:
         raise ValueError("release archive is missing its expected binary")
     if digest(extracted) != digest(args.staging_binary):
         raise ValueError("extracted binary differs from the built staging binary")
+    readme = args.output / args.folder / "README.md"
+    if not readme.is_file():
+        raise ValueError("release archive is missing its bundle README")
+    readme_text = readme.read_text(encoding="utf-8")
+    expected_readme = render_bundle_readme(
+        Path("README.bundle.md.in").read_text(encoding="utf-8"),
+        args.version, args.source_commit, args.repository,
+    )
+    if readme_text != expected_readme:
+        raise ValueError("bundle README has missing or stale release identity")
+    install = args.output / args.folder / "INSTALL.md"
+    if not install.is_file():
+        raise ValueError("release archive is missing INSTALL.md")
+    bundle_root = (args.output / args.folder).resolve()
+    for document in (readme, install):
+        for destination in re.findall(r"\[[^]]+\]\(([^)]+)\)", document.read_text(encoding="utf-8")):
+            if destination.startswith(("https://", "http://", "mailto:")):
+                continue
+            target = destination.split(None, 1)[0].split("#", 1)[0]
+            relative = PurePosixPath(target)
+            if relative.is_absolute() or ".." in relative.parts or "\\" in target:
+                raise ValueError(f"{document.name} has an unsafe relative link: {destination}")
+            linked = (document.parent / target).resolve() if target else document.resolve()
+            if not linked.is_relative_to(bundle_root) or not linked.is_file():
+                raise ValueError(f"{document.name} links to a missing file: {destination}")
     migration = args.output / args.folder / "scripts/postgres_minimize_legacy.sql"
     if not migration.is_file():
         raise ValueError("release archive is missing the PostgreSQL legacy migration")

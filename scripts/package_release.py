@@ -20,15 +20,31 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def render_bundle_readme(template: str, version: str, source_commit: str, repository: str) -> str:
+    expected = {"@RELEASE_LABEL@": 1, "@SOURCE_COMMIT@": 2, "@REPOSITORY@": 1}
+    if any(template.count(key) != count for key, count in expected.items()):
+        raise ValueError("bundle README must contain the expected identity placeholders")
+    for key, value in (("@RELEASE_LABEL@", version), ("@SOURCE_COMMIT@", source_commit),
+                       ("@REPOSITORY@", repository)):
+        template = template.replace(key, value)
+    return template
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--version", required=True)
     parser.add_argument("--target", required=True)
     parser.add_argument("--platform", required=True)
     parser.add_argument("--suffix", default="")
+    parser.add_argument("--source-commit", required=True)
+    parser.add_argument("--repository", required=True)
     args = parser.parse_args()
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9.+_-]*", args.version):
         parser.error("version must be a single safe filename component")
+    if not re.fullmatch(r"[0-9a-f]{40}", args.source_commit):
+        parser.error("source commit must be a full lowercase Git SHA-1")
+    if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", args.repository):
+        parser.error("repository must be a GitHub owner/name pair")
 
     prefix = f"request-guard-mcp-{args.version}-{args.platform}"
     artifacts = Path("artifacts")
@@ -37,9 +53,13 @@ def main() -> None:
     if not binary.is_file():
         raise FileNotFoundError(f"release binary was not produced: {binary}")
 
-    stage.mkdir(parents=True, exist_ok=True)
+    stage.mkdir(parents=True, exist_ok=False)
     shutil.copy2(binary, stage / binary.name)
-    shutil.copy2("README.md", stage / "README.md")
+    bundle_readme = render_bundle_readme(
+        Path("README.bundle.md.in").read_text(encoding="utf-8"),
+        args.version, args.source_commit, args.repository,
+    )
+    (stage / "README.md").write_text(bundle_readme, encoding="utf-8", newline="\n")
     shutil.copy2("INSTALL.md", stage / "INSTALL.md")
     shutil.copy2("LICENSE", stage / "LICENSE")
     shutil.copy2(".env.example", stage / ".env.example")

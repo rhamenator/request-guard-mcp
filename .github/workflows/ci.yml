@@ -26,6 +26,7 @@ jobs:
       - run: python3 scripts/verify_inspector_fixture.py
       - run: python3 scripts/test_main_container_publish.py
       - run: python3 scripts/test_verify_release_manifest.py
+      - run: python3 scripts/test_package_release_docs.py
 
   fmt:
     name: Formatting
