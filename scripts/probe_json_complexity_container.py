@@ -2,7 +2,6 @@
 """Bound wide-JSON admission on a private native image under a 512 MiB limit."""
 
 import argparse
-import os
 from pathlib import Path
 import secrets
 import subprocess
@@ -22,6 +21,12 @@ def docker(*args):
 
 def cgroup_peak(name):
     """Read the container's aggregate memory peak on a native cgroup-v2 runner."""
+    available = subprocess.run(
+        ("docker", "exec", name, "test", "-r", "/sys/fs/cgroup/memory.peak"),
+        capture_output=True, text=True, timeout=10,
+    )
+    if available.returncode:
+        raise RuntimeError("native runner must expose readable cgroup-v2 memory.peak")
     return int(docker("exec", name, "cat", "/sys/fs/cgroup/memory.peak"))
 
 
@@ -33,7 +38,7 @@ def main():
     if docker("image", "inspect", "--format", "{{.Architecture}}", image) != args.arch:
         raise RuntimeError("private image architecture differs from native runner")
     token = secrets.token_urlsafe(36)
-    name = f"request-guard-json-complexity-{os.getpid()}"
+    name = f"request-guard-json-complexity-{secrets.token_hex(8)}"
     with tempfile.TemporaryDirectory(prefix="request-guard-json-container-") as folder:
         env_file = Path(folder) / "server.env"
         env_file.write_text(f"AUTH_TOKENS={token}\n", encoding="utf-8")
@@ -41,7 +46,8 @@ def main():
         try:
             docker(
                 "run", "-d", "--name", name, "--network", "bridge",
-                "--env-file", str(env_file), "--memory", "512m", "--cpus", "2",
+                "--env-file", str(env_file), "--memory", "512m",
+                "--memory-swap", "512m", "--cpus", "2",
                 "--pids-limit", "128", "--security-opt", "no-new-privileges",
                 "-e", "MCP__HOST=0.0.0.0", "-e", "MCP__PORT=8085",
                 "-e", "MCP__LIMITS__MAX_CONNECTIONS=128", image,
@@ -51,11 +57,13 @@ def main():
             pid = int(docker("inspect", "--format", "{{.State.Pid}}", name))
             if not host or pid <= 1:
                 raise RuntimeError("private container has no reachable bridge address or PID")
-            if not os.readlink(f"/proc/{pid}/exe").endswith("/request-guard-mcp"):
-                raise RuntimeError("container PID is not the Request Guard server binary")
+            if docker("inspect", "--format", "{{.Path}}", name) != \
+                    "/usr/local/bin/request-guard-mcp":
+                raise RuntimeError("container entrypoint is not the Request Guard server binary")
             memory_limit = int(docker("inspect", "--format", "{{.HostConfig.Memory}}", name))
-            if memory_limit != 512 * 1024 * 1024:
-                raise RuntimeError("private container does not have the expected 512 MiB limit")
+            swap_limit = int(docker("inspect", "--format", "{{.HostConfig.MemorySwap}}", name))
+            if memory_limit != 512 * 1024 * 1024 or swap_limit != memory_limit:
+                raise RuntimeError("private container lacks the expected 512 MiB memory/swap limit")
             for attempt in range(50):
                 try:
                     with urllib.request.urlopen(f"http://{host}:8085/health", timeout=1) as reply:
