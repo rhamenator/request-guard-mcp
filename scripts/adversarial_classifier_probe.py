@@ -9,7 +9,7 @@ from adversarial_probe import post
 
 
 CASES = (
-    ("benign_browser", "Mozilla/5.0", "/welcome", None, {"ua_ai_bot", "path_sensitive"}),
+    ("benign_browser", "Mozilla/5.0", "/welcome", None, {"ua_ai_bot", "ua_scraper", "path_sensitive"}),
     ("gptbot_casefold", "gPtBoT/1.0", "/welcome", "ua_ai_bot", set()),
     ("gptbot_embedded", "Mozilla/5.0 (compatible; GPTBot/1.0)", "/welcome", "ua_ai_bot", set()),
     ("raw_dotenv", "Mozilla/5.0", "/.env", "path_sensitive", set()),
@@ -29,6 +29,14 @@ CASES = (
     ("internalized_control", "Mozilla/5.0", "/internalized", None, {"path_sensitive"}),
     ("xmlrpc_suffix_control", "Mozilla/5.0", "/xmlrpc.phpish", None, {"path_sensitive"}),
 )
+
+
+def signals_match(names, required, absent):
+    return (required is None or required in names) and not (absent & names)
+
+
+def response_id_matches(actual, expected):
+    return type(actual) is int and actual == expected
 
 
 def main():
@@ -57,10 +65,9 @@ def main():
             names = {signal["name"] for signal in result["structuredContent"]["signals"]}
             passed = (
                 status == 200
-                and message["id"] == request_id
+                and response_id_matches(message["id"], request_id)
                 and result["isError"] is False
-                and (required is None or required in names)
-                and not (absent & names)
+                and signals_match(names, required, absent)
                 and token.encode() not in body
             )
         except (KeyError, TypeError, ValueError):
