@@ -47,15 +47,16 @@ jobs:
         run: python3 scripts/main_container_publish.py >> "$GITHUB_OUTPUT"
 
   stable-tag-approval:
-    name: Approve stable container tag
+    name: Approve v1+ container tag
     needs: verify-container-ref
-    if: ${{ !cancelled() && github.ref_type == 'tag' && !startsWith(github.ref_name, 'v0.') && !contains(github.ref_name, '-') && needs.verify-container-ref.result == 'success' }}
+    # A v1 prerelease image is public too. Pause every v1+ version tag.
+    if: ${{ !cancelled() && github.ref_type == 'tag' && !startsWith(github.ref_name, 'v0.') && needs.verify-container-ref.result == 'success' }}
     runs-on: ubuntu-latest
     environment: stable-release
     permissions:
       contents: read
     steps:
-      - run: echo 'Stable container publication approved by the protected environment reviewer.'
+      - run: echo 'v1+ container publication approved by the protected environment reviewer.'
 
   build-and-push:
     name: Build and Push Container
@@ -101,7 +102,8 @@ jobs:
     needs: [verify-container-ref, stable-tag-approval]
     # Manual branch dispatch is allowed only on main; a version-named branch
     # must never create a public image tag without the stable-tag gate.
-    if: ${{ !cancelled() && github.event_name != 'pull_request' && (github.ref_type == 'tag' || github.ref == 'refs/heads/main') && needs.verify-container-ref.result == 'success' && needs.verify-container-ref.outputs.publish == 'true' && (needs.stable-tag-approval.result == 'success' || needs.stable-tag-approval.result == 'skipped') }}
+    # A skipped approval is valid only for main's experimental image or a v0 tag.
+    if: ${{ !cancelled() && github.event_name != 'pull_request' && (github.ref_type == 'tag' || github.ref == 'refs/heads/main') && needs.verify-container-ref.result == 'success' && needs.verify-container-ref.outputs.publish == 'true' && (needs.stable-tag-approval.result == 'success' || (needs.stable-tag-approval.result == 'skipped' && (github.ref == 'refs/heads/main' || (github.ref_type == 'tag' && startsWith(github.ref_name, 'v0.'))))) }}
     strategy:
       fail-fast: false
       matrix:
@@ -211,7 +213,7 @@ jobs:
 
   publish-container:
     name: Publish Multiarch Container
-    # The skipped stable approval on main, v0 and prerelease tags is an ancestor of
+    # The skipped v1+ approval on main and v0 tags is an ancestor of
     # build-platform. Override implicit success() so that a successful native
     # matrix can still assemble the index; a skipped/failed matrix cannot.
     if: ${{ !cancelled() && github.event_name != 'pull_request' && needs.build-platform.result == 'success' }}

@@ -4,7 +4,8 @@ Stable releases require a repeatable adversarial run against the packaged server
 
 The [v1.0 evidence map](releases/v1-gate-evidence-map.md) distinguishes existing experimental-release results from checks that must be repeated on the exact stable candidate.
 
-Stable tag jobs use the GitHub `stable-release` environment, configured with
+Every public `v1+` version tag, including a prerelease, uses the GitHub
+`stable-release` environment, configured with
 `rhamenator` as its required reviewer. The native Release workflow validates
 the tag version and main ancestry, then waits for approval before building
 archives. The Container workflow validates the same tag before requesting
@@ -27,11 +28,14 @@ unreviewed `1.x` binary under `main` or `git-<sha>`.
 Existing `:main` and `:git-<sha>` tags may continue pointing at an older
 experimental image; install reviewed `1.x` images by immutable version tag or
 digest instead of treating `:main` as a stable update channel.
-The tag verifier rejects SemVer build metadata (`+...`) because its suffix
-could otherwise make a stable tag appear to be a prerelease to the workflow.
+The tag verifier rejects SemVer build metadata (`+...`) because the release
+artifact naming contract does not support it; approval no longer depends on
+whether a version contains a prerelease hyphen.
 Before a stable release, verify the environment still has the required-reviewer
 protection rule and the tag ruleset is still active; missing protection does
-not satisfy this gate. Experimental and private-candidate paths remain automatic.
+not satisfy this gate. Experimental `v0.*` tags and `0.x` main images remain
+automatic; private `workflow_dispatch` native candidates build without public
+attestation or release publication.
 
 At minimum, exercise authentication boundaries, malformed JSON-RPC and MCP frames, invalid and oversized inputs, prompt-injection text treated as request data, bot-evasion variations, concurrency and slow clients, backend failure and recovery, and logging of sensitive fields. Use Kali and Ubuntu lab VMs when available; scope scanners to the owned test endpoint, record their request counts, and bound runtime and rate to preserve shared host responsiveness. Confirm each exploit or anomaly with a regression test, rerun the affected probe, then rerun the full gate. Reconcile independent Claude Code and Codex reviews with the observed runtime results and document remaining limits before a release.
 
