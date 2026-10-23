@@ -1045,6 +1045,59 @@ mod slow_client_tests {
     }
 
     #[tokio::test]
+    async fn http1_lifetime_drain_still_releases_a_stuck_handler() {
+        let router = Router::new()
+            .route(
+                "/stuck",
+                get(|| async { std::future::pending::<&'static str>().await }),
+            )
+            .route("/health", get(|| async { "ok" }));
+        let limits = LimitsConfig {
+            max_connections: 1,
+            http_header_timeout_secs: 1,
+            http_body_timeout_secs: 1,
+            per_tool_timeout_secs: 1,
+            classify_timeout_secs: 1,
+            ..LimitsConfig::default()
+        };
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let task = tokio::spawn(async move {
+            serve_listener_with_http1_lifetime(
+                listener,
+                router,
+                limits,
+                Duration::from_millis(200),
+            )
+            .await
+            .unwrap();
+        });
+        let mut stuck = TcpStream::connect(addr).await.unwrap();
+        stuck
+            .write_all(b"GET /stuck HTTP/1.1\r\nHost: localhost\r\n\r\n")
+            .await
+            .unwrap();
+        let mut response = Vec::new();
+        timeout(Duration::from_secs(6), stuck.read_to_end(&mut response))
+            .await
+            .expect("stuck handler must lose its permit at the drain deadline")
+            .unwrap();
+        assert!(response.is_empty());
+        let mut healthy = TcpStream::connect(addr).await.unwrap();
+        healthy
+            .write_all(b"GET /health HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+            .await
+            .unwrap();
+        let mut reply = [0_u8; 256];
+        let read = timeout(Duration::from_secs(2), healthy.read(&mut reply))
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(reply[..read].starts_with(b"HTTP/1.1 200"));
+        task.abort();
+    }
+
+    #[tokio::test]
     async fn http1_slow_reader_releases_connection_permit_at_lifetime() {
         // A single response larger than a normal kernel send buffer makes the
         // non-reading peer hold the connection in the response-write path.

@@ -62,7 +62,10 @@ All WebSocket connections are authenticated at connection establishment using a 
   128 requests and stops admitting requests at about 120 seconds after the
   first request. An in-flight response gets a bounded drain of the body
   deadline plus the larger tool/classify deadline and two seconds; stalled
-  response writes are cut off at that drain deadline. The final non-upgrade response carries
+  response writes are cut off at that drain deadline. At default limits, a
+  non-reading peer can therefore retain a connection permit for about 182
+  seconds total (120-second age plus at most 62 seconds of drain). The final
+  non-upgrade response carries
   `Connection: close`; WebSocket upgrades remain subject to their separate
   limits. Published v0.1.5 lacks these HTTP/1 controls. A peer can reconnect,
   so use proxy connection, read, and rate limits as another boundary.
