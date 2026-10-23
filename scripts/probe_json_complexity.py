@@ -53,7 +53,7 @@ def peak_rss_kib(pid):
     raise RuntimeError("VmHWM unavailable on this Linux runner")
 
 
-def run_probe(host, port, token, pid, concurrency):
+def run_probe(host, port, token, pid, concurrency, burst_limit_kib=64 * 1024):
     compact_payload = make_payload("0" * 800_000)
     wide_payload = make_payload([0] * 400_000)
     compact_status, compact = post(host, port, token, compact_payload)
@@ -73,8 +73,11 @@ def run_probe(host, port, token, pid, concurrency):
     if any(status != 413 for status, _ in burst):
         raise RuntimeError("concurrent wide JSON was not uniformly rejected")
     burst_peak = peak_rss_kib(pid)
-    if burst_peak - compact_peak > 64 * 1024:
-        raise RuntimeError(f"{concurrency} wide JSON requests added over 64 MiB to peak RSS")
+    if burst_peak - compact_peak > burst_limit_kib:
+        raise RuntimeError(
+            f"{concurrency} wide JSON requests added over "
+            f"{burst_limit_kib // 1024} MiB to peak RSS"
+        )
     print("PASS JSON complexity: compact accepted, wide HTTP 413, "
           f"{concurrency} concurrent wide HTTP 413, server alive; "
           f"VmHWM compact={compact_peak} KiB, "
