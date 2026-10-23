@@ -1,4 +1,10 @@
-# Alpine release build inputs
+# Native release build inputs and provenance
+
+All five native Release lanes use Rust 1.99.1, matching the pinned repository
+toolchain and blocking CI checks. Each packaged binary reports its full source
+commit, Rust version, and UTC runner build date through the `model_info` MCP
+tool; the workflow checks those fields in the extracted executable. The build
+date and hosted runner inputs do not make the archives bit-for-bit reproducible.
 
 The `linux-x64-musl` release lane uses Ubuntu 24.04, Rust 1.99.1, and Ubuntu's
 `musl`, `musl-dev`, and `musl-tools` packages at `1.2.4-2`. It records the
@@ -6,10 +12,9 @@ installed package, Rust, and GCC versions in the workflow summary. The Alpine
 smoke runs `alpine:3.24.2` by the Docker Official Image index digest
 `sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6`.
 Cargo dependencies remain pinned by `Cargo.lock`.
-The musl job sets `RUSTUP_TOOLCHAIN=1.99.1` explicitly because the repository's
-`rust-toolchain.toml` otherwise selects a moving `stable` channel even after
-the workflow installs the pinned toolchain. CI asserts that the musl target is
-installed for the active compiler before building.
+The workflow sets `RUSTUP_TOOLCHAIN=1.99.1` explicitly in every lane and asserts
+the active compiler and target before building. The musl lane additionally
+records the installed linker and package versions.
 
 Before a future build-input refresh, verify the new Ubuntu package versions
 against [Ubuntu's package index](https://packages.ubuntu.com/noble/musl-tools),
@@ -45,8 +50,14 @@ remains available. It inspects the bounded private MCP server log for
 synthetic tokens and cache-scope keys. PostgreSQL and Python test package
 revisions come from the versioned Alpine repository and are not pinned.
 Private branch candidates run the same build and verification steps without
-creating a GitHub release.
+creating a GitHub release or a public artifact attestation. Tagged builds
+download the five verified archives in a separate job, attest their immutable
+digests with GitHub's signed release-workflow provenance, and verify that the
+attestations bind each archive to the repository, tag ref, and source commit
+before creating a release. The build jobs have no OIDC or attestation-write
+permission. An archive sidecar is a same-workflow corruption check, not a
+signature. Published v0.1.5 predates native attestations.
 
-This pins the main musl-specific inputs; hosted runner images, the Ubuntu apt
-repository, and the remaining platform toolchains can still change. Review
-the workflow summary and archive hashes for every release.
+This pins the Rust toolchain and main musl-specific inputs; hosted runner
+images, the Ubuntu apt repository, and platform SDKs can still change. Review
+the workflow summary, archive hashes and tagged attestations for every release.

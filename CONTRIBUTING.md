@@ -38,7 +38,7 @@ If a check cannot be run locally, explain why in the pull request and report wha
 - Add a direct dependency only when the project uses it; remove unused direct dependencies.
 - Keep `Cargo.lock` committed for reproducible builds. Compatible updates are accepted only after the full CI suite passes.
 - Treat major-version updates and changes that raise a dependency's Rust requirement as compatibility changes. State the impact in the pull request and update `rust-version` only through an explicit review decision.
-- CI validates both the declared MSRV and current stable Rust. Do not merge an update that breaks either supported toolchain unless the project has explicitly changed its MSRV policy.
+- CI validates both the declared MSRV and the pinned release toolchain in `rust-toolchain.toml`. Review toolchain updates explicitly and run the full CI suite before changing that pin or the MSRV policy.
 
 ## Pull Requests
 

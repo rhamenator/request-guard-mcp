@@ -13,6 +13,27 @@ along with its matching `.sha256` file. Verify the archive before extracting it:
 - Windows PowerShell: compare `(Get-FileHash .\request-guard-mcp-*.zip -Algorithm SHA256).Hash`
   with the hash in the matching `.zip.sha256` file.
 
+For future tagged releases built after the native provenance change, verify the
+signed GitHub release-workflow attestation with a recent GitHub CLI and network
+access:
+
+```sh
+gh attestation verify <archive> --repo rhamenator/request-guard-mcp \
+  --signer-workflow rhamenator/request-guard-mcp/.github/workflows/release.yml \
+  --source-ref refs/tags/<release-tag> --source-digest <reviewed-commit-sha>
+```
+
+Replace all placeholders with the exact downloaded archive, tag, and reviewed
+commit. Private workflow-dispatch candidates intentionally have no public
+attestation. The five native tagged-release lanes use Rust 1.99.1. After
+starting the server, an authenticated MCP client can call `model_info` through
+`tools/call` with empty arguments; its `build_info` reports the embedded source
+commit, Rust version, and UTC build date. Compare the source commit to the
+reviewed tag and attestation. The build date describes runner time; it does not
+make archives bit-for-bit reproducible. A matching `.sha256` sidecar from the
+same release detects corruption but is not independent provenance. Published
+v0.1.5 predates this change and has no such native attestation.
+
 Extract the archive, then work inside its `request-guard-mcp-<version>-<platform>`
 folder. The server binary is already built; Rust, Cargo, Redis, PostgreSQL, and
 MaxMind data are not needed for the core `classify` and `explain` tools.
