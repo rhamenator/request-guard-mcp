@@ -761,6 +761,7 @@ where
             let first_request_for_service = Arc::clone(&first_request);
             let (activity_tx, mut activity_rx) = watch::channel(Http2Activity::default());
             let http1_requests = Arc::new(AtomicUsize::new(0));
+            let http1_requests_for_shutdown = Arc::clone(&http1_requests);
             let service = service_fn(move |request: hyper::Request<Incoming>| {
                 let is_http2 = request.version() == hyper::Version::HTTP_2;
                 let http1_request_number = if is_http2 {
@@ -842,8 +843,16 @@ where
                 };
                 let result = match outcome {
                     None => {
-                        connection.as_mut().graceful_shutdown();
-                        let _ = tokio::time::timeout(http_drain_timeout, &mut connection).await;
+                        // No request has reached the service on a silent or
+                        // partial-preface socket, so there is no response to
+                        // drain. Drop it now instead of allowing protocol
+                        // sniffing to consume the full shutdown window.
+                        if http1_requests_for_shutdown.load(Ordering::Acquire) > 0
+                            || activity_rx.borrow().seen
+                        {
+                            connection.as_mut().graceful_shutdown();
+                            let _ = tokio::time::timeout(http_drain_timeout, &mut connection).await;
+                        }
                         None
                     }
                     Some(Ok(Some(result))) => Some(result),

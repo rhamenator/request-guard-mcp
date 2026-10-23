@@ -114,6 +114,28 @@ def main() -> None:
                 process.kill()
                 process.wait(timeout=5)
 
+    # A socket that never completes even its protocol preface has no response
+    # to drain and must not hold process termination for the full tool window.
+    port = free_port()
+    env["MCP__PORT"] = str(port)
+    with tempfile.TemporaryDirectory(prefix="request-guard-sigterm-silent-") as cwd:
+        process = subprocess.Popen([str(binary)], cwd=cwd, env=env,
+                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        try:
+            wait_for_health(process, port)
+            with socket.create_connection(("127.0.0.1", port), timeout=3):
+                time.sleep(0.15)
+                started = time.monotonic()
+                process.send_signal(signal.SIGTERM)
+                code = process.wait(timeout=3)
+                if code != 0 or time.monotonic() - started > 3:
+                    raise RuntimeError("silent preface delayed graceful shutdown")
+                print("PASS SIGTERM: silent preface closed promptly; exit 0")
+        finally:
+            if process.poll() is None:
+                process.kill()
+                process.wait(timeout=5)
+
     # A second signal is the operator's forced-exit escape hatch if a peer
     # still holds an active body read during the drain window.
     port = free_port()
