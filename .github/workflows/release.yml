@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       candidate_version:
-        description: Version label for a private candidate artifact (no GitHub release)
+        description: Version label for an unpublished candidate (Actions artifacts readable by repository readers)
         required: true
         type: string
   push:
@@ -260,6 +260,7 @@ jobs:
             artifacts/*.tar.gz
             artifacts/*.sha256
           if-no-files-found: error
+          retention-days: 7
 
   attest-native-provenance:
     name: Attest and verify tagged native archives
