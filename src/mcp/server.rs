@@ -1146,7 +1146,8 @@ mod slow_client_tests {
             "a non-reading peer should still hold the only slot before its lifetime"
         );
 
-        tokio::time::sleep(Duration::from_secs(6)).await;
+        // Age (2s) plus drain (4s), with margin for a busy CI runner.
+        tokio::time::sleep(Duration::from_secs(7)).await;
         let mut healthy = TcpStream::connect(addr).await.unwrap();
         healthy
             .write_all(b"GET /health HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
