@@ -10,7 +10,72 @@ import time
 from adversarial_probe import post, rpc
 
 
-ACCEPTED_ERRORS = {-32700, -32600, -32601, -32602, -404}
+def malformed_case(number, rng):
+    """Return a deterministic envelope with one specific expected error."""
+    request_id = number + 1
+    variant = number % 8
+    envelope = {"jsonrpc": "2.0", "id": request_id, "method": "ping"}
+    if variant == 0:
+        # A valid request missing its final brace must remain a parse error.
+        return "truncated_json", json.dumps(envelope).encode()[:-1], -32700, None
+    if variant == 1:
+        envelope["jsonrpc"] = rng.choice(["1.0", None, True])
+        expected_id = None
+        expected_code = -32600
+        name = "invalid_version"
+    elif variant == 2:
+        envelope["id"] = rng.choice([[], {}, False])
+        expected_id = None
+        expected_code = -32600
+        name = "invalid_id"
+    elif variant == 3:
+        envelope["params"] = rng.choice([[], "oops", 42])
+        expected_id = request_id
+        expected_code = -32600
+        name = "scalar_params"
+    elif variant == 4:
+        envelope.update(method="tools/call", params={})
+        expected_id = request_id
+        expected_code = -32602
+        name = "missing_tool_name"
+    elif variant == 5:
+        envelope.update(method="tools/call", params={"name": 7})
+        expected_id = request_id
+        expected_code = -32602
+        name = "invalid_tool_name"
+    elif variant == 6:
+        envelope.update(method="tools/call", params={
+            "name": "classify", "arguments": {"user_agent": []},
+        })
+        expected_id = request_id
+        expected_code = -400
+        name = "invalid_classify_arguments"
+    else:
+        envelope.update(method="tools/call", params={
+            "name": f"nonexistent-tool-{rng.randrange(1_000_000)}", "arguments": {},
+        })
+        expected_id = request_id
+        expected_code = -404
+        name = "unknown_tool"
+    return name, json.dumps(envelope, separators=(",", ":")).encode(), expected_code, expected_id
+
+
+def response_matches(status, response, expected_code, expected_id):
+    try:
+        reply = json.loads(response)
+        return (
+            status == 200
+            and isinstance(reply, dict)
+            and reply.get("jsonrpc") == "2.0"
+            and "id" in reply
+            and type(reply["id"]) is type(expected_id)
+            and reply.get("id") == expected_id
+            and "result" not in reply
+            and isinstance(reply.get("error"), dict)
+            and reply["error"].get("code") == expected_code
+        )
+    except (ValueError, TypeError):
+        return False
 
 
 def main():
@@ -28,23 +93,15 @@ def main():
     failures = []
     start = time.monotonic()
     for number in range(args.cases):
-        envelope = {
-            "jsonrpc": rng.choice(["2.0", "1.0", None, True, [], {}]),
-            "id": rng.choice([0, "x", None, False, [], {}]),
-            "method": rng.choice(["nonexistent.method", 7, None, [], {}]),
-            "params": rng.choice([None, [], {}, "oops", 42]),
-        }
-        body = json.dumps(envelope, separators=(",", ":")).encode()
-        if number % 4 == 0:
-            body = body[: rng.randrange(1, len(body))]
+        name, body, expected_code, expected_id = malformed_case(number, rng)
         try:
             status, response = post(args.url, token, body)
-            reply = json.loads(response)
-            code = reply.get("error", {}).get("code") if isinstance(reply, dict) else None
-            if status != 200 or code not in ACCEPTED_ERRORS:
-                failures.append({"case": number, "status": status, "code": code})
+            if not response_matches(status, response, expected_code, expected_id):
+                failures.append({"case": number, "name": name, "status": status,
+                                 "expected_code": expected_code})
         except (OSError, ValueError, TypeError) as error:
-            failures.append({"case": number, "exception": type(error).__name__})
+            failures.append({"case": number, "name": name,
+                             "exception": type(error).__name__})
 
     try:
         status, response = post(args.url, token, rpc("ping", request_id=999))

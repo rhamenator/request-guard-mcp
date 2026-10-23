@@ -136,6 +136,7 @@ jobs:
       - run: python3 scripts/probe_http1_request_budget.py target/release/request-guard-mcp
       - run: python3 scripts/probe_json_complexity.py target/release/request-guard-mcp
       - run: python3 scripts/probe_unsupported_redis_tls.py target/release/request-guard-mcp
+      - run: python3 scripts/test_adversarial_probe.py
       - name: Adversarial HTTP and WebSocket smoke
         run: python3 scripts/ci_adversarial_smoke.py --binary target/release/request-guard-mcp
       - name: Bounded loopback ingress proxy probe

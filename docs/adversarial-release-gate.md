@@ -76,8 +76,11 @@ synthetic request marker, then confirms expected log events occurred without
 either value appearing in a bounded capture. This checks direct log leakage
 for those calls, not every tool, proxy, collector, or encoding. See
 `adversarial-evidence-logs-2026-10-19.md`.
-CI also sends 128 deterministic malformed JSON-RPC envelopes, verifies each
-gets a structured error, and confirms a healthy authenticated ping afterward.
+CI also sends 128 deterministic malformed JSON-RPC and tool-call envelopes,
+requires the specific error code and response ID for each case, and confirms
+a healthy authenticated ping afterward. The benign classifier control must
+not produce bot, scraper or sensitive-path signals. A probe-contract test
+checks that wrong error codes and a false scraper signal fail these assertions.
 On a two-slot listener it sheds 128 bounded excess TCP connections and then
 checks recovery. These probes cap their counts at 256, avoid sustained load,
 and run without additional Python dependencies. The expanded Kali-to-Ubuntu
