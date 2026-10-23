@@ -670,6 +670,7 @@ where
 {
     let connection_limit = Arc::new(Semaphore::new(limits.max_connections));
     let stopping = Arc::new(AtomicBool::new(false));
+    let (shutdown_tx, _) = watch::channel(false);
     let mut connections = JoinSet::new();
     let shutdown_drain = Duration::from_secs(
         limits
@@ -735,6 +736,7 @@ where
         };
         let router = router.clone();
         let stopping = Arc::clone(&stopping);
+        let mut shutdown_rx = shutdown_tx.subscribe();
         let header_timeout = Duration::from_secs(limits.http_header_timeout_secs);
         let http2_idle_timeout = Duration::from_secs(limits.http2_idle_timeout_secs);
         // Bound a peer that repeatedly sends cheap unauthenticated requests
@@ -829,16 +831,23 @@ where
                 // our transport-neutral first-request deadline closes the socket.
                 let first_request_deadline =
                     header_timeout.saturating_add(Duration::from_millis(250));
-                let outcome = tokio::time::timeout(first_request_deadline, async {
-                    tokio::select! {
-                        result = &mut connection => Some(result),
-                        _ = first_request.notified() => None,
-                    }
-                })
-                .await;
+                let outcome = tokio::select! {
+                    outcome = tokio::time::timeout(first_request_deadline, async {
+                        tokio::select! {
+                            result = &mut connection => Some(result),
+                            _ = first_request.notified() => None,
+                        }
+                    }) => Some(outcome),
+                    _ = shutdown_rx.changed() => None,
+                };
                 let result = match outcome {
-                    Ok(Some(result)) => Some(result),
-                    Ok(None) if activity_rx.borrow().seen => {
+                    None => {
+                        connection.as_mut().graceful_shutdown();
+                        let _ = tokio::time::timeout(http_drain_timeout, &mut connection).await;
+                        None
+                    }
+                    Some(Ok(Some(result))) => Some(result),
+                    Some(Ok(None)) if activity_rx.borrow().seen => {
                         // An HTTP/2 connection can stay open after a complete
                         // request. Idle, age and request-count caps apply;
                         // in-flight work gets a separate bounded drain.
@@ -854,6 +863,7 @@ where
                                 tokio::select! {
                                     biased;
                                     result = &mut connection => break Some(result),
+                                    _ = shutdown_rx.changed() => break None,
                                     _ = &mut lifetime_deadline => break None,
                                     changed = activity_rx.changed() => {
                                         if changed.is_err() { break None; }
@@ -867,6 +877,7 @@ where
                             } else {
                                 tokio::select! {
                                     result = &mut connection => break Some(result),
+                                    _ = shutdown_rx.changed() => break None,
                                     _ = &mut lifetime_deadline => break None,
                                     changed = activity_rx.changed() => {
                                         if changed.is_err() { break None; }
@@ -895,17 +906,21 @@ where
                     // an in-flight request a bounded chance to finish. A peer
                     // that stops reading still loses its permit at the drain
                     // deadline.
-                    Ok(None) => match tokio::time::timeout(http1_max_lifetime, &mut connection)
-                        .await
-                    {
-                        Ok(result) => Some(result),
-                        Err(_) => {
+                    Some(Ok(None)) => {
+                        let result = tokio::select! {
+                            result = tokio::time::timeout(http1_max_lifetime, &mut connection) => result.ok(),
+                            _ = shutdown_rx.changed() => None,
+                        };
+                        match result {
+                            Some(result) => Some(result),
+                            None => {
                             connection.as_mut().graceful_shutdown();
                             let _ = tokio::time::timeout(http_drain_timeout, &mut connection).await;
                             None
+                            }
                         }
-                    },
-                    Err(_) => None, // Pre-auth timeout is attacker-reachable; do not log each one.
+                    }
+                    Some(Err(_)) => None, // Pre-auth timeout is attacker-reachable; do not log each one.
                 };
                 if let Some(Err(error)) = result {
                     tracing::debug!(%peer, %error, "HTTP connection closed");
@@ -916,6 +931,7 @@ where
         });
     }
     stopping.store(true, Ordering::Release);
+    let _ = shutdown_tx.send(true);
     drop(listener);
     info!("shutdown signal received; draining active connections");
     if tokio::time::timeout(shutdown_drain, async {

@@ -85,14 +85,19 @@ All WebSocket connections are authenticated at connection establishment using a 
   bounded shutdown deadline. HTTP/2 extended CONNECT/WebSocket is not enabled.
 - Per-tool timeouts separately bound tool execution after dispatch. Deploy a
   proxy with connection and read limits as another boundary.
-- On development main, SIGTERM or Ctrl-C stops new TCP accepts and rejects
+- On development main, SIGTERM or Ctrl-C stops new TCP accepts, asks idle HTTP
+  connections to close, and rejects
   requests newly dispatched on existing HTTP connections with 503. Already
   dispatched HTTP responses have at most the body deadline plus the larger
   tool/classify deadline plus two seconds to complete; remaining connection
   tasks are then aborted and telemetry shutdown runs. Upgraded WebSocket
   sessions end when the process exits and must reconnect elsewhere. This does
   not guarantee completion of a slow response or delivery of an OTLP export.
-  Published v0.1.5 has no process-level SIGTERM drain.
+  A second SIGTERM or Ctrl-C forces immediate exit without waiting for drain.
+  The default drain can last about 62 seconds, so operators need at least 75
+  seconds of orchestrator stop grace and must raise it when they increase the
+  configured body or tool deadline. Published v0.1.5 has no process-level
+  SIGTERM drain.
 - Development main bounds each custom WebSocket response or control-frame send
   to five seconds. A client that stops reading may lose the response and its
   connection, releasing the WebSocket permit. Published v0.1.5 lacks this

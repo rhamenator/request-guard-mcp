@@ -89,6 +89,31 @@ def main() -> None:
                 process.kill()
                 process.wait(timeout=5)
 
+    # An idle HTTP keep-alive peer must not consume the entire active-request
+    # drain window just because it leaves the socket open.
+    port = free_port()
+    env["MCP__PORT"] = str(port)
+    with tempfile.TemporaryDirectory(prefix="request-guard-sigterm-idle-") as cwd:
+        process = subprocess.Popen([str(binary)], cwd=cwd, env=env,
+                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        try:
+            wait_for_health(process, port)
+            with socket.create_connection(("127.0.0.1", port), timeout=3) as client:
+                client.settimeout(3)
+                client.sendall(f"GET /health HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\n\r\n".encode())
+                if not client.recv(4096).startswith(b"HTTP/1.1 200"):
+                    raise RuntimeError("idle control request failed")
+                started = time.monotonic()
+                process.send_signal(signal.SIGTERM)
+                code = process.wait(timeout=3)
+                if code != 0 or time.monotonic() - started > 3:
+                    raise RuntimeError("idle keep-alive delayed graceful shutdown")
+                print("PASS SIGTERM: idle HTTP keep-alive closed promptly; exit 0")
+        finally:
+            if process.poll() is None:
+                process.kill()
+                process.wait(timeout=5)
+
 
 if __name__ == "__main__":
     main()

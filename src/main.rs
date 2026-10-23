@@ -58,11 +58,12 @@ async fn main() -> Result<()> {
         std::process::exit(0);
     }
 
-    // Register before entering the accept loop so container SIGTERM and
-    // terminal Ctrl-C both give active requests a bounded drain window.
+    // Register SIGTERM before entering the accept loop. The first signal
+    // starts a bounded drain; a second signal forces immediate termination.
     #[cfg(unix)]
     let mut terminate = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())?;
-    let shutdown = async move {
+    let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel();
+    let signal_monitor = tokio::spawn(async move {
         #[cfg(unix)]
         tokio::select! {
             _ = terminate.recv() => {},
@@ -70,8 +71,21 @@ async fn main() -> Result<()> {
         }
         #[cfg(not(unix))]
         let _ = tokio::signal::ctrl_c().await;
-    };
-    let result = mcp::server::run_server(app_state, shutdown).await;
+        let _ = shutdown_tx.send(());
+        #[cfg(unix)]
+        tokio::select! {
+            _ = terminate.recv() => {},
+            _ = tokio::signal::ctrl_c() => {},
+        }
+        #[cfg(not(unix))]
+        let _ = tokio::signal::ctrl_c().await;
+        std::process::exit(1);
+    });
+    let result = mcp::server::run_server(app_state, async {
+        let _ = shutdown_rx.await;
+    })
+    .await;
+    signal_monitor.abort();
     if let Some(provider) = tracer_provider {
         provider
             .shutdown()
