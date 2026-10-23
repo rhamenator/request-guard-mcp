@@ -28,9 +28,9 @@ def main():
             fail(f"private candidate label must be v{version}-<suffix>")
         print(f"Private candidate {candidate} matches package {version}")
         return
-    # The workflow approval predicate treats '-' as prerelease. A '+' build
-    # metadata suffix may itself contain '-', so disallow it rather than risk
-    # a stable version reaching publication through the prerelease path.
+    # Keep public tag/version identity unambiguous. The workflow approval
+    # predicate pauses every v1+ tag, including prereleases, but build
+    # metadata is still unsupported by the artifact naming contract.
     if "+" in name or "+" in version:
         fail("release tags with SemVer build metadata are not supported")
     if kind != "tag" or name != f"v{version}":
