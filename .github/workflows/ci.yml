@@ -107,6 +107,14 @@ jobs:
       - run: python3 scripts/probe_unsupported_redis_tls.py target/release/request-guard-mcp
       - name: Adversarial HTTP and WebSocket smoke
         run: python3 scripts/ci_adversarial_smoke.py --binary target/release/request-guard-mcp
+      - name: Bounded loopback ingress proxy probe
+        timeout-minutes: 5
+        run: |
+          if ! command -v nginx >/dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y --no-install-recommends nginx
+          fi
+          python3 scripts/probe_nginx_ingress.py target/release/request-guard-mcp
 
   audit:
     name: Security Audit
