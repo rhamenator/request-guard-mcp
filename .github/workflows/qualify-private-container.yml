@@ -78,6 +78,11 @@ jobs:
             --private-image request-guard-mcp:private-${{ matrix.arch }} \
             --arch '${{ matrix.arch }}'
 
+      - name: Bounded wide-JSON memory under 512 MiB
+        run: |
+          set -euo pipefail
+          python3 scripts/probe_json_complexity_container.py --arch '${{ matrix.arch }}'
+
       - name: Record private image and resolved package inventories
         env:
           ARCH: ${{ matrix.arch }}
