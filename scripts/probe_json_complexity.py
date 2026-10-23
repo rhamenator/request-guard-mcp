@@ -2,6 +2,7 @@
 """Check wide JSON rejection on a running binary without exhausting memory."""
 
 import argparse
+from concurrent.futures import ThreadPoolExecutor
 import json
 import os
 from pathlib import Path
@@ -91,10 +92,19 @@ def main():
                     raise RuntimeError("wide JSON was not rejected with HTTP 413")
                 if wide_peak - compact_peak > 8 * 1024:
                     raise RuntimeError("wide JSON added over 8 MiB to peak RSS")
+                with ThreadPoolExecutor(max_workers=16) as pool:
+                    burst = list(pool.map(lambda _: post(port, token, [0] * 400_000), range(16)))
+                if any(status != 413 for status, _ in burst):
+                    raise RuntimeError("concurrent wide JSON was not uniformly rejected")
+                burst_peak = peak_rss_kib(process.pid)
+                if burst_peak - compact_peak > 64 * 1024:
+                    raise RuntimeError("16 wide JSON requests added over 64 MiB to peak RSS")
                 if process.poll() is not None:
                     raise RuntimeError("server exited")
                 print("PASS JSON complexity: compact accepted, wide HTTP 413, "
-                      "peak RSS growth <=8 MiB, server alive")
+                      "16 concurrent wide HTTP 413, server alive; "
+                      f"VmHWM compact={compact_peak} KiB, "
+                      f"single-wide={wide_peak} KiB, burst={burst_peak} KiB")
             finally:
                 process.terminate()
                 try:
