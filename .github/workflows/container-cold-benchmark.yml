@@ -43,6 +43,7 @@ jobs:
         with:
           context: .
           file: docker/Dockerfile
+          build-args: SOURCE_COMMIT=${{ github.sha }}
           platforms: linux/${{ matrix.arch }}
           no-cache: true
           load: true
@@ -125,6 +126,7 @@ jobs:
         with:
           context: .
           file: docker/Dockerfile
+          build-args: SOURCE_COMMIT=${{ github.sha }}
           platforms: ${{ matrix.platforms }}
           no-cache: true
           push: false

@@ -7,6 +7,14 @@ on:
         description: "Immutable GHCR index digest (sha256: followed by 64 lowercase hex characters)"
         required: true
         type: string
+      source_commit:
+        description: "Full source commit expected in the running image (40 lowercase hex characters)"
+        required: true
+        type: string
+      source_version:
+        description: "Cargo package version expected in the running image"
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -38,7 +46,10 @@ jobs:
         env:
           DIGEST: ${{ inputs.digest }}
           ARCH: ${{ matrix.arch }}
+          SOURCE_COMMIT: ${{ inputs.source_commit }}
+          SOURCE_VERSION: ${{ inputs.source_version }}
         run: |
           python3 scripts/smoke_native_container.py \
-            --image "ghcr.io/rhamenator/request-guard-mcp@$DIGEST" --arch "$ARCH"
+            --image "ghcr.io/rhamenator/request-guard-mcp@$DIGEST" --arch "$ARCH" \
+            --expected-commit "$SOURCE_COMMIT" --expected-version "$SOURCE_VERSION"
           printf 'Published index %s passed native %s bounded smoke\n' "$DIGEST" "$ARCH" >> "$GITHUB_STEP_SUMMARY"

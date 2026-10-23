@@ -67,7 +67,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
       - name: Build image
-        run: docker build -t mcp-scan:latest -f docker/Dockerfile .
+        run: docker build --build-arg SOURCE_COMMIT="$GITHUB_SHA" -t mcp-scan:latest -f docker/Dockerfile .
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.65.0
         with:

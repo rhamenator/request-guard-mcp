@@ -121,19 +121,32 @@ now pull each just-pushed immutable platform digest and run bounded authenticate
 HTTP, WebSocket, and classifier probes before their digests can be assembled into
 the multiarch tag. `scripts/smoke_native_container.py` verifies that Docker
 loaded the expected architecture and reaches the container over its runner's
-bridge network. This checks native arm64 execution in CI, but it does not
+bridge network, then calls authenticated `model_info` and requires the running
+binary's version, full source commit and Rust 1.99.1 toolchain to match the
+workflow source. For pull requests, this is GitHub's checked-out merge commit;
+the platform digest must be rebuilt from the reviewed release commit. CI passes
+the full commit as a Docker build argument; a local
+`docker build` without `--build-arg SOURCE_COMMIT=<full-commit>` embeds
+`unknown` and does not satisfy this provenance check. This checks native arm64
+execution in CI, but it does not
 retroactively qualify the published v0.1.5 arm64 image or replace the full
 candidate adversarial gate.
 
 For an already published index, run the manual **Qualify Published Container**
-workflow with its exact `sha256:` index digest. It pulls the same immutable
+workflow with its exact `sha256:` index digest, full source commit and Cargo
+version. It pulls the same immutable
 index on native amd64 and arm64 runners, verifies the selected image
-architecture, and runs the same 51 bounded HTTP/WebSocket/classifier cases.
-For example, `gh workflow run qualify-published-container.yml -f
-digest=sha256:...` uses the workflow on the default branch; record the run URL,
+architecture, build metadata, and the same 51 bounded HTTP/WebSocket/classifier
+cases. For example, `gh workflow run qualify-published-container.yml -f
+digest=sha256:... -f source_commit=<full-commit> -f source_version=<cargo-version>`
+uses the workflow on the default branch; record the run URL,
 workflow commit, digest, and both job results with the release evidence. This
+compares the running binary to operator-supplied expected values; independently
+confirm that the commit and digest match the reviewed release provenance. This
 is a client and classifier smoke, not a substitute for backend outages, TLS,
-resource exhaustion, or independent stable-release review.
+resource exhaustion, or independent stable-release review. The published
+v0.1.5 container predates the embedded full-commit check; its historical
+qualification run remains separate evidence and does not pass this new check.
 
 The stdlib-only `scripts/adversarial_probe.py` is a first HTTP smoke subset. Start a lab server with a temporary token of at least 32 characters, then run:
 
