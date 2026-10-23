@@ -160,6 +160,13 @@ trust boundary.
   clients that send no complete request headers. Excess sockets are closed at
   accept time. A separate WebSocket semaphore retains its own cap after an
   upgrade; the admission permit is released when the HTTP upgrade completes.
+- Development main also limits one bearer to `max_connections - 1` concurrent
+  WebSocket upgrades when at least two distinct bearer tokens are configured
+  and the global cap exceeds one. It keys this local limit by the server's
+  HMAC-derived caller scope, not by the bearer token. This reserves one global
+  slot against a single Ping/Pong-active bearer; it does not provide a per-token
+  guarantee against multiple cooperating bearers, replicas, or reconnects.
+  Published v0.1.5 has no per-bearer WebSocket limit.
 - When tool capacity is saturated, new tool calls receive a
   `RATE_LIMIT_EXCEEDED` error without waiting for a permit. This limit applies
   after HTTP body receipt and authentication; it is not a connection limit.

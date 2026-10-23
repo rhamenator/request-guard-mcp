@@ -106,6 +106,19 @@ async fn ws_handler(state: ServerState, request: Request, caller_scope: String) 
         )
             .into_response();
     };
+    let caller_semaphore = state
+        .app
+        .websocket_caller_semaphores
+        .entry(caller_scope.clone())
+        .or_insert_with(|| Arc::new(Semaphore::new(state.app.websocket_per_caller_limit)))
+        .clone();
+    let Ok(caller_permit) = caller_semaphore.try_acquire_owned() else {
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            "WebSocket caller connection limit reached",
+        )
+            .into_response();
+    };
     let max_message_bytes = state.app.config.limits.max_request_bytes;
     ws = ws
         .protocols(["mcp"])
@@ -119,6 +132,7 @@ async fn ws_handler(state: ServerState, request: Request, caller_scope: String) 
             state.registry,
             caller_scope,
             connection_permit,
+            caller_permit,
         )
     })
 }

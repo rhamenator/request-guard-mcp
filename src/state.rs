@@ -15,6 +15,11 @@ pub struct AppState {
     pub config: Arc<Config>,
     pub semaphore: Arc<Semaphore>,
     pub connection_semaphore: Arc<Semaphore>,
+    /// HMAC-scoped WebSocket permits. Authenticated scopes are limited to the
+    /// configured bearer set; auth-disabled mode has one fixed `public` scope.
+    /// A configured bearer never appears here.
+    pub websocket_caller_semaphores: Arc<DashMap<String, Arc<Semaphore>>>,
+    pub websocket_per_caller_limit: usize,
     pub cache: Arc<CacheStore>,
     pub redis: Arc<RedisClient>,
     pub postgres: Arc<PostgresClient>,
@@ -132,9 +137,24 @@ impl AppState {
     ) -> Self {
         let concurrency = config.limits.global_concurrency;
         let max_connections = config.limits.max_connections;
+        // Preserve single-token deployments. With distinct configured callers,
+        // reserve at least one WebSocket slot that one bearer cannot occupy.
+        let multiple_callers = config.auth.enabled
+            && config
+                .auth
+                .tokens
+                .iter()
+                .skip(1)
+                .any(|token| token != &config.auth.tokens[0]);
+        let websocket_per_caller_limit = if multiple_callers && max_connections > 1 {
+            max_connections - 1
+        } else {
+            max_connections
+        };
         let config = Arc::new(config);
         let semaphore = Arc::new(Semaphore::new(concurrency));
         let connection_semaphore = Arc::new(Semaphore::new(max_connections));
+        let websocket_caller_semaphores = Arc::new(DashMap::new());
         let cache = Arc::new(CacheStore::new());
         let redis = Arc::new(redis);
         let postgres = Arc::new(postgres);
@@ -164,6 +184,8 @@ impl AppState {
             config,
             semaphore,
             connection_semaphore,
+            websocket_caller_semaphores,
+            websocket_per_caller_limit,
             cache,
             redis,
             postgres,
