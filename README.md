@@ -114,16 +114,22 @@ The earlier v0.1.3 release predates the v0.1.4 HTTP and Origin rules above;
 use its [tagged documentation](https://github.com/rhamenator/request-guard-mcp/tree/v0.1.3)
 when operating that version.
 
-## Quickstart
+## Quickstart (Linux/macOS)
+
+For Windows, follow the native bundle's `INSTALL.md` or create `.env` in an
+NTFS directory restricted to the server account and authorized administrators.
+Verify its ACL with `icacls .env` before running the credential helper; the
+helper requires explicit confirmation because it cannot enforce Windows ACLs.
 
 ```bash
 # Clone and run
 git clone https://github.com/rhamenator/request-guard-mcp
 cd request-guard-mcp
-cp .env.example .env
+(umask 077; cp .env.example .env)
 # Its default binds all interfaces for container deployments; do not run the
 # local quickstart without the loopback override below.
-# Prompt for strong application and backing-service credentials
+# Prompt for strong application and backing-service credentials; the helper
+# restricts .env to mode 0600 on Linux/macOS before writing secrets.
 python scripts/configure_credentials.py
 # The shell value overrides .env and keeps unauthenticated endpoints local.
 MCP__HOST=127.0.0.1 cargo run --release

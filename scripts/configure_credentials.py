@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import getpass
+import os
 import secrets
 from pathlib import Path
 
@@ -44,7 +45,28 @@ def is_valid_secret(key: str, value: str) -> bool:
 def main() -> None:
     root = Path(__file__).resolve().parent.parent
     target = root / ".env"
-    if not target.exists():
+    created = not target.exists()
+    if created:
+        target.touch(mode=0o600)
+    if os.name == "posix":
+        # A prior cp may have left .env mode 0644. Restrict it before secrets
+        # are read or written, rather than only after the final write.
+        target.chmod(0o600)
+    else:
+        print(
+            f'Run `icacls "{target}"` and restrict the .env ACL to the server '
+            "account and authorized administrators."
+        )
+        print(
+            "This helper cannot enforce Windows NTFS ACLs; Users, Everyone, "
+            "and Authenticated Users must not have read access."
+        )
+        confirmed = input(
+            "After verifying the ACL, type ACL-VERIFIED to continue: "
+        ).strip()
+        if confirmed != "ACL-VERIFIED":
+            raise SystemExit("Credentials were not written; verify the .env ACL first")
+    if created:
         target.write_text(
             (root / ".env.example").read_text(encoding="utf-8"), encoding="utf-8"
         )
@@ -87,7 +109,8 @@ def main() -> None:
             output.append(line)
     output.extend(f"{key}={value}\n" for key, value in remaining.items())
     target.write_text("".join(output), encoding="utf-8")
-    target.chmod(0o600)
+    if os.name == "posix":
+        target.chmod(0o600)
     print(f"Credentials written to {target}. Run: make docker-compose-up")
 
 
