@@ -124,6 +124,11 @@ stable, unique `CACHE_SCOPE_HMAC_KEY` of at least 32 bytes, distinct from
 `AUTH_TOKENS`. Without it the server refuses to start, because caller-scoped
 records must remain accessible after restart and across replicas. Keep this
 key private and back it up under your deployment's secret-management policy.
+On development main, startup inspects an already-current PostgreSQL schema
+without repeating table DDL, so rolling restarts do not take unnecessary
+table DDL locks against active writes. A first installation or upgrade from
+an older/incomplete schema still runs migrations and may need a quiet write
+window. Published v0.1.5 does not have this startup fast path.
 
 When PostgreSQL is enabled, this bundle stores a reduced replay snapshot:
 user agent, path, method, and whether the request supplied Accept
