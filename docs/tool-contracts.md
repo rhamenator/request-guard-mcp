@@ -93,7 +93,17 @@ Submit a correction to a prior classification.
 ## Analytical Tools
 
 ### `score_breakdown`
-Break down a score by contributing engine/signal.
+Break down a diagnostic rule-engine score by contributing signal. Supply
+`{"signals":{"user_agent":"GPTBot/1.0","path":"/"}}`, where `signals` is an
+inbound classification request metadata object, not a raw list of signal
+names, weights, or values. On development main, a supplied non-object,
+unsupported key, or wrong field type returns `INVALID_REQUEST`; omitting the
+optional `signals` field still returns an empty zero breakdown. Published
+v0.1.5 may silently return zero for malformed supplied `signals`.
+An unknown top-level argument, including a misspelling of `signals`, is also
+rejected on development main.
+This diagnostic does not reuse a stored decision or verify a caller-supplied
+TLS fingerprint; use `classify` for the live verdict.
 
 ### `validate_payload`
 Validate a payload against the schema for a named tool.

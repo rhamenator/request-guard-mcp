@@ -278,7 +278,7 @@ See [docs/architecture.md](docs/architecture.md) for a full system diagram and c
 | `health` | Server health check |
 | `model_info` | Server and tool metadata |
 | `feedback` | Submit classification feedback |
-| `score_breakdown` | Detailed score breakdown |
+| `score_breakdown` | Diagnostic rule-engine score for optional `signals` containing an inbound classification request metadata object, such as `{"user_agent":"GPTBot/1.0","path":"/"}`. Development main rejects an unknown field, raw signal list, or wrong field type instead of reporting a clean zero; published v0.1.5 can return zero for malformed supplied `signals`. This diagnostic is not a persisted verdict and does not verify a caller-supplied TLS fingerprint. |
 | `validate_payload` | Check a named tool's payload against its request shape; errors use root path `/`. Execution, feature flags, backend availability and business rules are not checked |
 | `feature_flags` | List feature flags |
 | `warmup` | Warm up caches |
