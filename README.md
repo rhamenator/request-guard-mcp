@@ -212,8 +212,9 @@ passed official MCP Inspector initialization, tool listing, `classify`, and
 [npm release guide](docs/npm-release.md).
 For HTTP mode with the published v0.1.5 npm launcher, a forced kill of only
 the Node wrapper can leave its native listener running; stop the child or
-process group too. On Linux, development main drains the child if its wrapper
-disappears; macOS and Windows forced-kill behavior is unqualified.
+process group too. Development HTTP launchers use a private parent pipe so
+the native server can start a bounded drain when its wrapper disappears.
+Forced-kill cleanup on macOS and Windows is being qualified on packaged builds.
 
 ## Docker
 

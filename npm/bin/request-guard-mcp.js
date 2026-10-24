@@ -32,7 +32,7 @@ if (!target) {
 const binary = path.join(__dirname, "..", "vendor", target[0], target[1]);
 const args = process.argv.slice(2);
 const stdioMode = args.length === 1 && args[0] === "--stdio";
-const parentPipe = process.platform === "linux" && !stdioMode;
+const parentPipe = !stdioMode;
 // The HTTP transport does not read stdin. Keep a pipe open so the native
 // server can drain and exit if this launcher is killed without a catchable
 // signal (for example SIGKILL). Stdio MCP retains its protocol stream.
