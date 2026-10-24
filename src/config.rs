@@ -311,7 +311,7 @@ impl Config {
                 .any(|token| token.len() < 32 || token.contains("replace_me"))
             {
                 anyhow::bail!(
-                    "AUTH_TOKENS entries must contain at least 32 characters and cannot be placeholders; run python scripts/configure_credentials.py"
+                    "AUTH_TOKENS entries must contain at least 32 bytes and cannot be placeholders; replace the example value in .env or set a unique token in the environment"
                 );
             }
         } else if !stdio && !self.bind_addr()?.ip().is_loopback() {
