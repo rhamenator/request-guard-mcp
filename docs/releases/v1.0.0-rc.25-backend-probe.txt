@@ -1,0 +1,26 @@
+{"stage": "healthy", "tool": "classify", "pass": true, "http": 200, "error_code": null}
+{"stage": "healthy", "tool": "replay_decision", "pass": true, "http": 200, "error_code": null}
+{"stage": "healthy", "tool": "ping", "pass": true, "http": 200, "error_code": null}
+{"passed": 3, "total": 3}
+PostgreSQL outage:
+{"stage": "outage", "tool": "classify", "pass": true, "http": 200, "error_code": -502}
+{"stage": "outage", "tool": "replay_decision", "pass": true, "http": 200, "error_code": -502}
+{"stage": "outage", "tool": "ping", "pass": true, "http": 200, "error_code": null}
+{"passed": 3, "total": 3}
+PostgreSQL recovery:
+{"stage": "healthy", "tool": "classify", "pass": true, "http": 200, "error_code": null}
+{"stage": "healthy", "tool": "replay_decision", "pass": true, "http": 200, "error_code": null}
+{"stage": "healthy", "tool": "ping", "pass": true, "http": 200, "error_code": null}
+{"passed": 3, "total": 3}
+Redis healthy:
+{"stage": "healthy", "tool": "threat_lookup", "pass": true, "http": 200, "error_code": null}
+{"stage": "healthy", "tool": "classify", "pass": true, "http": 200, "error_code": null}
+{"passed": 2, "total": 2}
+Redis outage:
+{"stage": "outage", "tool": "threat_lookup", "pass": true, "http": 200, "error_code": -502}
+{"stage": "outage", "tool": "classify", "pass": true, "http": 200, "error_code": null}
+{"passed": 2, "total": 2}
+Redis recovery:
+{"stage": "healthy", "tool": "threat_lookup", "pass": true, "http": 200, "error_code": null}
+{"stage": "healthy", "tool": "classify", "pass": true, "http": 200, "error_code": null}
+{"passed": 2, "total": 2}

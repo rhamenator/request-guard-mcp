@@ -1,0 +1,75 @@
+{"case": "missing_auth", "pass": true, "detail": 401}
+{"case": "wrong_auth", "pass": true, "detail": 403}
+{"case": "authorized_rpc", "pass": true, "detail": 200}
+{"case": "malformed_json", "pass": true, "detail": {"http": 200, "rpc": -32700}}
+{"case": "wrong_jsonrpc_version", "pass": true, "detail": 200}
+{"case": "invalid_request_id", "pass": true, "detail": 200}
+{"case": "scalar_params", "pass": true, "detail": 200}
+{"case": "invalid_parameter_type", "pass": true, "detail": 200}
+{"case": "instruction_as_data", "pass": true, "detail": 200}
+{"case": "oversized_body", "pass": true, "detail": 413}
+{"passed": 10, "total": 10}
+{"case": "ws_missing_auth", "pass": true, "detail": 401}
+{"case": "ws_wrong_auth", "pass": true, "detail": 403}
+{"case": "ws_authorized_upgrade", "pass": true, "detail": 101}
+{"case": "ws_initialize", "pass": true, "detail": {"opcode": 1, "id": 1}}
+{"case": "ws_malformed_json", "pass": true, "detail": {"opcode": 1, "code": -32700}}
+{"case": "ws_wrong_jsonrpc_version", "pass": true, "detail": {"opcode": 1, "code": -32600}}
+{"case": "ws_scalar_params", "pass": true, "detail": {"opcode": 1, "code": -32600}}
+{"case": "ws_array_input", "pass": true, "detail": {"opcode": 1, "code": -32600}}
+{"case": "ws_empty_object", "pass": true, "detail": {"opcode": 1, "code": -32600}}
+{"case": "ws_null_request_id", "pass": true, "detail": {"opcode": 1, "code": -32600}}
+{"case": "ws_fractional_request_id", "pass": true, "detail": {"opcode": 1, "code": -32600}}
+{"case": "ws_nonobject_params", "pass": true, "detail": {"opcode": 1, "code": -32600}}
+{"case": "ws_bad_notification", "pass": true, "detail": {"opcode": 1, "code": -32600}}
+{"case": "ws_bad_client_result", "pass": true, "detail": {"opcode": 1, "code": -32600}}
+{"case": "ws_integer_id", "pass": true, "detail": {"opcode": 1, "id": 7}}
+{"case": "ws_string_id", "pass": true, "detail": {"opcode": 1, "id": "string"}}
+{"case": "ws_tools_list", "pass": true, "detail": {"opcode": 1, "tools": 23}}
+{"case": "ws_notification_no_reply", "pass": true, "detail": {"upgrade": 101, "no_reply": true, "recovered": true}}
+{"case": "ws_client_response_no_reply", "pass": true, "detail": {"upgrade": 101, "no_reply": true, "recovered": true}}
+{"case": "ws_oversized_frame", "pass": true, "detail": {"upgrade": 101, "opcode": 8, "close_code": 1009, "hard_close": false}}
+{"case": "ws_oversized_fragmented_message", "pass": true, "detail": {"upgrade": 101, "opcode": 8, "close_code": 1009, "hard_close": false}}
+{"case": "ws_after_oversize_recovers", "pass": true, "detail": {"upgrade": 101, "opcode": 1}}
+{"passed": 22, "total": 22}
+{"case": "benign_browser", "pass": true, "http": 200, "signals": []}
+{"case": "gptbot_casefold", "pass": true, "http": 200, "signals": ["ua_ai_bot", "ua_non_browser"]}
+{"case": "gptbot_embedded", "pass": true, "http": 200, "signals": ["ua_ai_bot"]}
+{"case": "raw_dotenv", "pass": true, "http": 200, "signals": ["path_sensitive"]}
+{"case": "encoded_dotenv", "pass": true, "http": 200, "signals": ["path_sensitive"]}
+{"case": "double_encoded_dotenv", "pass": true, "http": 200, "signals": ["path_sensitive"]}
+{"case": "triple_encoded_dotenv", "pass": true, "http": 200, "signals": ["path_sensitive"]}
+{"case": "quadruple_encoded_dotenv", "pass": true, "http": 200, "signals": ["path_sensitive"]}
+{"case": "encoded_separator", "pass": true, "http": 200, "signals": ["path_sensitive"]}
+{"case": "double_encoded_backslash", "pass": true, "http": 200, "signals": ["path_sensitive"]}
+{"case": "masscan_scanner", "pass": true, "http": 200, "signals": ["ua_non_browser", "ua_scraper"]}
+{"case": "nikto_scanner", "pass": true, "http": 200, "signals": ["ua_non_browser", "ua_scraper"]}
+{"case": "sqlmap_scanner", "pass": true, "http": 200, "signals": ["ua_non_browser", "ua_scraper"]}
+{"case": "httpclient_library", "pass": true, "http": 200, "signals": ["ua_non_browser", "ua_scraper"]}
+{"case": "internal_path", "pass": true, "http": 200, "signals": ["path_sensitive"]}
+{"case": "internal_child", "pass": true, "http": 200, "signals": ["path_sensitive"]}
+{"case": "xmlrpc_path", "pass": true, "http": 200, "signals": ["path_sensitive"]}
+{"case": "internalized_control", "pass": true, "http": 200, "signals": []}
+{"case": "xmlrpc_suffix_control", "pass": true, "http": 200, "signals": []}
+{"passed": 19, "total": 19}
+{"case": "missing_bearer", "pass": true, "http": 401}
+{"case": "wrong_bearer", "pass": true, "http": 403}
+{"case": "authorized_ping", "pass": true, "http": 200}
+{"case": "unlisted_origin", "pass": true, "http": 403}
+{"case": "unsupported_protocol_header", "pass": true, "http": 400}
+{"case": "non_json_content_type", "pass": true, "http": 415}
+{"case": "json_excluded_by_accept", "pass": true, "http": 406}
+{"case": "non_upgrade_get", "pass": true, "http": 405}
+{"case": "accepted_notification", "pass": true, "http": 202}
+{"case": "invalid_notification", "pass": true, "http": 400}
+{"case": "post_rejection_recovery", "pass": true, "http": 200}
+{"passed": 11, "total": 11}
+{"case": "bounded_malformed_envelopes", "passed": 128, "total": 128, "seconds": 1.101, "recovery": true, "failures": []}
+{"case": "incomplete_headers_close", "pass": true, "detail": null}
+{"case": "incomplete_body_408", "pass": true, "detail": 408}
+{"case": "chunked_body_413", "pass": true, "detail": 413}
+{"case": "post_limit_recovery", "pass": true, "detail": 200}
+{"passed": 4, "total": 4}
+{"case": "redis_unavailable_error", "pass": true, "detail": {"http": 200, "rpc": -502, "message": "INTEGRATION_UNAVAILABLE"}}
+{"case": "core_tool_after_backend_error", "pass": true, "detail": {"http": 200, "isError": false}}
+{"passed": 2, "total": 2}
