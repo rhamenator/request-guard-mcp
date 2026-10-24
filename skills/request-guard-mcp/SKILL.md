@@ -56,6 +56,11 @@ there is no request cancellation or session resumption. PostgreSQL integration
 is unavailable in stdio mode. Private five-platform packaged smoke,
 an official Python SDK 2.3.0 client, and a clean npm-installed Linux launcher
 passed before release; this does not establish support for every client.
+When using the published v0.1.5 npm launcher in HTTP mode, forcibly killing
+only the Node wrapper can leave its native listener running; stop the native
+child or process group too. On Linux, development main uses a private parent
+pipe so a forcibly killed wrapper starts a bounded native drain. Forced-kill
+behavior on macOS and Windows is not yet qualified.
 The earlier v0.1.3 release supports
 standard MCP initialization and tool calls but predates the v0.1.4 Origin,
 HTTP status/header, JSON-RPC envelope, and PostgreSQL native CA changes below.

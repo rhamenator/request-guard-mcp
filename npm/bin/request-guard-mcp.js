@@ -30,7 +30,18 @@ if (!target) {
   process.exit(1);
 }
 const binary = path.join(__dirname, "..", "vendor", target[0], target[1]);
-const child = spawn(binary, process.argv.slice(2), { stdio: "inherit", env: process.env });
+const args = process.argv.slice(2);
+const stdioMode = args.length === 1 && args[0] === "--stdio";
+const parentPipe = process.platform === "linux" && !stdioMode;
+// The HTTP transport does not read stdin. Keep a pipe open so the native
+// server can drain and exit if this launcher is killed without a catchable
+// signal (for example SIGKILL). Stdio MCP retains its protocol stream.
+const child = spawn(binary, args, {
+  stdio: parentPipe ? ["pipe", "inherit", "inherit"] : "inherit",
+  env: parentPipe
+    ? { ...process.env, REQUEST_GUARD_NPM_PARENT_PIPE: "1" }
+    : { ...process.env, REQUEST_GUARD_NPM_PARENT_PIPE: undefined },
+});
 let spawnFailed = false;
 const forwardedSignals = process.platform === "win32"
   ? ["SIGINT", "SIGTERM"]

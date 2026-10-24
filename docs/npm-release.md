@@ -46,6 +46,12 @@ their SHA-256 sidecars, including Linux x64 musl. It verifies every checksum and
 expected binary from each archive. Installation does not run a `postinstall` script
 or download executable code. The small Node launcher selects the bundled
 binary and forwards arguments, environment, stdio, and termination signals.
+On Linux development main, HTTP mode gives the native child a private stdin pipe.
+If the launcher is forcibly killed, closing that pipe starts a bounded server
+drain. Published v0.1.5 lacks this safeguard; when forcibly killing its npm
+launcher in HTTP mode, also stop the native child or the whole process group
+so the listener does not remain active. Forced-kill child lifetime on macOS
+and Windows has not been qualified by this Linux probe.
 The published 0.1.5 launcher selects the musl binary on Alpine and the glibc
 binary on glibc Linux hosts. A clean install on Alpine and on glibc Linux passed
 the official five-check MCP Inspector smoke test.

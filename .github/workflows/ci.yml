@@ -134,6 +134,10 @@ jobs:
           toolchain: 1.99.1
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
       - run: cargo build --release --all-features
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22.20.0"
+      - run: python3 scripts/probe_npm_parent_pipe.py target/release/request-guard-mcp
       - run: python3 scripts/probe_validate_payload.py target/release/request-guard-mcp
       - run: python3 scripts/probe_score_breakdown.py target/release/request-guard-mcp
       - run: python3 scripts/probe_self_test_suite.py target/release/request-guard-mcp
