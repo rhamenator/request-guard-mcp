@@ -119,12 +119,15 @@ when operating that version.
 git clone https://github.com/rhamenator/request-guard-mcp
 cd request-guard-mcp
 cp .env.example .env
+# Its default binds all interfaces for container deployments; do not run the
+# local quickstart without the loopback override below.
 # Prompt for strong application and backing-service credentials
 python scripts/configure_credentials.py
-cargo run --release
+# The shell value overrides .env and keeps unauthenticated endpoints local.
+MCP__HOST=127.0.0.1 cargo run --release
 ```
 
-Server starts on `http://0.0.0.0:8085`. Test it:
+Server starts on `http://127.0.0.1:8085`. Test it:
 
 ```bash
 # Health check
@@ -158,6 +161,12 @@ MCP_SERVER_PRIMARY_URL=ws://request-guard-mcp:8085/mcp
 MCP_SERVER_PRIMARY_AUTH_TOKEN=replace_me
 MCP_SERVER_PRIMARY_TIMEOUT=10
 ```
+
+The `ws://request-guard-mcp:8085` example sends the bearer token without
+transport encryption and is only suitable on a trusted private network. Use
+`wss://` through a trusted TLS-terminating proxy outside that boundary. Block
+unauthenticated `/health`, `/ready`, and `/metrics` at the proxy or firewall,
+or allow only trusted monitoring sources.
 
 For clients already configured with the previous `ai-scraping-defense-mcp` hostname, Docker Compose and Kubernetes manifests include an optional legacy DNS alias/service that points to the same server.
 
