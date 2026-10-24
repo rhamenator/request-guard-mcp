@@ -159,7 +159,12 @@ The migration preserves current non-attested replay signals, but old
 attested-TLS decisions may already replay differently. Confirm the desired
 retention period and purge older rows separately.
 An upsert of the same request ID resets `created_at`, so the retention clock
-starts again. Deletion does not immediately erase old bytes from PostgreSQL
+starts again. Development main clears feedback when the stored replay inputs
+or response change, but keeps feedback for an equivalent retry. A changed
+decision needs a new label. Published v0.1.5 does not clear feedback on
+replacement; use a fresh request ID for each distinct event. Existing stale
+labels from older releases are not repaired automatically. Deletion does not
+immediately erase old bytes from PostgreSQL
 dead tuples, WAL, replicas or backups: arrange vacuum and backup/WAL expiry
 under your data policy.
 Starting with v0.1.4, MCP HTTP POST and WebSocket requests carrying `Origin`

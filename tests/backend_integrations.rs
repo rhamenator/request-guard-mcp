@@ -342,6 +342,100 @@ async fn concurrent_postgres_schema_initialization_completes() {
 }
 
 #[tokio::test]
+async fn replacing_a_decision_does_not_relabel_its_old_feedback() {
+    let Ok(postgres_url) = std::env::var("TEST_POSTGRES_URL") else {
+        assert!(
+            !matches!(std::env::var("REQUIRE_TEST_BACKENDS").as_deref(), Ok("1")),
+            "required PostgreSQL integration URL is missing"
+        );
+        return;
+    };
+    let mut config = Config::default();
+    config.postgres.url = Some(postgres_url);
+    config.auth.cache_scope_hmac_key = Some("integration-test-scope-key-32-bytes-long".to_string());
+    let state = AppState::initialize(config).await.unwrap();
+    let request_id = format!("replace-feedback-{}", Uuid::new_v4());
+    let caller_scope = format!("caller:replace-feedback-{}", Uuid::new_v4());
+
+    let mut suspicious = classify_request(request_id.clone(), "sqlmap/1.7");
+    suspicious.path = Some("/.env".to_string());
+    let first = tools::classify::run_scoped(&state, suspicious, &caller_scope)
+        .await
+        .unwrap();
+    assert_eq!(first.verdict.to_string(), "block");
+    let feedback = tools::feedback::run_scoped(
+        &state,
+        FeedbackRequest {
+            request_id: request_id.clone(),
+            correct_verdict: "allow".to_string(),
+            notes: None,
+            reporter: None,
+        },
+        &caller_scope,
+    )
+    .await
+    .unwrap();
+    assert!(feedback.accepted);
+    let report_request = CalibrationReportRequest {
+        window_hours: Some(1),
+    };
+    let before =
+        tools::calibration_report::run_scoped(&state, report_request.clone(), &caller_scope)
+            .await
+            .unwrap();
+    assert_eq!(before.samples, 1);
+    assert_eq!(before.false_positive_rate, 1.0);
+
+    let mut retry = classify_request(request_id.clone(), "sqlmap/1.7");
+    retry.path = Some("/.env".to_string());
+    tools::classify::run_scoped(&state, retry, &caller_scope)
+        .await
+        .unwrap();
+    let after_retry =
+        tools::calibration_report::run_scoped(&state, report_request.clone(), &caller_scope)
+            .await
+            .unwrap();
+    assert_eq!(
+        after_retry.samples, 1,
+        "equivalent retry must keep feedback"
+    );
+    assert_eq!(after_retry.false_positive_rate, 1.0);
+
+    let mut benign = classify_request(request_id.clone(), "Mozilla/5.0");
+    benign.path = Some("/welcome".to_string());
+    let replacement = tools::classify::run_scoped(&state, benign, &caller_scope)
+        .await
+        .unwrap();
+    assert_eq!(replacement.verdict.to_string(), "allow");
+    let after =
+        tools::calibration_report::run_scoped(&state, report_request.clone(), &caller_scope)
+            .await
+            .unwrap();
+    assert_eq!(
+        after.samples, 0,
+        "old feedback must not label a new decision"
+    );
+
+    tools::feedback::run_scoped(
+        &state,
+        FeedbackRequest {
+            request_id,
+            correct_verdict: "allow".to_string(),
+            notes: None,
+            reporter: None,
+        },
+        &caller_scope,
+    )
+    .await
+    .unwrap();
+    let latest = tools::calibration_report::run_scoped(&state, report_request, &caller_scope)
+        .await
+        .unwrap();
+    assert_eq!(latest.samples, 1);
+    assert_eq!(latest.false_positive_rate, 0.0);
+}
+
+#[tokio::test]
 async fn postgres_decisions_and_reports_are_isolated_by_caller() {
     let Ok(postgres_url) = std::env::var("TEST_POSTGRES_URL") else {
         eprintln!("skipping PostgreSQL isolation test: TEST_POSTGRES_URL not set");

@@ -30,12 +30,12 @@ pub async fn run_scoped(
         .get_decision(caller_scope, &req.request_id)
         .await
         .map_err(|error| AppError::Upstream(error.to_string()))?;
-    if decision.is_none() {
+    let Some(decision) = decision else {
         return Err(AppError::InvalidRequest(format!(
             "classification request id '{}' was not found",
             req.request_id
         )));
-    }
+    };
     let feedback_id = state
         .postgres
         .record_feedback(
@@ -44,9 +44,16 @@ pub async fn run_scoped(
             &correct_verdict,
             req.notes.as_deref(),
             req.reporter.as_deref(),
+            &decision,
         )
         .await
-        .map_err(|error| AppError::Upstream(error.to_string()))?;
+        .map_err(|error| AppError::Upstream(error.to_string()))?
+        .ok_or_else(|| {
+            AppError::InvalidRequest(
+                "classification changed or was deleted while recording feedback; retry against the latest decision"
+                    .to_string(),
+            )
+        })?;
     Ok(FeedbackResponse {
         accepted: true,
         feedback_id,
