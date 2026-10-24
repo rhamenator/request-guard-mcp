@@ -144,7 +144,7 @@ fn tool_input_schema(name: &str) -> Value {
             vec!["token"],
         ),
         "abuse_pattern_match" => (
-            serde_json::json!({"text":{"type":"string"},"categories":{"type":"array","items":{"type":"string"}}}),
+            serde_json::json!({"text":{"type":"string"},"categories":{"type":"array","items":{"type":"string"},"description":"Optional category filter: injection, traversal, ai_attack, data_extraction (ASCII case-insensitive); unknown values are rejected"}}),
             vec!["text"],
         ),
         "score_breakdown" => (
@@ -558,7 +558,7 @@ impl McpTool for AbusePatternMatchTool {
             .and_then(|v| {
                 serde_json::from_value(v).map_err(|e| AppError::InvalidRequest(e.to_string()))
             })?;
-        let result = crate::tools::abuse_pattern_match::run(&state, req).await;
+        let result = crate::tools::abuse_pattern_match::run(&state, req).await?;
         serde_json::to_value(result).map_err(AppError::from)
     }
 }

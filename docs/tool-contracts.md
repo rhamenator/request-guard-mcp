@@ -135,6 +135,13 @@ Run the built-in test suite.
 
 ### `abuse_pattern_match`
 **Request**: `{ "text": "...", "categories": ["injection", "ai_attack"] }`
+`categories` is optional; an omitted or empty list checks all patterns. On
+development main, accepted values are `injection`, `traversal`, `ai_attack`,
+and `data_extraction` (ASCII case-insensitive, with surrounding whitespace
+ignored); unknown values return an
+invalid-request error. Development main checks SQL patterns across line breaks.
+Published v0.1.5 may report a clean result for an unknown category or multiline
+SQL. Results are heuristic signals, not a blocking decision.
 
 ## Operational Tools
 
