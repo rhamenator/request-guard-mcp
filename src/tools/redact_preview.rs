@@ -1,6 +1,7 @@
 use crate::models::{request::RedactPreviewRequest, response::RedactPreviewResponse};
 use crate::state::AppState;
 use crate::util::json::redact_fields;
+use serde_json::Value;
 
 const DEFAULT_SENSITIVE_FIELDS: &[&str] = &[
     "authorization",
@@ -14,27 +15,91 @@ const DEFAULT_SENSITIVE_FIELDS: &[&str] = &[
 ];
 
 pub async fn run(_state: &AppState, req: RedactPreviewRequest) -> RedactPreviewResponse {
-    let mut payload = req.payload.clone();
+    preview(req)
+}
+
+fn preview(req: RedactPreviewRequest) -> RedactPreviewResponse {
+    let mut payload = req.payload;
     let fields: Vec<String> = req.fields.unwrap_or_else(|| {
         DEFAULT_SENSITIVE_FIELDS
             .iter()
             .map(|s| s.to_string())
             .collect()
     });
-
-    let before_json = serde_json::to_string(&payload).unwrap_or_default();
+    let mut found = vec![false; fields.len()];
+    find_redacted_keys(&payload, &fields, &mut found);
     redact_fields(&mut payload, &fields);
-    let after_json = serde_json::to_string(&payload).unwrap_or_default();
-
-    // Determine which fields were actually redacted
     let fields_redacted: Vec<String> = fields
         .iter()
-        .filter(|f| before_json.contains(f.as_str()) && after_json.contains("[REDACTED]"))
+        .zip(found)
+        .filter(|(_, was_redacted)| *was_redacted)
+        .map(|(field, _)| field)
         .cloned()
         .collect();
 
     RedactPreviewResponse {
         redacted: payload,
         fields_redacted,
+    }
+}
+
+fn find_redacted_keys(value: &Value, fields: &[String], found: &mut [bool]) {
+    match value {
+        Value::Object(map) => {
+            for (key, child) in map {
+                let mut replaced = false;
+                for (index, field) in fields.iter().enumerate() {
+                    if field.eq_ignore_ascii_case(key) {
+                        found[index] = true;
+                        replaced = true;
+                    }
+                }
+                // redact_fields replaces the whole value at a matching key,
+                // so nested keys within it are not visited.
+                if !replaced {
+                    find_redacted_keys(child, fields, found);
+                }
+            }
+        }
+        Value::Array(items) => {
+            for item in items {
+                find_redacted_keys(item, fields, found);
+            }
+        }
+        _ => {}
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::preview;
+    use crate::models::request::RedactPreviewRequest;
+    use serde_json::json;
+
+    #[test]
+    fn reports_only_keys_actually_replaced() {
+        let result = preview(RedactPreviewRequest {
+            payload: json!({
+                "token": "synthetic",
+                "note": "api_key is rotated",
+                "already": "[REDACTED]",
+                "nested": [{"PASSWORD": "synthetic"}]
+            }),
+            fields: Some(vec!["token".into(), "api_key".into(), "password".into()]),
+        });
+        assert_eq!(result.fields_redacted, vec!["token", "password"]);
+        assert_eq!(result.redacted["token"], "[REDACTED]");
+        assert_eq!(result.redacted["nested"][0]["PASSWORD"], "[REDACTED]");
+        assert_eq!(result.redacted["note"], "api_key is rotated");
+    }
+
+    #[test]
+    fn replaced_parent_does_not_claim_its_nested_key() {
+        let result = preview(RedactPreviewRequest {
+            payload: json!({"token": {"password": "synthetic"}}),
+            fields: Some(vec!["token".into(), "password".into()]),
+        });
+        assert_eq!(result.fields_redacted, vec!["token"]);
+        assert_eq!(result.redacted["token"], "[REDACTED]");
     }
 }
