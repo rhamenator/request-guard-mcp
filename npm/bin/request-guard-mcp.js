@@ -3,6 +3,7 @@
 
 const path = require("node:path");
 const fs = require("node:fs");
+const os = require("node:os");
 const { spawn } = require("node:child_process");
 
 const targets = {
@@ -30,13 +31,17 @@ if (!target) {
 }
 const binary = path.join(__dirname, "..", "vendor", target[0], target[1]);
 const child = spawn(binary, process.argv.slice(2), { stdio: "inherit", env: process.env });
+let spawnFailed = false;
 for (const signal of ["SIGINT", "SIGTERM"]) {
   process.on(signal, () => child.kill(signal));
 }
 child.on("error", (error) => {
+  spawnFailed = true;
   console.error(`Could not start Request Guard MCP: ${error.message}`);
   process.exitCode = 1;
 });
 child.on("exit", (code, signal) => {
-  process.exitCode = code ?? (signal === "SIGINT" ? 130 : 143);
+  if (spawnFailed) return;
+  const signalNumber = signal && os.constants.signals[signal];
+  process.exitCode = code ?? (Number.isInteger(signalNumber) ? 128 + signalNumber : 1);
 });
