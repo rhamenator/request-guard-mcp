@@ -338,6 +338,14 @@ async fn redis_and_postgres_backed_tools_complete_real_round_trip() {
     .await
     .unwrap();
     assert_eq!(active.queues[0].depth, 1);
+    assert_eq!(
+        active.queues[0].consumers,
+        state
+            .config
+            .limits
+            .global_concurrency
+            .min(u32::MAX as usize) as u32
+    );
     state
         .redis
         .record_tool_finished("integration", &operation_id)
@@ -353,6 +361,18 @@ async fn redis_and_postgres_backed_tools_complete_real_round_trip() {
     .unwrap();
     assert_eq!(completed.queues[0].depth, 0);
     assert!(completed.queues[0].rate_per_second > 0.0);
+
+    let unknown = tools::queue_status::run(
+        &state,
+        QueueStatusRequest {
+            queue: Some("not-recorded".to_string()),
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(unknown.queues[0].name, "not-recorded");
+    assert_eq!(unknown.queues[0].depth, 0);
+    assert_eq!(unknown.queues[0].consumers, active.queues[0].consumers);
 
     let health = tools::health::run(&state).await;
     assert_eq!(health.status, "healthy");

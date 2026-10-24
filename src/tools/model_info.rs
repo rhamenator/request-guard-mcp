@@ -72,7 +72,7 @@ pub async fn run(state: &AppState) -> ModelInfoResponse {
         ),
         tool(
             "queue_status",
-            "Status of processing queues",
+            "Best-effort Redis tool-operation telemetry; depth counts active records, not queued work",
             flag(state, "queue_status"),
         ),
         tool("config_snapshot", "Snapshot of current configuration", true),
