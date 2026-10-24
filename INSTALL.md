@@ -87,7 +87,13 @@ accessible only to trusted local users. Explicit environment variables and
 `CONFIG_FILE` still configure optional backends; automatic `.env` discovery
 is disabled in stdio mode. PostgreSQL is currently rejected in this mode
 because its rows do not expire and each launch uses a fresh caller scope;
-Redis entries retain their configured TTL. Requests are processed
+Redis cache keys use the configured cache TTL and queue records receive a
+bounded expiry, but the canary registry and bounded canary event list do not
+expire automatically. Unlike PostgreSQL's fresh per-launch caller scope,
+Redis canary records use one shared prefix; the event list is capped by count
+but not by age. A successful evaluation can retain up to 4096 encoded bytes
+of caller context in an event. Avoid secrets in that context and arrange
+operator-managed retention for these Redis keys. Requests are processed
 sequentially and the transport has no session resumption or standalone SSE.
 The optional Python SDK probe is **not in this archive**. To repeat it, check
 out the [source commit recorded in the bundled README](README.md) in a
