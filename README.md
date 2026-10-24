@@ -204,6 +204,10 @@ is a separate native installation option. A fresh registry install of 0.1.5
 passed official MCP Inspector initialization, tool listing, `classify`, and
 `explain`, plus the bounded stdio smoke on Linux x64. v0.1.4 has no stdio. See the
 [npm release guide](docs/npm-release.md).
+For HTTP mode with the published v0.1.5 npm launcher, a forced kill of only
+the Node wrapper can leave its native listener running; stop the child or
+process group too. On Linux, development main drains the child if its wrapper
+disappears; macOS and Windows forced-kill behavior is unqualified.
 
 ## Docker
 
