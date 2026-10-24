@@ -47,6 +47,10 @@ for mutate in (
         raise AssertionError("invalid index was accepted")
 
 workflow = (Path(__file__).resolve().parents[1] / ".github/workflows/container.yml").read_text()
+publish_job = workflow.split("\n  publish-container:\n", 1)[1]
+assert publish_job.index("uses: actions/checkout@") < publish_job.index(
+    "verify_container_index.py proposed-index.json"
+)
 preflight = workflow.index("imagetools create --dry-run")
 publish = workflow.index("imagetools create --metadata-file")
 assert preflight < publish
