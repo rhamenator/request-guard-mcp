@@ -96,7 +96,8 @@ def main():
         preload.write_text(
             "const cp=require('node:child_process');const fs=require('node:fs');"
             "const spawn=cp.spawn;cp.spawn=function(...args){const child=spawn(...args);"
-            "if(child.pid)fs.writeFileSync(process.env.RG_TEST_CHILD_PID,String(child.pid));"
+            "if(child.pid){const file=process.env.RG_TEST_CHILD_PID;"
+            "fs.writeFileSync(file+'.tmp',String(child.pid));fs.renameSync(file+'.tmp',file);}"
             "return child;};\n"
         )
         port = free_port()
@@ -162,7 +163,11 @@ def main():
             if child_pid is None and pid_file.exists():
                 child_pid = int(pid_file.read_text())
                 if sys.platform == "win32":
-                    handle = WindowsProcess(child_pid)
+                    try:
+                        handle = WindowsProcess(child_pid)
+                    except OSError:
+                        # The child may already have exited during startup.
+                        pass
                 else:
                     identity = posix_identity(child_pid)
             if handle is not None:
