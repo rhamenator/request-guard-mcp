@@ -342,6 +342,71 @@ async fn concurrent_postgres_schema_initialization_completes() {
 }
 
 #[tokio::test]
+async fn initialized_postgres_schema_does_not_wait_for_ddl_lock() {
+    let Ok(postgres_url) = std::env::var("TEST_POSTGRES_URL") else {
+        assert!(
+            !matches!(std::env::var("REQUIRE_TEST_BACKENDS").as_deref(), Ok("1")),
+            "required PostgreSQL integration URL is missing"
+        );
+        return;
+    };
+
+    let schema = format!("request_guard_{}", Uuid::new_v4().simple());
+    let admin = sqlx::PgPool::connect(&postgres_url).await.unwrap();
+    sqlx::query(&format!("CREATE SCHEMA {schema}"))
+        .execute(&admin)
+        .await
+        .unwrap();
+    let separator = if postgres_url.contains('?') { '&' } else { '?' };
+    let scoped_url = format!("{postgres_url}{separator}options[search_path]={schema}");
+    let mut config = Config::default();
+    config.postgres.url = Some(scoped_url);
+    let first = AppState::initialize(config.clone()).await.unwrap();
+
+    // ACCESS SHARE permits ordinary feedback DML but blocks the unnecessary
+    // ACCESS EXCLUSIVE table lock of CREATE TABLE IF NOT EXISTS. The second
+    // initializer must finish while this transaction still holds the lock.
+    let mut writer = admin.begin().await.unwrap();
+    sqlx::query(&format!(
+        "LOCK TABLE {schema}.mcp_decisions IN ACCESS SHARE MODE"
+    ))
+    .execute(&mut *writer)
+    .await
+    .unwrap();
+    let second = tokio::time::timeout(
+        std::time::Duration::from_secs(10),
+        AppState::initialize(config.clone()),
+    )
+    .await
+    .expect("initialized schema unexpectedly waited for table DDL lock")
+    .unwrap();
+    assert!(second.postgres.ping().await);
+    writer.rollback().await.unwrap();
+    // A legacy or incomplete schema must still take the migration path.
+    sqlx::query(&format!(
+        "DROP INDEX {schema}.idx_mcp_feedback_caller_created"
+    ))
+    .execute(&admin)
+    .await
+    .unwrap();
+    let repaired = AppState::initialize(config).await.unwrap();
+    let restored: (bool,) = sqlx::query_as("SELECT to_regclass($1) IS NOT NULL")
+        .bind(format!("{schema}.idx_mcp_feedback_caller_created"))
+        .fetch_one(&admin)
+        .await
+        .unwrap();
+    assert!(
+        restored.0,
+        "schema initialization did not restore missing index"
+    );
+    drop((first, second, repaired));
+    sqlx::query(&format!("DROP SCHEMA {schema} CASCADE"))
+        .execute(&admin)
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
 async fn replacing_a_decision_does_not_relabel_its_old_feedback() {
     let Ok(postgres_url) = std::env::var("TEST_POSTGRES_URL") else {
         assert!(

@@ -181,6 +181,51 @@ mod inner {
                 .execute(&mut *transaction)
                 .await
                 .context("failed to lock PostgreSQL schema initialization")?;
+            // Avoid taking table DDL locks on every process startup. In a
+            // rolling restart, another process can be writing feedback while
+            // this one initializes; even CREATE TABLE IF NOT EXISTS can then
+            // deadlock with that writer. Check the complete current schema
+            // under the initializer lock, and run DDL only for a new or legacy
+            // schema that actually needs it. Keep this object list in sync
+            // with the DDL below; the real-PostgreSQL integration test holds
+            // a read lock across a second startup and checks index repair.
+            let schema_complete: bool = sqlx::query_scalar(
+                r#"
+                SELECT to_regclass('mcp_decisions') IS NOT NULL
+                   AND to_regclass('mcp_feedback') IS NOT NULL
+                   AND to_regclass('idx_mcp_decisions_created_at') IS NOT NULL
+                   AND to_regclass('idx_mcp_decisions_verdict') IS NOT NULL
+                   AND to_regclass('idx_mcp_feedback_request_id') IS NOT NULL
+                   AND to_regclass('idx_mcp_feedback_created_at') IS NOT NULL
+                   AND to_regclass('idx_mcp_decisions_caller_created') IS NOT NULL
+                   AND to_regclass('idx_mcp_feedback_caller_created') IS NOT NULL
+                   AND EXISTS (
+                       SELECT 1 FROM pg_attribute
+                       WHERE attrelid = to_regclass('mcp_decisions')
+                         AND attname = 'caller_scope' AND NOT attisdropped
+                   )
+                   AND EXISTS (
+                       SELECT 1 FROM pg_attribute
+                       WHERE attrelid = to_regclass('mcp_feedback')
+                         AND attname = 'caller_scope' AND NOT attisdropped
+                   )
+                   AND EXISTS (
+                       SELECT 1 FROM pg_constraint
+                       WHERE conrelid = to_regclass('mcp_feedback')
+                         AND conname = 'mcp_feedback_request_id_fkey'
+                   )
+                "#,
+            )
+            .fetch_one(&mut *transaction)
+            .await
+            .context("failed to inspect PostgreSQL persistence schema")?;
+            if schema_complete {
+                transaction
+                    .commit()
+                    .await
+                    .context("failed to commit PostgreSQL schema inspection")?;
+                return Ok(());
+            }
             sqlx::raw_sql(
                 r#"
                 CREATE TABLE IF NOT EXISTS mcp_decisions (
