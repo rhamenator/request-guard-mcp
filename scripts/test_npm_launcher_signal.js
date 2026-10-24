@@ -50,18 +50,32 @@ async function checkSignal(signal, target) {
     stdio: "ignore",
   });
   let childPid;
-  let wrapperFinished = false;
+  let childConfirmedDead = false;
   try {
     childPid = await waitForPid(pidFile);
     const exited = waitForExit(wrapper);
     process.kill(target === "wrapper" ? wrapper.pid : childPid, signal);
     const result = await exited;
-    wrapperFinished = true;
     assert.equal(result.signal, null, "wrapper must report a numeric exit code");
     assert.equal(result.code, 128 + os.constants.signals[signal], signal);
+    if (target === "wrapper") {
+      let childAlive = true;
+      for (let attempt = 0; attempt < 100; attempt++) {
+        try { process.kill(childPid, 0); } catch (error) {
+          if (error.code !== "ESRCH") throw error;
+          childAlive = false;
+          break;
+        }
+        await new Promise(resolve => setTimeout(resolve, 20));
+      }
+      childConfirmedDead = !childAlive;
+      assert.equal(childAlive, false, `${signal} must not orphan the child`);
+    } else {
+      childConfirmedDead = true;
+    }
   } finally {
     if (wrapper.exitCode === null) wrapper.kill("SIGKILL");
-    if (childPid && !wrapperFinished) {
+    if (childPid && !childConfirmedDead) {
       try { process.kill(childPid, "SIGKILL"); } catch (error) {
         if (error.code !== "ESRCH") throw error;
       }
@@ -73,12 +87,13 @@ async function checkSignal(signal, target) {
   try {
     await checkSignal("SIGTERM", "wrapper");
     await checkSignal("SIGINT", "wrapper");
+    await checkSignal("SIGHUP", "wrapper");
     await checkSignal("SIGKILL", "child");
     fs.unlinkSync(childBinary);
     const missing = spawn(launcher, [], { stdio: "ignore" });
     const missingResult = await waitForExit(missing);
     assert.equal(missingResult.code, 1, "missing binary must report launcher failure");
-    console.log("PASS npm launcher: forwarded SIGTERM 143/SIGINT 130, child SIGKILL 137, missing binary 1");
+    console.log("PASS npm launcher: forwarded SIGTERM 143/SIGINT 130/SIGHUP 129, child SIGKILL 137, missing binary 1");
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
