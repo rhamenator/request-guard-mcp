@@ -289,7 +289,7 @@ See [docs/architecture.md](docs/architecture.md) for a full system diagram and c
 | `enrich_ua` | User-agent parsing |
 | `threat_lookup` | Threat indicator lookup |
 | `canary_eval` | Canary token evaluation |
-| `abuse_pattern_match` | Abuse pattern detection |
+| `abuse_pattern_match` | Heuristic abuse pattern detection. Development main accepts the optional categories `injection`, `traversal`, `ai_attack`, `data_extraction` without regard to ASCII case and rejects unknown categories; published v0.1.5 can return a false-clean result for an unknown category or multiline SQL text. This tool does not enforce a blocking policy. |
 | `drift_report` | Score drift over time |
 | `calibration_report` | Precision/recall report |
 | `queue_status` | Processing queue status |

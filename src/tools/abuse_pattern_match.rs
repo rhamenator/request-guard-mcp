@@ -1,3 +1,4 @@
+use crate::error::AppError;
 use crate::models::{
     request::AbusePatternMatchRequest,
     response::{AbusePatternMatchResponse, PatternMatch},
@@ -17,7 +18,7 @@ static PATTERNS: Lazy<Vec<AbusePattern>> = Lazy::new(|| {
         AbusePattern {
             name: "sql_injection",
             category: "injection",
-            regex: Regex::new(r"(?i)(\bSELECT\b.*\bFROM\b|\bUNION\b.*\bSELECT\b|\bDROP\b.*\bTABLE\b)").unwrap(),
+            regex: Regex::new(r"(?is)(\bSELECT\b.*\bFROM\b|\bUNION\b.*\bSELECT\b|\bDROP\b.*\bTABLE\b)").unwrap(),
         },
         AbusePattern {
             name: "xss",
@@ -42,12 +43,34 @@ static PATTERNS: Lazy<Vec<AbusePattern>> = Lazy::new(|| {
     ]
 });
 
-pub async fn run(_state: &AppState, req: AbusePatternMatchRequest) -> AbusePatternMatchResponse {
-    let categories = req.categories.as_deref().unwrap_or(&[]);
+const CATEGORIES: [&str; 4] = ["injection", "traversal", "ai_attack", "data_extraction"];
+
+pub async fn run(
+    _state: &AppState,
+    req: AbusePatternMatchRequest,
+) -> Result<AbusePatternMatchResponse, AppError> {
+    match_patterns(req)
+}
+
+fn match_patterns(req: AbusePatternMatchRequest) -> Result<AbusePatternMatchResponse, AppError> {
+    let categories: Vec<String> = req
+        .categories
+        .unwrap_or_default()
+        .into_iter()
+        .map(|category| category.trim().to_ascii_lowercase())
+        .collect();
+    if categories
+        .iter()
+        .any(|category| !CATEGORIES.contains(&category.as_str()))
+    {
+        return Err(AppError::InvalidRequest(
+            "categories must be injection, traversal, ai_attack, or data_extraction".to_string(),
+        ));
+    }
     let mut matches = Vec::new();
 
     for p in PATTERNS.iter() {
-        if !categories.is_empty() && !categories.contains(&p.category.to_string()) {
+        if !categories.is_empty() && !categories.iter().any(|category| category == p.category) {
             continue;
         }
         if let Some(m) = p.regex.find(&req.text) {
@@ -66,9 +89,45 @@ pub async fn run(_state: &AppState, req: AbusePatternMatchRequest) -> AbusePatte
         (matches.len() as f64 * 0.3).clamp(0.0, 1.0)
     };
 
-    AbusePatternMatchResponse {
+    Ok(AbusePatternMatchResponse {
         matched: !matches.is_empty(),
         patterns: matches,
         risk_score,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{match_patterns, CATEGORIES, PATTERNS};
+    use crate::models::request::AbusePatternMatchRequest;
+
+    fn request(text: &str, categories: &[&str]) -> AbusePatternMatchRequest {
+        AbusePatternMatchRequest {
+            text: text.to_string(),
+            categories: Some(categories.iter().map(|value| value.to_string()).collect()),
+        }
+    }
+
+    #[test]
+    fn category_variants_do_not_produce_a_false_clean_result() {
+        let result = match_patterns(request("SELECT a FROM t", &[" Injection "])).unwrap();
+        assert!(result.matched);
+        assert_eq!(result.patterns[0].pattern, "sql_injection");
+        assert!(match_patterns(request("SELECT a FROM t", &["injecton"])).is_err());
+        assert!(match_patterns(request("SELECT a FROM t", &["injection", "wrong"])).is_err());
+    }
+
+    #[test]
+    fn multiline_sql_is_detected() {
+        let result = match_patterns(request("SELECT a\nFROM t", &["injection"])).unwrap();
+        assert!(result.matched);
+        assert_eq!(result.patterns[0].pattern, "sql_injection");
+    }
+
+    #[test]
+    fn every_pattern_category_is_selectable() {
+        assert!(PATTERNS
+            .iter()
+            .all(|pattern| CATEGORIES.contains(&pattern.category)));
     }
 }
