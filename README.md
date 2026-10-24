@@ -294,7 +294,7 @@ See [docs/architecture.md](docs/architecture.md) for a full system diagram and c
 | `calibration_report` | Precision/recall report |
 | `queue_status` | Best-effort Redis tool-operation telemetry, not a backlog. `depth` counts observed active records, which can lag or remain stale; `consumers` is the configured global concurrency ceiling, not live workers or free permits. A requested name with no records returns zero activity, which does not prove the queue exists or is healthy. Published v0.1.5 advertises this tool as queue status but uses the same field semantics. |
 | `config_snapshot` | Running config snapshot |
-| `self_test` | Built-in test suite |
+| `self_test` | Built-in test suite (`suite: "all"` or omitted) |
 
 ## License
 
