@@ -24,6 +24,11 @@ token. Confirm every example bearer, HMAC, TLS attestation, and backend password
 replaced before deployment; published v0.1.5 does not reject the shipped HMAC
 or attestation placeholders. Then confirm `tools/list` includes `classify` and
 `explain` before using the skill.
+Store the server `.env` and any token files so only the server account and
+authorized administrators can read them. On Linux/macOS, create `.env` under
+`umask 077` and verify mode 0600; on Windows, check its NTFS ACL before adding
+secrets. Development-main native `INSTALL.md` gives these steps explicitly;
+published v0.1.5 bundles predate that wording.
 The release workflow is configured to run official MCP Inspector 2.11.0 on
 future native bundles. Published v0.1.5 bundles were built with the prior
 2.5.0 smoke; a separate 2.11.0 smoke passed on the exact public Linux x64

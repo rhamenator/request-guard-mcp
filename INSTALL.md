@@ -38,8 +38,12 @@ Extract the archive, then work inside its `request-guard-mcp-<version>-<platform
 folder. The server binary is already built; Rust, Cargo, Redis, PostgreSQL, and
 MaxMind data are not needed for the core `classify` and `explain` tools.
 
-1. Copy `.env.example` to `.env` (`cp .env.example .env` on Linux/macOS, or
-   `Copy-Item .env.example .env` in PowerShell).
+1. Create `.env` with access limited to the account running the server. On
+   Linux/macOS, run `(umask 077; cp .env.example .env); chmod 600 .env` before
+   adding secrets. On Windows, copy it with `Copy-Item .env.example .env` in
+   an NTFS directory restricted to that account and authorized administrators;
+   check the resulting file ACL with `icacls .env` before adding secrets. It
+   must not grant read access to `Users`, `Everyone`, or `Authenticated Users`.
 2. Replace `AUTH_TOKENS=replace_me_with_a_strong_token` in `.env` with a unique,
    randomly generated token of at least 32 characters. Keep `.env` private. For
    local-only use, change `MCP__HOST=0.0.0.0` to `MCP__HOST=127.0.0.1`.
