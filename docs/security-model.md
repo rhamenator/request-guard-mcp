@@ -25,6 +25,17 @@ trust boundary.
   listings without the server-side key. Configure `CACHE_SCOPE_HMAC_KEY`
   (>= 32 bytes) to keep scopes stable across restarts and replicas; otherwise a
   process-local random key is used.
+- Development main also partitions classification cache entries by recorded
+  source commit, version, cache schema marker, and normalized known-bad TLS
+  fingerprint configuration. Only these inputs are partitioned; reassess cache
+  identity if future runtime settings affect verdicts. Local builds with
+  `unknown` commit metadata or uncommitted source changes must use a new Redis
+  key prefix or clear old cache entries after classification source changes.
+  Published v0.1.5 lacks this partition: a v0.1.5 replica can continue serving
+  its cached verdict during a rolling upgrade or after a threat-set change,
+  until the configured TTL expires (300 seconds by default). A patched build
+  does not read those old keys. Cache partitioning does not replace deployment
+  coordination.
 - PostgreSQL decision, replay, feedback, drift, and calibration records are
   partitioned by the authenticated caller scope. `CACHE_SCOPE_HMAC_KEY` is
   required with PostgreSQL so a caller's scope remains stable after restart.
