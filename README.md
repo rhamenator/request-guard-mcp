@@ -284,7 +284,7 @@ See [docs/architecture.md](docs/architecture.md) for a full system diagram and c
 |------|-------------|
 | `classify` | Classify a request as bot/human |
 | `explain` | Explain a classification decision |
-| `batch_classify` | Classify multiple requests |
+| `batch_classify` | Classify multiple requests. On development main, `options.include_details: false` omits per-item signal details; omitted or `true` preserves the full result. Check `errors` and each item error when `fail_fast` is false. Published v0.1.5 accepts but ignores `include_details`. |
 | `health` | Server health check |
 | `model_info` | Server and tool metadata |
 | `feedback` | Submit classification feedback |

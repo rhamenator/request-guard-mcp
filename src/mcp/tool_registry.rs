@@ -116,7 +116,7 @@ fn tool_input_schema(name: &str) -> Value {
             vec!["request_id"],
         ),
         "batch_classify" => (
-            serde_json::json!({"items":{"type":"array","items":{"type":"object"}},"options":{"type":"object","properties":{"fail_fast":{"type":"boolean"},"include_details":{"type":"boolean"}},"additionalProperties":false}}),
+            serde_json::json!({"items":{"type":"array","items":{"type":"object"}},"options":{"type":"object","properties":{"fail_fast":{"type":"boolean","default":false},"include_details":{"type":"boolean","default":true,"description":"When false, omit per-item signal details; omitted preserves the full response."}},"additionalProperties":false}}),
             vec!["items"],
         ),
         "feedback" => (
