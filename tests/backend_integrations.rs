@@ -9,6 +9,74 @@ use request_guard_mcp::{state::AppState, tools};
 use serde_json::json;
 use uuid::Uuid;
 
+#[tokio::test]
+async fn changed_tls_threat_set_does_not_reuse_distributed_classification_verdict() {
+    let Ok(redis_url) = std::env::var("TEST_REDIS_URL") else {
+        assert!(
+            !matches!(std::env::var("REQUIRE_TEST_BACKENDS").as_deref(), Ok("1")),
+            "required Redis integration URL is missing"
+        );
+        return;
+    };
+    eprintln!("running real Redis classification cache-domain regression");
+
+    let ja3 = "72a589da586844d7f0818ce684948eea";
+    let attestation_key = format!("{}{}", Uuid::new_v4(), Uuid::new_v4());
+    let prefix = format!(
+        "request_guard_cache_domain_test_{}",
+        Uuid::new_v4().simple()
+    );
+    let mut config = Config::default();
+    config.redis.url = Some(redis_url);
+    config.redis.key_prefix = prefix;
+    config.tls_fingerprints.attestation_key = Some(attestation_key.clone());
+    let first_state = AppState::initialize(config.clone()).await.unwrap();
+
+    let mut request = classify_request(Uuid::new_v4().to_string(), "Mozilla/5.0");
+    request.path = Some("/products".into());
+    request.tls_ja3 = Some(ja3.into());
+    request.tls_fingerprint_source = Some("envoy".into());
+    request.tls_fingerprint_attestation = Some(
+        request_guard_mcp::util::tls_attestation::create_attestation(
+            attestation_key.as_bytes(),
+            chrono::Utc::now().timestamp(),
+            request.ip.as_deref().unwrap(),
+            request.method.as_deref().unwrap(),
+            request.path.as_deref().unwrap(),
+            request.tls_ja3.as_deref(),
+            None,
+            request.tls_fingerprint_source.as_deref().unwrap(),
+        )
+        .unwrap(),
+    );
+    let first = tools::classify::run(&first_state, request.clone())
+        .await
+        .unwrap();
+    assert_eq!(first.verdict.to_string(), "allow");
+    let mut cached_request = request.clone();
+    cached_request.tls_fingerprint_verified = true;
+    let old_key = request_guard_mcp::util::hashing::request_fingerprint(
+        "internal",
+        &cached_request,
+        &first_state.classification_cache_domain,
+    );
+    assert!(first_state
+        .redis
+        .cache_get(&old_key)
+        .await
+        .unwrap()
+        .is_some());
+
+    config.tls_fingerprints.known_bad_ja3 = vec![ja3.into()];
+    let second_state = AppState::initialize(config).await.unwrap();
+    let second = tools::classify::run(&second_state, request).await.unwrap();
+    assert_eq!(second.verdict.to_string(), "block");
+    assert!(second
+        .signals
+        .iter()
+        .any(|signal| signal.name == "tls_fingerprint_known_bad"));
+}
+
 fn classify_request(request_id: String, user_agent: &str) -> ClassifyRequest {
     ClassifyRequest {
         ip: Some("203.0.113.25".to_string()),

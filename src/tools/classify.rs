@@ -58,7 +58,7 @@ async fn run_internal(
     let signals: SignalSet = rule_engine.evaluate(&req);
 
     // Check cache for fingerprint
-    let fingerprint = request_fingerprint(caller_scope, &req);
+    let fingerprint = request_fingerprint(caller_scope, &req, &state.classification_cache_domain);
     let distributed_cached = if state.redis.is_available() {
         match state.redis.cache_get(&fingerprint).await {
             Ok(value) => value,

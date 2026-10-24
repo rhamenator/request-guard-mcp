@@ -21,6 +21,8 @@ pub struct AppState {
     pub websocket_caller_semaphores: Arc<DashMap<String, Arc<Semaphore>>>,
     pub websocket_per_caller_limit: usize,
     pub cache: Arc<CacheStore>,
+    /// Separates cached verdicts across builds and configured TLS threat sets.
+    pub classification_cache_domain: Arc<String>,
     pub redis: Arc<RedisClient>,
     pub postgres: Arc<PostgresClient>,
     pub geoip: Arc<GeoipClient>,
@@ -164,6 +166,12 @@ impl AppState {
         let feature_flags = Arc::new(DashMap::new());
         let request_counter = Arc::new(AtomicU64::new(0));
         let build_info = Arc::new(BuildInfo::current());
+        let classification_cache_domain =
+            Arc::new(crate::util::hashing::classification_cache_domain(
+                &config.tls_fingerprints,
+                &build_info.version,
+                &build_info.git_commit,
+            ));
 
         // Initialize default feature flags
         feature_flags.insert("batch_classify".to_string(), config.features.enable_batch);
@@ -187,6 +195,7 @@ impl AppState {
             websocket_caller_semaphores,
             websocket_per_caller_limit,
             cache,
+            classification_cache_domain,
             redis,
             postgres,
             geoip,
