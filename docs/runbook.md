@@ -136,18 +136,41 @@ HTTP 200 response with a JSON-RPC `error` object.
 
 ## Loading reputation and canary data
 
-The default Redis prefix is `request_guard`. Threat records are JSON values in
-the `request_guard:threats:<type>` hash, keyed by normalized indicators:
+The default Redis prefix is `request_guard`; substitute your configured prefix
+in every command below. Open an authenticated Redis CLI session against the
+intended database using a credential method that does not place passwords in
+process arguments. Threat records are JSON values in the
+`request_guard:threats:<type>` hash, keyed by normalized indicators:
 
-```bash
-redis-cli -u "$MCP_REDIS_URL" HSET request_guard:threats:ip 198.51.100.9 \
-  '{"threat_type":"scanner","severity":"high","source":"operator","last_seen":"2026-08-11T00:00:00Z"}'
+```text
+HSET request_guard:threats:ip 198.51.100.9 '{"threat_type":"scanner","severity":"high","source":"operator","last_seen":"2026-08-11T00:00:00Z"}'
 ```
 
 For simple IP blocklists, add addresses to `request_guard:blocklist:ips`.
 Canary tokens are never stored raw: SHA-256 the token and store a JSON record
 in the `request_guard:canaries` hash. Successful evaluations append a bounded
-event record to `request_guard:canary_events`.
+event record to `request_guard:canary_events`. The event list keeps at most
+10,000 records but has no time-based TTL; the canary registry hash also has no
+TTL. Each event contains `canary_id`, the SHA-256 `token_hash`, `triggered_at`,
+and optional `context` (stored as an unredacted JSON value when its encoded
+size is at most 4096 bytes; larger values become a SHA-256 digest, byte count,
+and truncation marker). Events use
+one Redis prefix across callers, without PostgreSQL's per-caller scope. Avoid
+secrets and unnecessary personal data in context. Set an operator-managed
+retention schedule. In an authenticated Redis CLI session against the intended
+database, inspect the count before removing all current event records:
+
+```text
+LLEN request_guard:canary_events
+UNLINK request_guard:canary_events
+```
+
+`UNLINK` discards the event history and frees the key asynchronously; export only what
+your policy permits first. To retain fewer recent events instead, use
+`LTRIM request_guard:canary_events 0 999` for the most recent 1000 entries;
+it still provides no age-based expiry. These commands do not remove registered
+canaries, Redis persistence/replica copies, or backups, and do not establish
+physical erasure.
 
 ## Common Operations
 
