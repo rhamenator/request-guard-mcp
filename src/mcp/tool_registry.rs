@@ -147,10 +147,16 @@ fn tool_input_schema(name: &str) -> Value {
             serde_json::json!({"text":{"type":"string"},"categories":{"type":"array","items":{"type":"string"},"description":"Optional category filter: injection, traversal, ai_attack, data_extraction (ASCII case-insensitive); unknown values are rejected"}}),
             vec!["text"],
         ),
-        "score_breakdown" => (
-            serde_json::json!({"request_id":{"type":"string"},"signals":{}}),
-            vec![],
-        ),
+        "score_breakdown" => {
+            let mut classify_schema = tool_input_schema("classify");
+            classify_schema["description"] = serde_json::json!(
+                "Optional inbound classification request metadata; a raw signal list or unknown field is rejected"
+            );
+            (
+                serde_json::json!({"request_id":{"type":"string"},"signals":classify_schema}),
+                vec![],
+            )
+        }
         "validate_payload" => (
             serde_json::json!({"tool":{"type":"string"},"payload":{}}),
             vec!["tool", "payload"],
@@ -571,7 +577,7 @@ impl McpTool for ScoreBreakdownTool {
         "score_breakdown"
     }
     fn description(&self) -> &str {
-        "Break down a classification score"
+        "Break down rule-engine signals from optional inbound classification request metadata; malformed supplied signals return INVALID_REQUEST"
     }
     async fn call(&self, state: Arc<AppState>, params: Option<Value>) -> Result<Value, AppError> {
         let req: crate::models::request::ScoreBreakdownRequest = params
@@ -582,7 +588,7 @@ impl McpTool for ScoreBreakdownTool {
                 request_id: None,
                 signals: None,
             });
-        let result = crate::tools::score_breakdown::run(&state, req).await;
+        let result = crate::tools::score_breakdown::run(&state, req).await?;
         serde_json::to_value(result).map_err(AppError::from)
     }
 }

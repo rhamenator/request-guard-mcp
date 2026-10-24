@@ -125,9 +125,20 @@ pub struct AbusePatternMatchRequest {
 
 /// Score breakdown request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ScoreBreakdownRequest {
     pub request_id: Option<String>,
+    #[serde(default, deserialize_with = "supplied_json_value")]
     pub signals: Option<serde_json::Value>,
+}
+
+// Keep an explicitly supplied JSON null distinct from an omitted optional
+// field, so score_breakdown can reject it as malformed input.
+fn supplied_json_value<'de, D>(deserializer: D) -> Result<Option<serde_json::Value>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Ok(Some(serde_json::Value::deserialize(deserializer)?))
 }
 
 /// Validate payload request.
