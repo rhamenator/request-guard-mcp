@@ -266,7 +266,7 @@ See [docs/architecture.md](docs/architecture.md) for a full system diagram and c
 | `model_info` | Server and tool metadata |
 | `feedback` | Submit classification feedback |
 | `score_breakdown` | Detailed score breakdown |
-| `validate_payload` | Validate a tool payload |
+| `validate_payload` | Check a named tool's payload against its request shape; errors use root path `/`. Execution, feature flags, backend availability and business rules are not checked |
 | `feature_flags` | List feature flags |
 | `warmup` | Warm up caches |
 | `replay_decision` | Replay a past decision |

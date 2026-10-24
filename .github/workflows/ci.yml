@@ -132,6 +132,7 @@ jobs:
           toolchain: 1.99.1
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
       - run: cargo build --release --all-features
+      - run: python3 scripts/probe_validate_payload.py target/release/request-guard-mcp
       - run: python3 scripts/probe_sigterm_shutdown.py target/release/request-guard-mcp
       - run: python3 scripts/probe_accept_recovery.py target/release/request-guard-mcp
       - run: python3 scripts/probe_ws_non_reader.py target/release/request-guard-mcp
