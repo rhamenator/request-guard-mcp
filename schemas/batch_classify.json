@@ -7,14 +7,14 @@
     "items": {
       "type": "array",
       "items": { "$ref": "classify.json" },
-      "minItems": 1,
-      "maxItems": 200
+      "minItems": 0,
+      "description": "The server enforces a configurable maximum batch size (default 50)."
     },
     "options": {
       "type": "object",
       "properties": {
         "fail_fast": { "type": "boolean", "default": false },
-        "include_details": { "type": "boolean", "default": false }
+        "include_details": { "type": "boolean", "default": true, "description": "When false, omit per-item signal details; omitted preserves the full response." }
       }
     }
   }

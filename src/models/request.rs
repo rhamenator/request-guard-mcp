@@ -37,8 +37,13 @@ pub struct BatchClassifyRequest {
 pub struct BatchOptions {
     #[serde(default)]
     pub fail_fast: bool,
-    #[serde(default)]
+    // Preserve the historical detailed batch response when this option is omitted.
+    #[serde(default = "default_batch_include_details")]
     pub include_details: bool,
+}
+
+fn default_batch_include_details() -> bool {
+    true
 }
 
 /// Explain tool request.

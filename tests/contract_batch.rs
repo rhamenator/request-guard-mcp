@@ -85,3 +85,84 @@ async fn batch_result_indices_are_ordered() {
         assert_eq!(item.index, i);
     }
 }
+
+#[tokio::test]
+async fn batch_details_option_preserves_default_and_omits_signals_when_false() {
+    let state = make_state();
+    for (options, expect_signals) in [
+        (None, true),
+        (
+            Some(models::request::BatchOptions {
+                fail_fast: false,
+                include_details: true,
+            }),
+            true,
+        ),
+        (
+            Some(models::request::BatchOptions {
+                fail_fast: false,
+                include_details: false,
+            }),
+            false,
+        ),
+    ] {
+        let response = tools::batch_classify::run(
+            &state,
+            models::request::BatchClassifyRequest {
+                items: vec![make_req("GPTBot/1.0")],
+                options,
+            },
+        )
+        .await
+        .unwrap();
+        let result = response.results[0].result.as_ref().unwrap();
+        assert_eq!(!result.signals.is_empty(), expect_signals);
+        assert_eq!(result.verdict, models::enums::Verdict::Block);
+    }
+
+    let parsed: models::request::BatchClassifyRequest =
+        serde_json::from_value(serde_json::json!({"items": [], "options": {"fail_fast": false}}))
+            .unwrap();
+    assert!(parsed.options.unwrap().include_details);
+}
+
+#[tokio::test]
+async fn batch_partial_errors_and_fail_fast_are_explicit() {
+    let state = make_state();
+    let mut invalid = make_req("GPTBot/1.0");
+    invalid.tls_ja3 = Some("invalid".to_string());
+    let items = vec![make_req("GPTBot/1.0"), invalid, make_req("GPTBot/1.0")];
+
+    let response = tools::batch_classify::run(
+        &state,
+        models::request::BatchClassifyRequest {
+            items: items.clone(),
+            options: Some(models::request::BatchOptions {
+                fail_fast: false,
+                include_details: false,
+            }),
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        (response.total, response.processed, response.errors),
+        (3, 2, 1)
+    );
+    assert!(response.results[1].result.is_none());
+    assert!(response.results[1].error.is_some());
+    assert!(response.results[2].result.is_some());
+
+    let error = tools::batch_classify::run(
+        &state,
+        models::request::BatchClassifyRequest {
+            items,
+            options: Some(models::request::BatchOptions {
+                fail_fast: true,
+                include_details: true,
+            }),
+        },
+    )
+    .await;
+    assert!(matches!(error, Err(error::AppError::Validation(_))));
+}

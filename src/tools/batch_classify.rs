@@ -33,14 +33,23 @@ pub async fn run_scoped(
         .options
         .as_ref()
         .is_some_and(|options| options.fail_fast);
+    let include_details = req
+        .options
+        .as_ref()
+        .is_none_or(|options| options.include_details);
 
     for (i, item) in req.items.into_iter().enumerate() {
         match crate::tools::classify::run_scoped(state, item, caller_scope).await {
-            Ok(result) => results.push(BatchItemResult {
-                index: i,
-                result: Some(result),
-                error: None,
-            }),
+            Ok(mut result) => {
+                if !include_details {
+                    result.signals.clear();
+                }
+                results.push(BatchItemResult {
+                    index: i,
+                    result: Some(result),
+                    error: None,
+                });
+            }
             Err(error) => {
                 error_count += 1;
                 if fail_fast {

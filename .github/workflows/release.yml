@@ -205,6 +205,11 @@ jobs:
         run: |
           python scripts/probe_self_test_suite.py \
             "verified-release/request-guard-mcp-${RELEASE_VERSION}-${{ matrix.platform }}/request-guard-mcp${{ matrix.suffix }}"
+      - name: Check packaged batch details and errors
+        shell: bash
+        run: |
+          python scripts/probe_batch_details.py \
+            "verified-release/request-guard-mcp-${RELEASE_VERSION}-${{ matrix.platform }}/request-guard-mcp${{ matrix.suffix }}"
       - name: Verify packaged source and toolchain metadata
         shell: bash
         run: |
