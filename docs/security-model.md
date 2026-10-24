@@ -28,6 +28,11 @@ trust boundary.
 - PostgreSQL decision, replay, feedback, drift, and calibration records are
   partitioned by the authenticated caller scope. `CACHE_SCOPE_HMAC_KEY` is
   required with PostgreSQL so a caller's scope remains stable after restart.
+  Development main removes older feedback in the same transaction when the
+  same caller replaces a decision with changed stored replay inputs or
+  response under a reused request ID. An equivalent retry keeps feedback.
+  Published v0.1.5 does not clear old feedback on replacement, and upgrading
+  does not repair already stale labels automatically.
   Existing records created before this partitioning are retained in the
   database but are not exposed through caller-scoped tools; migrate or archive
   them offline before relying on historical reports.

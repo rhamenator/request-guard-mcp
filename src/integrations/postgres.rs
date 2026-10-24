@@ -62,6 +62,27 @@ fn replay_feature_snapshot(request: &ClassifyRequest) -> ClassifyRequest {
 pub struct PersistedDecision {
     pub request: ClassifyRequest,
     pub response: ClassifyResponse,
+    /// Exact stored JSON, retained to reject feedback if this row changes
+    /// between the tool's read and its locked insert.
+    pub request_payload: serde_json::Value,
+    pub response_payload: serde_json::Value,
+}
+
+fn responses_match(mut old: serde_json::Value, mut new: serde_json::Value) -> bool {
+    // PostgreSQL JSONB canonicalizes decimal numbers (for example,
+    // 0.9437499999999999 to 0.94375), and a retry has a new latency.
+    // All other response fields must still match for feedback to survive.
+    let score_matches = old["score"]
+        .as_f64()
+        .zip(new["score"].as_f64())
+        .is_some_and(|(a, b)| (a - b).abs() <= 1e-12);
+    for response in [&mut old, &mut new] {
+        if let Some(fields) = response.as_object_mut() {
+            fields.remove("score");
+            fields.remove("latency_ms");
+        }
+    }
+    score_matches && old == new
 }
 
 #[derive(Debug, Clone, Default)]
@@ -232,6 +253,34 @@ mod inner {
             let pool = self.pool()?;
             let request_payload = serde_json::to_value(replay_feature_snapshot(request))?;
             let response_payload = serde_json::to_value(response)?;
+            let decision_key = scoped_decision_key(caller_scope, &response.request_id);
+            let mut transaction = pool
+                .begin()
+                .await
+                .context("failed to begin classification decision update")?;
+            // Lock the logical key before looking for a row. A row lock alone
+            // cannot serialize two first inserts: both could see no row, then
+            // the second upsert could replace the first without clearing its
+            // newly submitted feedback.
+            sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))")
+                .bind(&decision_key)
+                .execute(&mut *transaction)
+                .await
+                .context("failed to lock classification decision key")?;
+            let previous = sqlx::query(
+                "SELECT request_payload, response_payload FROM mcp_decisions WHERE request_id = $1 AND caller_scope = $2 FOR UPDATE",
+            )
+            .bind(&decision_key)
+            .bind(caller_scope)
+            .fetch_optional(&mut *transaction)
+            .await
+            .context("failed to inspect existing classification decision")?;
+            let replaces_distinct_decision = previous.is_some_and(|row| {
+                let old_request: Value = row.get("request_payload");
+                let old_response: Value = row.get("response_payload");
+                old_request != request_payload
+                    || !responses_match(old_response, response_payload.clone())
+            });
             sqlx::query(
                 r#"
                 INSERT INTO mcp_decisions
@@ -246,15 +295,30 @@ mod inner {
                     created_at = EXCLUDED.created_at
                 "#,
             )
-            .bind(scoped_decision_key(caller_scope, &response.request_id))
+            .bind(&decision_key)
             .bind(caller_scope)
             .bind(request_payload)
             .bind(response_payload)
             .bind(response.verdict.to_string())
             .bind(response.score)
-            .execute(pool)
+            .execute(&mut *transaction)
             .await
             .context("failed to persist classification decision")?;
+            if replaces_distinct_decision {
+                // A changed decision invalidates old labels; an identical
+                // retry does not. The row lock also orders concurrent feedback
+                // inserts against this replacement.
+                sqlx::query("DELETE FROM mcp_feedback WHERE request_id = $1 AND caller_scope = $2")
+                    .bind(&decision_key)
+                    .bind(caller_scope)
+                    .execute(&mut *transaction)
+                    .await
+                    .context("failed to clear feedback for replaced decision")?;
+            }
+            transaction
+                .commit()
+                .await
+                .context("failed to commit classification decision update")?;
             Ok(())
         }
 
@@ -273,11 +337,13 @@ mod inner {
             .await
             .context("failed to load persisted decision")?;
             row.map(|row| {
-                let request: Value = row.try_get("request_payload")?;
-                let response: Value = row.try_get("response_payload")?;
+                let request_payload: Value = row.try_get("request_payload")?;
+                let response_payload: Value = row.try_get("response_payload")?;
                 Ok(PersistedDecision {
-                    request: serde_json::from_value(request)?,
-                    response: serde_json::from_value(response)?,
+                    request: serde_json::from_value(request_payload.clone())?,
+                    response: serde_json::from_value(response_payload.clone())?,
+                    request_payload,
+                    response_payload,
                 })
             })
             .transpose()
@@ -290,19 +356,31 @@ mod inner {
             correct_verdict: &str,
             notes: Option<&str>,
             reporter: Option<&str>,
-        ) -> Result<String> {
+            expected: &PersistedDecision,
+        ) -> Result<Option<String>> {
             let pool = self.pool()?;
             let decision_key = scoped_decision_key(caller_scope, request_id);
-            let exists: bool = sqlx::query_scalar(
-                "SELECT EXISTS(SELECT 1 FROM mcp_decisions WHERE request_id = $1 AND caller_scope = $2)",
+            let mut transaction = pool
+                .begin()
+                .await
+                .context("failed to begin classification feedback update")?;
+            let current = sqlx::query(
+                "SELECT request_payload, response_payload FROM mcp_decisions WHERE request_id = $1 AND caller_scope = $2 FOR UPDATE",
             )
             .bind(&decision_key)
             .bind(caller_scope)
-            .fetch_one(pool)
+            .fetch_optional(&mut *transaction)
             .await
-            .context("failed to verify feedback request id")?;
-            if !exists {
-                return Err(anyhow!("classification request id was not found"));
+            .context("failed to lock feedback decision")?;
+            let Some(current) = current else {
+                return Ok(None);
+            };
+            let request_payload: Value = current.try_get("request_payload")?;
+            let response_payload: Value = current.try_get("response_payload")?;
+            if request_payload != expected.request_payload
+                || !responses_match(response_payload, expected.response_payload.clone())
+            {
+                return Ok(None);
             }
             let feedback_id = Uuid::new_v4().to_string();
             sqlx::query(
@@ -318,10 +396,14 @@ mod inner {
             .bind(correct_verdict)
             .bind(notes)
             .bind(reporter)
-            .execute(pool)
+            .execute(&mut *transaction)
             .await
             .context("failed to persist classification feedback")?;
-            Ok(feedback_id)
+            transaction
+                .commit()
+                .await
+                .context("failed to commit classification feedback update")?;
+            Ok(Some(feedback_id))
         }
 
         pub async fn drift_summary(
@@ -513,7 +595,8 @@ mod inner {
             _correct_verdict: &str,
             _notes: Option<&str>,
             _reporter: Option<&str>,
-        ) -> Result<String> {
+            _expected: &PersistedDecision,
+        ) -> Result<Option<String>> {
             Err(anyhow!("PostgreSQL integration feature is disabled"))
         }
         pub async fn drift_summary(
