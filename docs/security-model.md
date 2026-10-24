@@ -57,6 +57,18 @@ trust boundary.
   rows; a reviewed, one-time operator migration is available at
   `scripts/postgres_minimize_legacy.sql`.
   Published v0.1.5 still stores full classification requests.
+- Optional Redis supports plaintext `redis://` only in published v0.1.5 and
+  development main; `rediss://` fails startup. Keep Redis on a trusted isolated
+  link or an independently secured loopback tunnel, or leave it unconfigured.
+  A Redis password does not encrypt the connection. In both published v0.1.5
+  and development main, canary registry records and the event list have no
+  automatic time-based expiry; the list is capped at 10,000 events by count. A
+  matched `canary_eval` can store caller-provided context whose JSON encoding
+  is at most 4096 bytes, unredacted in a shared event and without
+  PostgreSQL's caller scope.
+  Operators must define Redis retention and purge; cache and queue TTLs do
+  not expire canary records. Do not submit secrets or unnecessary personal
+  data as canary context.
 
 ## Transport Security
 
