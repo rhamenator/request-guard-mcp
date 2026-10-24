@@ -1,0 +1,51 @@
+# Sanitized operator transcription of terminal results, not a runner attestation.
+# Exact private candidate: f2b7b8e4148bf75658221b5ae757349696a87127
+# Host exact-manifest verifier, over five archives and five SHA256 sidecars:
+Verified exact five native archives and five SHA256 sidecars
+# Ubuntu guest sha256sum before extraction:
+1b9f1229c6c133dfbfa64994f406213fd3f8456f23fb3ea10ef5389002d46773  request-guard-mcp-v1.0.0-rc.26-linux-x64.tar.gz
+# The three guest launch scripts all executed the extracted
+# ./request-guard-mcp-v1.0.0-rc.26-linux-x64/request-guard-mcp binary.
+# Kali core transcript literal-bearer check before copy:
+TOKEN_ABSENT
+# Kali -> Ubuntu PostgreSQL: remote adversarial_postgres_probe.py, same synthetic request ID.
+{"stage": "healthy", "tool": "classify", "pass": true, "http": 200, "error_code": null}
+{"stage": "healthy", "tool": "replay_decision", "pass": true, "http": 200, "error_code": null}
+{"stage": "healthy", "tool": "ping", "pass": true, "http": 200, "error_code": null}
+{"passed": 3, "total": 3}
+{"stage": "outage", "tool": "classify", "pass": true, "http": 200, "error_code": -502}
+{"stage": "outage", "tool": "replay_decision", "pass": true, "http": 200, "error_code": -502}
+{"stage": "outage", "tool": "ping", "pass": true, "http": 200, "error_code": null}
+{"passed": 3, "total": 3}
+{"stage": "healthy", "tool": "classify", "pass": true, "http": 200, "error_code": null}
+{"stage": "healthy", "tool": "replay_decision", "pass": true, "http": 200, "error_code": null}
+{"stage": "healthy", "tool": "ping", "pass": true, "http": 200, "error_code": null}
+{"passed": 3, "total": 3}
+# Kali -> Ubuntu Redis: remote adversarial_redis_recovery_probe.py,
+# synthetic domain rc26.example.test; the record was reseeded after restart.
+{"stage": "healthy", "tool": "threat_lookup", "pass": true, "http": 200, "error_code": null}
+{"stage": "healthy", "tool": "classify", "pass": true, "http": 200, "error_code": null}
+{"passed": 2, "total": 2}
+{"stage": "outage", "tool": "threat_lookup", "pass": true, "http": 200, "error_code": -502}
+{"stage": "outage", "tool": "classify", "pass": true, "http": 200, "error_code": null}
+{"passed": 2, "total": 2}
+{"stage": "healthy", "tool": "threat_lookup", "pass": true, "http": 200, "error_code": null}
+{"stage": "healthy", "tool": "classify", "pass": true, "http": 200, "error_code": null}
+{"passed": 2, "total": 2}
+# Host-side pinned-Alpine smoke_alpine_postgres_tls.py on extracted musl binary:
+# binary SHA256 518120cf172d63610d721f4399f1e9a0cb04adde61fa7a15f06bc444102c27cf
+PASS Alpine PostgreSQL TLS: explicit CA, untrusted CA, hostname, OS store, private logs
+# Guest log check before shutdown: grep -Fq with bearer, HMAC key and indicator.
+10290 base.log
+ 1961 pg.log
+ 1835 redis-mcp.log
+14086 total
+SYNTHETIC_MARKERS_ABSENT
+# Guest version and cleanup observations:
+Redis server v=8.0.5 sha=00000000:0 malloc=jemalloc-5.3.0 bits=64 build=d47fc40702b1fad8
+18 main 5432 online postgres
+shut off  # copperfin-kali-full
+shut off  # copperfin-ubuntu26-deb
+# The disposable database drop, Redis shutdown, guest-file deletion and
+# bearer/HMAC removal returned success without a transcript of file listing.
+# Docker had no running containers; pre-existing VFP9 guest was untouched.
