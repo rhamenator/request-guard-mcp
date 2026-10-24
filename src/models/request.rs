@@ -1,4 +1,4 @@
-use serde::{Deserialize, Serialize};
+use serde::{de::Error, Deserialize, Deserializer, Serialize};
 use std::collections::HashMap;
 
 /// Primary classification request.
@@ -176,5 +176,37 @@ pub struct ConfigSnapshotRequest {
 /// Self-test request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SelfTestRequest {
+    #[serde(default, deserialize_with = "deserialize_self_test_suite")]
     pub suite: Option<String>,
+}
+
+fn deserialize_self_test_suite<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let suite = String::deserialize(deserializer)?;
+    if suite != "all" {
+        return Err(D::Error::custom("unsupported self_test suite"));
+    }
+    Ok(Some(suite))
+}
+
+#[cfg(test)]
+mod self_test_suite_tests {
+    use super::SelfTestRequest;
+
+    #[test]
+    fn only_all_or_omitted_suite_is_accepted() {
+        for input in [r"{}", r#"{"suite":"all"}"#] {
+            assert!(serde_json::from_str::<SelfTestRequest>(input).is_ok());
+        }
+        for input in [
+            r#"{"suite":"unknown"}"#,
+            r#"{"suite":""}"#,
+            r#"{"suite":null}"#,
+            r#"{"suite":1}"#,
+        ] {
+            assert!(serde_json::from_str::<SelfTestRequest>(input).is_err());
+        }
+    }
 }

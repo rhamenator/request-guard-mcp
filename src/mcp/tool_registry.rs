@@ -174,7 +174,10 @@ fn tool_input_schema(name: &str) -> Value {
             serde_json::json!({"redact_secrets":{"type":"boolean","const":true,"description":"Only redacted snapshots are available through MCP"}}),
             vec![],
         ),
-        "self_test" => (serde_json::json!({"suite":{"type":"string"}}), vec![]),
+        "self_test" => (
+            serde_json::json!({"suite":{"type":"string","enum":["all"]}}),
+            vec![],
+        ),
         _ => (serde_json::json!({}), vec![]),
     };
     serde_json::json!({

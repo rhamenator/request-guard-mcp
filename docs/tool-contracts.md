@@ -143,6 +143,8 @@ Snapshot of current running configuration (secrets redacted by default).
 ### `self_test`
 Run the built-in test suite.
 **Request**: `{ "suite": "all" }`
+The `suite` field may be omitted; `all` is the only supported value. An
+unsupported suite is rejected instead of returning a passing result.
 
 ## Security Tools
 
