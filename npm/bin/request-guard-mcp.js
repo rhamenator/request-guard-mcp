@@ -32,7 +32,10 @@ if (!target) {
 const binary = path.join(__dirname, "..", "vendor", target[0], target[1]);
 const child = spawn(binary, process.argv.slice(2), { stdio: "inherit", env: process.env });
 let spawnFailed = false;
-for (const signal of ["SIGINT", "SIGTERM"]) {
+const forwardedSignals = process.platform === "win32"
+  ? ["SIGINT", "SIGTERM"]
+  : ["SIGINT", "SIGTERM", "SIGHUP"];
+for (const signal of forwardedSignals) {
   process.on(signal, () => child.kill(signal));
 }
 child.on("error", (error) => {
