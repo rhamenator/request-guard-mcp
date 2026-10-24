@@ -269,7 +269,7 @@ See [docs/architecture.md](docs/architecture.md) for a full system diagram and c
 | `feature_flags` | List feature flags |
 | `warmup` | Warm up caches |
 | `replay_decision` | Replay a past decision |
-| `redact_preview` | Preview field redaction |
+| `redact_preview` | Preview case-insensitive, exact JSON key redaction. Development main lists only keys actually replaced in `fields_redacted`; published v0.1.5 can misreport this list. Custom `fields` replace the defaults; text inside string values is not parsed. |
 | `enrich_ip` | IP geolocation/ASN enrichment |
 | `enrich_asn` | ASN organization enrichment |
 | `enrich_ua` | User-agent parsing |
