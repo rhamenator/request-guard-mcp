@@ -270,15 +270,14 @@ jobs:
             [[ -n "$tag" ]] && tags+=(--tag "$tag")
           done <<< "$TAGS"
           (( ${#tags[@]} > 0 ))
+          # Validate the exact proposed index before moving any public tag.
+          docker buildx imagetools create --dry-run "${sources[@]}" > proposed-index.json
+          python3 scripts/verify_container_index.py proposed-index.json
           docker buildx imagetools create --metadata-file manifest.json "${tags[@]}" "${sources[@]}"
           manifest_digest="$(jq -r '."containerimage.descriptor".digest' manifest.json)"
           [[ "$manifest_digest" =~ ^sha256:[0-9a-f]{64}$ ]]
-          docker buildx imagetools inspect --raw "$image@$manifest_digest" | jq -e '
-            . as $index |
-            ([$index.manifests[] | select(.platform.os == "linux") | .platform.architecture] | sort) == ["amd64", "arm64"] and
-            ([$index.manifests[] | select(.annotations."vnd.docker.reference.type" == "attestation-manifest") | .annotations."vnd.docker.reference.digest"] | sort) ==
-            ([$index.manifests[] | select(.platform.os == "linux") | .digest] | sort)
-          ' >/dev/null
+          docker buildx imagetools inspect --raw "$image@$manifest_digest" > published-index.json
+          python3 scripts/verify_container_index.py published-index.json
           for tag in "${tags[@]}"; do
             if [[ "$tag" == --tag ]]; then continue; fi
             actual="$(docker buildx imagetools inspect "$tag" --format '{{json .Manifest}}' | jq -r '.digest')"

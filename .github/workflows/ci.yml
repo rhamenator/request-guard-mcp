@@ -25,6 +25,7 @@ jobs:
       - run: python3 scripts/test_package_npm.py
       - run: python3 scripts/verify_inspector_fixture.py
       - run: python3 scripts/test_main_container_publish.py
+      - run: python3 scripts/test_verify_container_index.py
       - run: python3 scripts/test_verify_release_manifest.py
       - run: python3 scripts/test_release_approval_policy.py
       - run: python3 scripts/test_package_release_docs.py
