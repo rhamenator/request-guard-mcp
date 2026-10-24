@@ -30,16 +30,6 @@ def healthy(port):
         return False
 
 
-def listener_closed(port):
-    try:
-        with socket.create_connection(("127.0.0.1", port), timeout=1.0):
-            return False
-    except ConnectionRefusedError:
-        return True
-    except OSError:
-        return False
-
-
 def posix_identity(pid):
     result = subprocess.run(["ps", "-p", str(pid), "-o", "lstart=", "-o", "stat="],
                             capture_output=True, text=True, check=False)
@@ -147,17 +137,23 @@ def main():
             wrapper.kill()
             wrapper.wait(timeout=2)
             exit_deadline = time.monotonic() + 15
+            child_exited = False
+            health_still_served = True
             while time.monotonic() < exit_deadline:
                 if sys.platform == "win32":
                     child_exited = not handle.running()
                 else:
                     current = posix_identity(child_pid)
                     child_exited = current is None or current[0] != identity[0] or current[1].startswith("Z")
-                if child_exited and listener_closed(port):
+                health_still_served = healthy(port)
+                if child_exited and not health_still_served:
                     break
                 time.sleep(0.05)
             else:
-                raise AssertionError("native child or HTTP listener survived wrapper forced kill")
+                raise AssertionError(
+                    "native child or HTTP listener survived wrapper forced kill: "
+                    f"child_exited={child_exited}, health_still_served={health_still_served}"
+                )
             print(f"PASS packaged npm parent pipe on {sys.platform}: native child/listener exited")
         finally:
             if wrapper.poll() is None:
