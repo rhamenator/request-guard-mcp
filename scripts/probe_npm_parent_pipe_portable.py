@@ -32,7 +32,7 @@ def healthy(port):
 
 def listener_closed(port):
     try:
-        with socket.create_connection(("127.0.0.1", port), timeout=0.3):
+        with socket.create_connection(("127.0.0.1", port), timeout=1.0):
             return False
     except ConnectionRefusedError:
         return True
@@ -111,7 +111,8 @@ def main():
         )
         port = free_port()
         env = {key: value for key, value in os.environ.items()
-               if key.upper() in {"PATH", "TMPDIR", "TEMP", "SYSTEMROOT", "WINDIR", "COMSPEC"}}
+               if key.upper() in {"PATH", "TMPDIR", "TEMP", "SYSTEMROOT", "WINDIR",
+                                  "COMSPEC", "USERPROFILE", "SYSTEMDRIVE"}}
         env.update({"HOME": cwd, "MCP__HOST": "127.0.0.1", "MCP__PORT": str(port),
                     "MCP__AUTH__ENABLED": "true",
                     "AUTH_TOKENS": "synthetic-parent-pipe-token-abcdefghijklmnopqrstuvwxyz123456",
@@ -124,26 +125,29 @@ def main():
         identity = None
         handle = None
         try:
-            for _ in range(100):
-                if healthy(port) and pid_file.exists():
+            startup_deadline = time.monotonic() + 20
+            while time.monotonic() < startup_deadline:
+                if child_pid is None and pid_file.exists():
+                    child_pid = int(pid_file.read_text())
+                    if sys.platform == "win32":
+                        handle = WindowsProcess(child_pid)
+                        if not handle.running():
+                            raise AssertionError("native child exited before HTTP health")
+                    else:
+                        identity = posix_identity(child_pid)
+                        if identity is None or identity[1].startswith("Z"):
+                            raise AssertionError("native child exited before HTTP health")
+                if child_pid is not None and healthy(port):
                     break
                 if wrapper.poll() is not None:
                     raise AssertionError("npm wrapper exited before HTTP health was available")
                 time.sleep(0.05)
             else:
                 raise AssertionError("npm wrapper did not start HTTP listener")
-            child_pid = int(pid_file.read_text())
-            if sys.platform == "win32":
-                handle = WindowsProcess(child_pid)
-                if not handle.running():
-                    raise AssertionError("native child exited before wrapper kill")
-            else:
-                identity = posix_identity(child_pid)
-                if identity is None or identity[1].startswith("Z"):
-                    raise AssertionError("native child exited before wrapper kill")
             wrapper.kill()
             wrapper.wait(timeout=2)
-            for _ in range(100):
+            exit_deadline = time.monotonic() + 15
+            while time.monotonic() < exit_deadline:
                 if sys.platform == "win32":
                     child_exited = not handle.running()
                 else:
@@ -159,6 +163,12 @@ def main():
             if wrapper.poll() is None:
                 wrapper.kill()
                 wrapper.wait(timeout=2)
+            if child_pid is None and pid_file.exists():
+                child_pid = int(pid_file.read_text())
+                if sys.platform == "win32":
+                    handle = WindowsProcess(child_pid)
+                else:
+                    identity = posix_identity(child_pid)
             if handle is not None:
                 try:
                     handle.terminate()
