@@ -10,7 +10,7 @@
 
 A **Rust MCP (Model Context Protocol) server** for request risk classification, enrichment, and abuse-signal analysis. The official MCP Inspector can call its tools over HTTP POST; custom WebSocket clients can use the JSON-RPC endpoint. Client support depends on transport and authentication compatibility. The `ai-scraping-defense` projects are optional clients. Stable release readiness is subject to the [adversarial release gate](docs/adversarial-release-gate.md).
 
-The experimental [v0.1.5 native release](https://github.com/rhamenator/request-guard-mcp/releases/tag/v0.1.5) includes checksum-protected binaries for Linux x64 (glibc and musl/Alpine), Windows x64, macOS Intel, and macOS Apple Silicon. Follow [INSTALL.md](INSTALL.md) for native setup. The matching [npm package](https://www.npmjs.com/package/request-guard-mcp/v/0.1.5) is also published; see the [npm guide](docs/npm-release.md#install-and-connect). v0.1.4 does not contain stdio.
+The experimental [v0.1.5 native release](https://github.com/rhamenator/request-guard-mcp/releases/tag/v0.1.5) includes checksum-protected binaries for Linux x64 (glibc and musl/Alpine), Windows x64, macOS Intel, and macOS Apple Silicon. Follow the [v0.1.5 INSTALL.md](https://github.com/rhamenator/request-guard-mcp/blob/v0.1.5/INSTALL.md) for that release's native setup; the main-branch instructions describe later development changes. The matching [npm package](https://www.npmjs.com/package/request-guard-mcp/v/0.1.5) is also published; see the [npm guide](docs/npm-release.md#install-and-connect). v0.1.4 does not contain stdio.
 
 The v0.1.5 release retains the Linux x64 musl archive for Alpine and the [PostgreSQL TLS behavior qualified for v0.1.4](docs/releases/v0.1.4-postgres-tls-evidence.md). Choose `linux-x64-musl` on Alpine and `linux-x64` on glibc hosts.
 
@@ -154,7 +154,7 @@ explicit handler deadline. Restrict these endpoints at the proxy.
 
 ## Client Configuration
 
-Use these variables from any MCP-capable client that supports `MODEL_URI`-style provider routing:
+For optional `ai-scraping-defense` clients that support `MODEL_URI`-style provider routing, use these client-specific variables:
 
 ```dotenv
 MODEL_URI=mcp://primary/classify
@@ -172,7 +172,7 @@ or allow only trusted monitoring sources.
 
 For clients already configured with the previous `ai-scraping-defense-mcp` hostname, Docker Compose and Kubernetes manifests include an optional legacy DNS alias/service that points to the same server.
 
-See [docs/compatibility-matrix.md](docs/compatibility-matrix.md) for full details.
+Other MCP clients should use HTTP POST, or stdio with v0.1.5 and later, rather than assume these provider-routing variables are understood. WebSocket is for compatible custom JSON-RPC clients. See [docs/compatibility-matrix.md](docs/compatibility-matrix.md) for tested clients and transport limits.
 Trusted TLS producers must also follow [the attestation contract](docs/tls-fingerprint-attestation.md).
 
 For a clean client check against an installed binary, run
@@ -190,7 +190,7 @@ tested results and current protocol limits.
 
 The v0.1.5 GitHub release includes checksum-protected native bundles for Linux x64 glibc and musl,
 Windows x64, macOS Intel, and macOS Apple Silicon. Download the archive for your
-platform and follow the bundled [INSTALL.md](INSTALL.md) for checksum verification,
+platform and follow its bundled INSTALL.md for checksum verification,
 token setup, startup, and MCP client connection. A container
 image is also published to `ghcr.io/rhamenator/request-guard-mcp`. For a
 long-running service deployment, use the container deployment examples. Package the
@@ -238,8 +238,10 @@ kubectl apply -f deploy/k8s/secret.yaml
 make k8s-apply
 ```
 
-The Kubernetes example pins the published v0.1.4 image and matching version
-labels. The verified multiarch image index is
+The Kubernetes example pins the historical published v0.1.4 image and matching
+version labels. It does not include v0.1.5 changes. For a newer release, review
+and update the image digest, version labels, configuration, and instructions as
+one deployment change. The verified v0.1.4 multiarch image index is
 `sha256:a553eb4f25ee7eebdf67ad4d7df5be1c0d9b337e78274eb93565137134df90f7`.
 
 Replace **every** example Secret value before deployment. Development main
