@@ -292,7 +292,7 @@ See [docs/architecture.md](docs/architecture.md) for a full system diagram and c
 | `abuse_pattern_match` | Heuristic abuse pattern detection. Development main accepts the optional categories `injection`, `traversal`, `ai_attack`, `data_extraction` without regard to ASCII case and rejects unknown categories; published v0.1.5 can return a false-clean result for an unknown category or multiline SQL text. This tool does not enforce a blocking policy. |
 | `drift_report` | Score drift over time |
 | `calibration_report` | Precision/recall report |
-| `queue_status` | Processing queue status |
+| `queue_status` | Best-effort Redis tool-operation telemetry, not a backlog. `depth` counts observed active records, which can lag or remain stale; `consumers` is the configured global concurrency ceiling, not live workers or free permits. A requested name with no records returns zero activity, which does not prove the queue exists or is healthy. Published v0.1.5 advertises this tool as queue status but uses the same field semantics. |
 | `config_snapshot` | Running config snapshot |
 | `self_test` | Built-in test suite |
 

@@ -678,7 +678,7 @@ impl McpTool for QueueStatusTool {
         "queue_status"
     }
     fn description(&self) -> &str {
-        "Status of processing queues"
+        "Best-effort Redis tool-operation telemetry; depth counts active records, not queued work"
     }
     async fn call(&self, state: Arc<AppState>, params: Option<Value>) -> Result<Value, AppError> {
         let req = params

@@ -115,7 +115,16 @@ Precision/recall calibration report.
 and false-negative rates computed from the latest feedback per decision.
 
 ### `queue_status`
-Status of processing queues.
+Best-effort Redis tool-operation telemetry. With no `queue` argument, the
+response lists names observed in Redis active-operation records. With a name,
+the response includes that name even when Redis has no matching record;
+zero activity does not establish that the queue exists or is healthy.
+`depth` counts observed active-operation records, not waiting work; timed-out
+records can remain active until Redis trim or expiry. `consumers`
+is the configured global concurrency ceiling, not a live worker count or the
+number of free permits. `rate_per_second` is completions in the last minute
+divided by 60. Redis bookkeeping can lag or omit a record during outages;
+these fields are not an audit trail or an ingress saturation signal.
 
 ### `config_snapshot`
 Snapshot of current running configuration (secrets redacted by default).

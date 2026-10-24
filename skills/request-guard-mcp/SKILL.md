@@ -36,6 +36,10 @@ Development main bounds best-effort Redis operation records to 500 ms each;
 published v0.1.5 can wait longer when configured Redis stalls. A timed-out
 record may be absent from `queue_status` or show as active until Redis
 trim/expiry; Redis-dependent tools still need a healthy backend.
+`queue_status` is best-effort operation telemetry: `depth` counts observed
+in-flight tools rather than waiting work, and `consumers` is the configured
+global concurrency ceiling rather than free workers. A zero result for a
+requested name does not prove that name exists or that ingress is healthy.
 Development main also bounds concurrent Redis/PostgreSQL pings on the unauthenticated
 `/health` and `/ready` endpoints to one second per request. A stalled backend
 makes `/health` return HTTP 200 with an unhealthy JSON status, and `/ready` return HTTP 503.
