@@ -1,6 +1,11 @@
 use serde::{de::Error, Deserialize, Deserializer, Serialize};
 use std::collections::HashMap;
 
+/// Request shape for tools with no arguments.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EmptyToolRequest {}
+
 /// Primary classification request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]

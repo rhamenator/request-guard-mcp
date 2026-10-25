@@ -209,7 +209,12 @@ impl McpTool for HealthTool {
     fn description(&self) -> &str {
         "Server health check"
     }
-    async fn call(&self, state: Arc<AppState>, _params: Option<Value>) -> Result<Value, AppError> {
+    async fn call(&self, state: Arc<AppState>, params: Option<Value>) -> Result<Value, AppError> {
+        let _: crate::models::request::EmptyToolRequest = params
+            .map(serde_json::from_value)
+            .transpose()
+            .map_err(|error: serde_json::Error| AppError::InvalidRequest(error.to_string()))?
+            .unwrap_or_default();
         let result = crate::tools::health::run(&state).await;
         serde_json::to_value(result).map_err(AppError::from)
     }
@@ -225,7 +230,12 @@ impl McpTool for ModelInfoTool {
     fn description(&self) -> &str {
         "Model and server metadata"
     }
-    async fn call(&self, state: Arc<AppState>, _params: Option<Value>) -> Result<Value, AppError> {
+    async fn call(&self, state: Arc<AppState>, params: Option<Value>) -> Result<Value, AppError> {
+        let _: crate::models::request::EmptyToolRequest = params
+            .map(serde_json::from_value)
+            .transpose()
+            .map_err(|error: serde_json::Error| AppError::InvalidRequest(error.to_string()))?
+            .unwrap_or_default();
         let result = crate::tools::model_info::run(&state).await;
         serde_json::to_value(result).map_err(AppError::from)
     }
