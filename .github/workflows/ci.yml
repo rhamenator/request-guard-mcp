@@ -152,6 +152,7 @@ jobs:
       - run: python3 scripts/probe_sensitive_path_boundaries.py target/release/request-guard-mcp
       - run: python3 scripts/probe_classify_unknown_fields.py target/release/request-guard-mcp
       - run: python3 scripts/probe_reporting_input_fields.py target/release/request-guard-mcp
+      - run: python3 scripts/probe_secondary_input_fields.py target/release/request-guard-mcp
       - run: python3 scripts/probe_explain_consistency.py target/release/request-guard-mcp
       - run: python3 scripts/probe_explain_format.py target/release/request-guard-mcp
       - run: python3 scripts/probe_threat_lookup_shape.py target/release/request-guard-mcp
