@@ -294,7 +294,7 @@ See [docs/architecture.md](docs/architecture.md) for a full system diagram and c
 | `feature_flags` | List startup feature flags; development main rejects unknown flag names; use `/ready` for live backend readiness. |
 | `warmup` | Best-effort synthetic classify/local-cache warmup, not a Redis health check; development main rejects unsupported targets. |
 | `replay_decision` | Replay a past decision |
-| `redact_preview` | Preview case-insensitive, exact JSON key redaction. Development main lists only keys actually replaced in `fields_redacted`; published v0.1.5 can misreport this list. Custom `fields` replace the defaults; text inside string values is not parsed. |
+| `redact_preview` | Preview case-insensitive, exact JSON key redaction. Development main lists only keys actually replaced in `fields_redacted` and rejects misspelled request fields; published v0.1.5 can misreport this list. Custom `fields` replace the defaults; text inside string values is not parsed. |
 | `enrich_ip` | IP geolocation/ASN enrichment; development main looks up IPv4-mapped IPv6 under its IPv4 key and treats IPv6 unique-local/link-local as local addresses. Published v0.1.5 does not include this correction. |
 | `enrich_asn` | ASN organization enrichment |
 | `enrich_ua` | User-agent parsing |

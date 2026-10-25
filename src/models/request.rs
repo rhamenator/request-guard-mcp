@@ -106,6 +106,7 @@ pub struct ReplayRequest {
 
 /// Redact preview request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct RedactPreviewRequest {
     pub payload: serde_json::Value,
     pub fields: Option<Vec<String>>,
