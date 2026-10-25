@@ -20,7 +20,7 @@ To package the skill for a directory listing, run `python3 scripts/package_skill
 
 ## Features
 
-- **23 implemented MCP tool contracts** with truthful, backend-aware availability in `model_info`
+- **23 implemented MCP tool contracts** with configured startup capability in `model_info`; use `health` or `/ready` for live backend status
 - **Path reconnaissance signals** inspect raw and up to four rounds of percent-encoded spellings, including `/internal` and `/xmlrpc.php`, without rewriting the original request or deciding origin routing
 - **Scanner user-agent signals** recognize common tool names such as masscan, Nikto, sqlmap, and HttpClient as heuristics; a user agent is self-declared and never proves identity
 - **WebSocket and HTTP POST transports** for implemented MCP methods; see the [current protocol limits](docs/inspector-interoperability.md#current-client-limits)
@@ -287,7 +287,7 @@ See [docs/architecture.md](docs/architecture.md) for a full system diagram and c
 | `explain` | Explain a classification decision |
 | `batch_classify` | Classify multiple requests. On development main, `options.include_details: false` omits per-item signal details; omitted or `true` preserves the full result. Check `errors` and each item error when `fail_fast` is false. Published v0.1.5 accepts but ignores `include_details`. |
 | `health` | Server health check; on development main, `uptime_seconds` counts from server state initialization, including time before the first health call. Published v0.1.5 may begin counting at the first health call. |
-| `model_info` | Server and tool metadata |
+| `model_info` | Server and tool metadata; `enabled` reflects configured startup capability, not live backend health. Check `health` or `/ready` before relying on a backend. |
 | `feedback` | Submit classification feedback |
 | `score_breakdown` | Diagnostic rule-engine score for optional `signals` containing an inbound classification request metadata object, such as `{"user_agent":"GPTBot/1.0","path":"/"}`. Development main rejects an unknown field, raw signal list, or wrong field type instead of reporting a clean zero; published v0.1.5 can return zero for malformed supplied `signals`. This diagnostic is not a persisted verdict and does not verify a caller-supplied TLS fingerprint. |
 | `validate_payload` | Check a named tool's payload against its request shape; development main also checks supported `feature_flags.flag` and `warmup.target` names. Errors use root path `/`. Execution, feature enablement, backend availability and other business rules are not checked. |
