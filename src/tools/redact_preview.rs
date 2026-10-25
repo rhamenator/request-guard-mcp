@@ -102,4 +102,13 @@ mod tests {
         assert_eq!(result.fields_redacted, vec!["token"]);
         assert_eq!(result.redacted["token"], "[REDACTED]");
     }
+
+    #[test]
+    fn rejects_misspelled_custom_fields() {
+        let request = serde_json::from_value::<RedactPreviewRequest>(json!({
+            "payload": {"access_token": "synthetic"},
+            "field": ["access_token"]
+        }));
+        assert!(request.is_err());
+    }
 }

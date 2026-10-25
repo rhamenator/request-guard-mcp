@@ -214,3 +214,4 @@ Replay a prior decision deterministically.
 ### `redact_preview`
 Preview redaction of sensitive fields.
 **Request**: `{ "payload": {...}, "fields": ["authorization", "cookie"] }`
+On development main, unknown request fields are rejected. Custom `fields` replace the defaults; the tool matches whole JSON keys and does not scan string values. Inspect the returned payload before sharing it.
