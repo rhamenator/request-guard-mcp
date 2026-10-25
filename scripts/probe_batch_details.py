@@ -40,6 +40,13 @@ def main():
         requests.append({"jsonrpc": "2.0", "id": request_id,
                          "method": "tools/call", "params": {
                              "name": "batch_classify", "arguments": arguments}})
+    requests.append({"jsonrpc": "2.0", "id": 10,
+                     "method": "tools/call", "params": {
+                         "name": "validate_payload", "arguments": {
+                             "tool": "batch_classify",
+                             "payload": {"items": [item], "options": {
+                                 "include_detail_RG_SYNTHETIC_SECRET_315": False}},
+                         }}})
     essentials = {"PATH", "SYSTEMROOT", "WINDIR", "TEMP", "TMPDIR", "USERPROFILE"}
     env = {key: value for key, value in os.environ.items()
            if key.upper() in essentials}
@@ -57,7 +64,7 @@ def main():
     if result.returncode != 0:
         raise AssertionError(f"stdio child exited {result.returncode}")
     responses = [json.loads(line) for line in result.stdout.splitlines()]
-    if [response.get("id") for response in responses] != list(range(1, 10)):
+    if [response.get("id") for response in responses] != list(range(1, 11)):
         raise AssertionError("unexpected stdio response count/order")
     if responses[0].get("result", {}).get("protocolVersion") != "2025-06-18":
         raise AssertionError("initialize failed")
@@ -88,10 +95,12 @@ def main():
         raise AssertionError("partial batch error/result positions are wrong")
     if responses[6].get("error", {}).get("code") != -400:
         raise AssertionError("fail_fast did not reject the failing item")
-    for response in responses[7:]:
+    for response in responses[7:9]:
         if (response.get("error", {}).get("code") != -400
                 or response.get("error", {}).get("message") != "INVALID_REQUEST"):
             raise AssertionError("unknown batch option was not rejected")
+    if responses[9]["result"]["structuredContent"]["valid"] is not False:
+        raise AssertionError("validate_payload accepted unknown batch option")
     if b"RG_SYNTHETIC_SECRET_315" in result.stdout + result.stderr:
         raise AssertionError("unknown option name reflected into diagnostics")
     if invalid_marker.encode() in result.stdout + result.stderr:
