@@ -295,10 +295,10 @@ See [docs/architecture.md](docs/architecture.md) for a full system diagram and c
 | `warmup` | Warm up caches |
 | `replay_decision` | Replay a past decision |
 | `redact_preview` | Preview case-insensitive, exact JSON key redaction. Development main lists only keys actually replaced in `fields_redacted`; published v0.1.5 can misreport this list. Custom `fields` replace the defaults; text inside string values is not parsed. |
-| `enrich_ip` | IP geolocation/ASN enrichment |
+| `enrich_ip` | IP geolocation/ASN enrichment; development main looks up IPv4-mapped IPv6 under its IPv4 key and treats IPv6 unique-local/link-local as local addresses. Published v0.1.5 does not include this correction. |
 | `enrich_asn` | ASN organization enrichment |
 | `enrich_ua` | User-agent parsing |
-| `threat_lookup` | Threat indicator lookup |
+| `threat_lookup` | Threat indicator lookup; development main checks the IPv4 Redis key before the literal mapped key for IPv4-mapped IPv6 input. Published v0.1.5 uses the literal mapped key. |
 | `canary_eval` | Canary token evaluation |
 | `abuse_pattern_match` | Heuristic abuse pattern detection. Development main accepts the optional categories `injection`, `traversal`, `ai_attack`, `data_extraction` without regard to ASCII case and rejects unknown categories; published v0.1.5 can return a false-clean result for an unknown category or multiline SQL text. This tool does not enforce a blocking policy. |
 | `drift_report` | Score drift over time |
