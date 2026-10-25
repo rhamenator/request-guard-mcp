@@ -34,6 +34,7 @@ pub struct BatchClassifyRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct BatchOptions {
     #[serde(default)]
     pub fail_fast: bool,

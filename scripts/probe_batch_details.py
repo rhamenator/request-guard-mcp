@@ -34,6 +34,8 @@ def main():
         {"items": [item], "options": {"include_details": True}},
         {"items": [item, invalid, item], "options": {"fail_fast": False}},
         {"items": [item, invalid, item], "options": {"fail_fast": True}},
+        {"items": [item], "options": {"include_detail_RG_SYNTHETIC_SECRET_315": False}},
+        {"items": [item, invalid], "options": {"failfast": True}},
     ), 3):
         requests.append({"jsonrpc": "2.0", "id": request_id,
                          "method": "tools/call", "params": {
@@ -55,7 +57,7 @@ def main():
     if result.returncode != 0:
         raise AssertionError(f"stdio child exited {result.returncode}")
     responses = [json.loads(line) for line in result.stdout.splitlines()]
-    if [response.get("id") for response in responses] != list(range(1, 8)):
+    if [response.get("id") for response in responses] != list(range(1, 10)):
         raise AssertionError("unexpected stdio response count/order")
     if responses[0].get("result", {}).get("protocolVersion") != "2025-06-18":
         raise AssertionError("initialize failed")
@@ -86,9 +88,15 @@ def main():
         raise AssertionError("partial batch error/result positions are wrong")
     if responses[6].get("error", {}).get("code") != -400:
         raise AssertionError("fail_fast did not reject the failing item")
+    for response in responses[7:]:
+        if (response.get("error", {}).get("code") != -400
+                or response.get("error", {}).get("message") != "INVALID_REQUEST"):
+            raise AssertionError("unknown batch option was not rejected")
+    if b"RG_SYNTHETIC_SECRET_315" in result.stdout + result.stderr:
+        raise AssertionError("unknown option name reflected into diagnostics")
     if invalid_marker.encode() in result.stdout + result.stderr:
         raise AssertionError("invalid input reflected into diagnostics")
-    print("PASS packaged batch_classify: details default/true/false, partial errors, fail_fast")
+    print("PASS packaged batch_classify: details default/true/false, partial errors, fail_fast, unknown options rejected")
 
 
 if __name__ == "__main__":
