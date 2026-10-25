@@ -33,6 +33,7 @@ mod inner {
     use crate::util::hashing::sha256_hex;
     use anyhow::Context;
     use deadpool_redis::{Config as DConfig, Pool, PoolConfig, Runtime};
+    use std::net::IpAddr;
     use std::time::{SystemTime, UNIX_EPOCH};
     use tracing::info;
     use uuid::Uuid;
@@ -139,32 +140,51 @@ mod inner {
             indicator: &str,
         ) -> Result<Option<ThreatRecord>> {
             let mut connection = self.connection().await?;
-            let value: Option<String> = deadpool_redis::redis::cmd("HGET")
-                .arg(self.key(&format!("threats:{indicator_type}")))
-                .arg(indicator)
-                .query_async(&mut connection)
-                .await
-                .context("failed to query Redis threat intelligence")?;
-            if let Some(json) = value {
-                return Ok(Some(
-                    serde_json::from_str(&json).context("invalid Redis threat record")?,
-                ));
+            let canonical = if indicator_type == "ip" {
+                indicator
+                    .parse::<IpAddr>()
+                    .ok()
+                    .map(|ip| ip.to_canonical().to_string())
+            } else {
+                None
+            };
+            let mut keys = Vec::with_capacity(2);
+            if let Some(ref canonical) = canonical {
+                keys.push(canonical.as_str());
             }
-            if indicator_type == "ip" {
-                let listed: bool = deadpool_redis::redis::cmd("SISMEMBER")
-                    .arg(self.key("blocklist:ips"))
-                    .arg(indicator)
+            if keys.first().copied() != Some(indicator) {
+                keys.push(indicator);
+            }
+            for key in &keys {
+                let value: Option<String> = deadpool_redis::redis::cmd("HGET")
+                    .arg(self.key(&format!("threats:{indicator_type}")))
+                    .arg(key)
                     .query_async(&mut connection)
                     .await
-                    .context("failed to query Redis IP blocklist")?;
-                if listed {
-                    return Ok(Some(ThreatRecord {
-                        threat_type: "blocklisted_ip".to_string(),
-                        severity: "high".to_string(),
-                        source: "redis_blocklist".to_string(),
-                        last_seen: None,
-                        metadata: None,
-                    }));
+                    .context("failed to query Redis threat intelligence")?;
+                if let Some(json) = value {
+                    return Ok(Some(
+                        serde_json::from_str(&json).context("invalid Redis threat record")?,
+                    ));
+                }
+            }
+            if indicator_type == "ip" {
+                for key in &keys {
+                    let listed: bool = deadpool_redis::redis::cmd("SISMEMBER")
+                        .arg(self.key("blocklist:ips"))
+                        .arg(key)
+                        .query_async(&mut connection)
+                        .await
+                        .context("failed to query Redis IP blocklist")?;
+                    if listed {
+                        return Ok(Some(ThreatRecord {
+                            threat_type: "blocklisted_ip".to_string(),
+                            severity: "high".to_string(),
+                            source: "redis_blocklist".to_string(),
+                            last_seen: None,
+                            metadata: None,
+                        }));
+                    }
                 }
             }
             Ok(None)

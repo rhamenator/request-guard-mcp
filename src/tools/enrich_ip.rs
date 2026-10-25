@@ -15,7 +15,7 @@ pub async fn run(state: &AppState, req: EnrichIpRequest) -> Result<EnrichIpRespo
     let enrichment = if state.geoip.has_ip_database() {
         state
             .geoip
-            .lookup_ip(&parsed)
+            .lookup_ip(&crate::util::net::canonical_ip(parsed))
             .map_err(|error| AppError::Upstream(error.to_string()))?
     } else {
         Default::default()

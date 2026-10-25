@@ -147,6 +147,12 @@ HSET request_guard:threats:ip 198.51.100.9 '{"threat_type":"scanner","severity":
 ```
 
 For simple IP blocklists, add addresses to `request_guard:blocklist:ips`.
+On development main, `enrich_ip` and `threat_lookup` check the canonical IPv4
+key (`198.51.100.9`) first for IPv4-mapped IPv6 input
+(`::ffff:198.51.100.9`), then the literal mapped key if the canonical key is
+absent. Store new IPv4 threat and blocklist entries under the IPv4 spelling;
+existing mapped keys remain readable. Published v0.1.5 does not perform this
+alias lookup.
 Canary tokens are never stored raw: SHA-256 the token and store a JSON record
 in the `request_guard:canaries` hash. Successful evaluations append a bounded
 event record to `request_guard:canary_events`. The event list keeps at most

@@ -99,6 +99,17 @@ fn classify_request(request_id: String, user_agent: &str) -> ClassifyRequest {
 }
 
 #[tokio::test]
+async fn non_public_ip_enrichment_needs_no_optional_backend() {
+    let state = AppState::initialize(Config::default()).await.unwrap();
+    for ip in ["::1", "fd00::1", "fe80::1", "::ffff:10.0.0.1"] {
+        let response = tools::enrich_ip::run(&state, EnrichIpRequest { ip: ip.into() })
+            .await
+            .unwrap();
+        assert_eq!(response.risk_score, 0.0, "{ip}");
+    }
+}
+
+#[tokio::test]
 async fn maxmind_city_asn_and_anonymous_databases_enrich_real_records() {
     let (Ok(city_path), Ok(asn_path), Ok(anonymous_path)) = (
         std::env::var("TEST_GEOIP_CITY_DB"),
@@ -169,7 +180,7 @@ async fn redis_and_postgres_backed_tools_complete_real_round_trip() {
 
     let suffix = Uuid::new_v4().simple().to_string();
     let mut config = Config::default();
-    config.redis.url = Some(redis_url);
+    config.redis.url = Some(redis_url.clone());
     config.redis.key_prefix = format!("request_guard_test_{suffix}");
     config.postgres.url = Some(postgres_url);
     config.auth.cache_scope_hmac_key = Some("integration-test-scope-key-32-bytes-long".to_string());
@@ -271,6 +282,17 @@ async fn redis_and_postgres_backed_tools_complete_real_round_trip() {
     .unwrap();
     assert!(threat.found);
     assert_eq!(threat.source.as_deref(), Some("integration-test"));
+    let mapped_threat = tools::threat_lookup::run(
+        &state,
+        ThreatLookupRequest {
+            indicator: "::ffff:198.51.100.9".to_string(),
+            indicator_type: Some("ip".to_string()),
+        },
+    )
+    .await
+    .unwrap();
+    assert!(mapped_threat.found);
+    assert_eq!(mapped_threat.source.as_deref(), Some("integration-test"));
     let reputation = tools::enrich_ip::run(
         &state,
         EnrichIpRequest {
@@ -280,6 +302,70 @@ async fn redis_and_postgres_backed_tools_complete_real_round_trip() {
     .await
     .unwrap();
     assert_eq!(reputation.risk_score, 0.9);
+    let mapped_reputation = tools::enrich_ip::run(
+        &state,
+        EnrichIpRequest {
+            ip: "::ffff:198.51.100.9".to_string(),
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(mapped_reputation.risk_score, reputation.risk_score);
+    assert_eq!(mapped_reputation.ip, "::ffff:198.51.100.9");
+
+    state
+        .redis
+        .store_threat(
+            "ip",
+            "::ffff:198.51.100.10",
+            &ThreatRecord {
+                threat_type: "legacy_mapped".to_string(),
+                severity: "medium".to_string(),
+                source: "integration-test".to_string(),
+                last_seen: None,
+                metadata: None,
+            },
+        )
+        .await
+        .unwrap();
+    let legacy_mapped = tools::threat_lookup::run(
+        &state,
+        ThreatLookupRequest {
+            indicator: "::ffff:198.51.100.10".to_string(),
+            indicator_type: Some("ip".to_string()),
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(legacy_mapped.threat_type.as_deref(), Some("legacy_mapped"));
+
+    #[cfg(feature = "redis-integration")]
+    {
+        let client = deadpool_redis::redis::Client::open(redis_url).unwrap();
+        let mut redis = client.get_multiplexed_async_connection().await.unwrap();
+        let blocklist_key = format!("{}:blocklist:ips", state.config.redis.key_prefix);
+        let _: usize = deadpool_redis::redis::cmd("SADD")
+            .arg(&blocklist_key)
+            .arg("198.51.100.11")
+            .query_async(&mut redis)
+            .await
+            .unwrap();
+        let listed = tools::threat_lookup::run(
+            &state,
+            ThreatLookupRequest {
+                indicator: "::ffff:198.51.100.11".to_string(),
+                indicator_type: Some("ip".to_string()),
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(listed.threat_type.as_deref(), Some("blocklisted_ip"));
+        let _: usize = deadpool_redis::redis::cmd("DEL")
+            .arg(&blocklist_key)
+            .query_async(&mut redis)
+            .await
+            .unwrap();
+    }
 
     state
         .redis

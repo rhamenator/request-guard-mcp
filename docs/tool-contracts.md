@@ -82,6 +82,12 @@ Submit a correction to a prior classification.
 **Request**: `{ "ip": "1.2.3.4" }`
 **Response**: `{ "ip", "country", "city", "asn", "org", "is_proxy", "is_datacenter", "is_tor", "risk_score" }`
 
+On development main, IPv4-mapped IPv6 inputs use their IPv4 form for MaxMind
+and Redis reputation lookup; `ip` still echoes the parsed input spelling.
+IPv6 unique-local and link-local addresses, plus mapped private IPv4 addresses, receive the local/private
+baseline without requiring an optional enrichment backend. This applies to
+`enrich_ip`, not to the inbound `classify` verdict.
+
 ### `enrich_asn`
 **Request**: `{ "asn": 15169 }`
 **Response**: `{ "asn", "organization", "country", "risk_score", "is_hosting" }`
