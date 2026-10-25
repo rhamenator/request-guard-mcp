@@ -124,7 +124,10 @@ fn tool_input_schema(name: &str) -> Value {
             vec!["request_id", "correct_verdict"],
         ),
         "feature_flags" => (serde_json::json!({"flag":{"type":"string"}}), vec![]),
-        "warmup" => (serde_json::json!({"target":{"type":"string"}}), vec![]),
+        "warmup" => (
+            serde_json::json!({"target":{"type":"string","enum":["all","rule_engine","scorer","cache"]}}),
+            vec![],
+        ),
         "redact_preview" => (
             serde_json::json!({"payload":{},"fields":{"type":"array","items":{"type":"string"}}}),
             vec!["payload"],
@@ -367,7 +370,7 @@ impl McpTool for FeatureFlagsTool {
         "feature_flags"
     }
     fn description(&self) -> &str {
-        "List or get feature flags"
+        "List or get startup feature flags; not live backend health"
     }
     async fn call(&self, state: Arc<AppState>, params: Option<Value>) -> Result<Value, AppError> {
         let req: crate::models::request::FeatureFlagsRequest = params
@@ -375,7 +378,7 @@ impl McpTool for FeatureFlagsTool {
             .transpose()
             .map_err(|e: serde_json::Error| AppError::InvalidRequest(e.to_string()))?
             .unwrap_or(crate::models::request::FeatureFlagsRequest { flag: None });
-        let result = crate::tools::feature_flags::run(&state, req).await;
+        let result = crate::tools::feature_flags::run(&state, req).await?;
         serde_json::to_value(result).map_err(AppError::from)
     }
 }
@@ -388,7 +391,7 @@ impl McpTool for WarmupTool {
         "warmup"
     }
     fn description(&self) -> &str {
-        "Warm up caches and engines"
+        "Run best-effort synthetic classify or local-cache warmup; not a backend health check"
     }
     async fn call(&self, state: Arc<AppState>, params: Option<Value>) -> Result<Value, AppError> {
         let req: crate::models::request::WarmupRequest = params
@@ -396,7 +399,7 @@ impl McpTool for WarmupTool {
             .transpose()
             .map_err(|e: serde_json::Error| AppError::InvalidRequest(e.to_string()))?
             .unwrap_or(crate::models::request::WarmupRequest { target: None });
-        let result = crate::tools::warmup::run(&state, req).await;
+        let result = crate::tools::warmup::run(&state, req).await?;
         serde_json::to_value(result).map_err(AppError::from)
     }
 }

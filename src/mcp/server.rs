@@ -561,7 +561,7 @@ where
     let warmup_req = crate::models::request::WarmupRequest {
         target: Some("all".to_string()),
     };
-    crate::tools::warmup::run(&app_state, warmup_req).await;
+    let _ = crate::tools::warmup::run(&app_state, warmup_req).await?;
 
     let server_state = ServerState {
         app: Arc::new(app_state),

@@ -64,14 +64,37 @@ pub struct FeedbackRequest {
 
 /// Feature flags request – no body needed but keep struct for uniformity.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct FeatureFlagsRequest {
+    #[serde(default, deserialize_with = "deserialize_present_string")]
     pub flag: Option<String>,
 }
 
 /// Warmup request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct WarmupRequest {
+    #[serde(default, deserialize_with = "deserialize_warmup_target")]
     pub target: Option<String>,
+}
+
+fn deserialize_present_string<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    String::deserialize(deserializer).map(Some)
+}
+
+fn deserialize_warmup_target<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let target = String::deserialize(deserializer)?;
+    if matches!(target.as_str(), "all" | "rule_engine" | "scorer" | "cache") {
+        Ok(Some(target))
+    } else {
+        Err(D::Error::custom("unsupported warmup target"))
+    }
 }
 
 /// Replay decision request.
@@ -175,8 +198,17 @@ pub struct QueueStatusRequest {
 
 /// Config snapshot request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ConfigSnapshotRequest {
+    #[serde(default, deserialize_with = "deserialize_present_bool")]
     pub redact_secrets: Option<bool>,
+}
+
+fn deserialize_present_bool<'de, D>(deserializer: D) -> Result<Option<bool>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    bool::deserialize(deserializer).map(Some)
 }
 
 /// Self-test request.

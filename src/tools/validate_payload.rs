@@ -13,11 +13,23 @@ use crate::state::AppState;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 
-pub async fn run(_state: &AppState, req: ValidatePayloadRequest) -> ValidatePayloadResponse {
+pub async fn run(state: &AppState, req: ValidatePayloadRequest) -> ValidatePayloadResponse {
     // Check the same request structs used by the tool wrappers. This is a
-    // structural check only: it does not run the tool or check feature flags,
-    // backend availability, or tool-specific business rules.
-    let error = validate_for_tool(&req.tool, &req.payload).err();
+    // Check supported names for operational diagnostics in addition to their
+    // request shapes. This does not run a tool, check whether a feature is
+    // enabled, test backend availability, or apply other business rules.
+    let error = validate_for_tool(&req.tool, &req.payload)
+        .and_then(|_| {
+            if req.tool == "feature_flags" {
+                if let Some(name) = req.payload.get("flag").and_then(Value::as_str) {
+                    if !state.feature_flags.contains_key(name) {
+                        return Err("unsupported feature flag".to_string());
+                    }
+                }
+            }
+            Ok(())
+        })
+        .err();
     ValidatePayloadResponse {
         valid: error.is_none(),
         errors: error
@@ -88,6 +100,12 @@ mod tests {
         )
         .is_err());
         assert!(validate_for_tool("enrich_ip", &json!({"ip": 1})).is_err());
+        assert!(validate_for_tool("feature_flags", &json!({"flags": "enrichment"})).is_err());
+        assert!(validate_for_tool("warmup", &json!({"targt": "cache"})).is_err());
+        assert!(validate_for_tool("warmup", &json!({"target": "bogus"})).is_err());
+        assert!(validate_for_tool("warmup", &json!({"target": null})).is_err());
+        assert!(validate_for_tool("config_snapshot", &json!({"redact_secret": false})).is_err());
+        assert!(validate_for_tool("config_snapshot", &json!({"redact_secrets": null})).is_err());
         assert!(validate_for_tool(
             "canary_eval",
             &json!({"token": "synthetic", "context": {"path": "/protected"}})
@@ -111,5 +129,29 @@ mod tests {
                 "registered tool missing structural validator: {name}"
             );
         }
+    }
+
+    #[tokio::test]
+    async fn unknown_named_feature_is_invalid_without_running_tool() {
+        let state = AppState::new(crate::config::Config::default());
+        let known = run(
+            &state,
+            ValidatePayloadRequest {
+                tool: "feature_flags".into(),
+                payload: json!({"flag":"batch_classify"}),
+            },
+        )
+        .await;
+        assert!(known.valid);
+        let unknown = run(
+            &state,
+            ValidatePayloadRequest {
+                tool: "feature_flags".into(),
+                payload: json!({"flag":"not_a_flag"}),
+            },
+        )
+        .await;
+        assert!(!unknown.valid);
+        assert_eq!(unknown.errors[0].message, "unsupported feature flag");
     }
 }

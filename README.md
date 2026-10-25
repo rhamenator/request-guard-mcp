@@ -290,9 +290,9 @@ See [docs/architecture.md](docs/architecture.md) for a full system diagram and c
 | `model_info` | Server and tool metadata |
 | `feedback` | Submit classification feedback |
 | `score_breakdown` | Diagnostic rule-engine score for optional `signals` containing an inbound classification request metadata object, such as `{"user_agent":"GPTBot/1.0","path":"/"}`. Development main rejects an unknown field, raw signal list, or wrong field type instead of reporting a clean zero; published v0.1.5 can return zero for malformed supplied `signals`. This diagnostic is not a persisted verdict and does not verify a caller-supplied TLS fingerprint. |
-| `validate_payload` | Check a named tool's payload against its request shape; errors use root path `/`. Execution, feature flags, backend availability and business rules are not checked |
-| `feature_flags` | List feature flags |
-| `warmup` | Warm up caches |
+| `validate_payload` | Check a named tool's payload against its request shape; development main also checks supported `feature_flags.flag` and `warmup.target` names. Errors use root path `/`. Execution, feature enablement, backend availability and other business rules are not checked. |
+| `feature_flags` | List startup feature flags; development main rejects unknown flag names; use `/ready` for live backend readiness. |
+| `warmup` | Best-effort synthetic classify/local-cache warmup, not a Redis health check; development main rejects unsupported targets. |
 | `replay_decision` | Replay a past decision |
 | `redact_preview` | Preview case-insensitive, exact JSON key redaction. Development main lists only keys actually replaced in `fields_redacted`; published v0.1.5 can misreport this list. Custom `fields` replace the defaults; text inside string values is not parsed. |
 | `enrich_ip` | IP geolocation/ASN enrichment; development main looks up IPv4-mapped IPv6 under its IPv4 key and treats IPv6 unique-local/link-local as local addresses. Published v0.1.5 does not include this correction. |

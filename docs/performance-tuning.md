@@ -12,13 +12,19 @@
 
 ## Classify Path Latency
 
-The `classify` tool is the hottest path. Optimizations applied:
+The server runs a best-effort `warmup` call at startup. Its rule regexes use
+`once_cell::sync::Lazy` and compile on first use; there is no JIT compiler.
+The `rule_engine` and `scorer` warmup targets run synthetic classification;
+the `cache` target writes a marker into the local cache. Warmup does not prove
+Redis health or that every engine was exercised on a cold path.
 
-1. **Compiled regexes**: All patterns compiled once via `once_cell::sync::Lazy`, reused across requests.
-2. **In-process LRU cache**: Moka cache keyed on `sha256(ip|user_agent|path)`. Cache hit avoids engine evaluation entirely.
-3. **Zero-copy deserialization**: `serde_json` deserializes directly into typed structs.
-4. **No heap allocations in hot path**: Signal vectors are pre-allocated with reasonable capacity.
-5. **Warmup**: Call the `warmup` tool at startup (done automatically) to JIT-compile patterns.
+Classification evaluates rules before checking the cache. A hit can skip the
+scoring step, but not rule evaluation. The fingerprint includes the
+authenticated caller scope, the rule-relevant request fields, a cache schema
+domain, recorded build version/commit and configured known-bad TLS set. A
+three-field `(ip, user_agent, path)` match alone does not imply a cache hit.
+JSON deserialization and signal construction allocate memory; no zero-copy or
+allocation-free hot-path guarantee has been established.
 
 ## Tuning for High Throughput
 
@@ -58,16 +64,16 @@ Monitor these Prometheus metrics for performance insights:
 
 ## Redis Caching
 
-When Redis is configured, the in-process Moka cache acts as L1 and Redis as a shared L2. To maximize hit rate:
-
-- Ensure classify requests for the same `(ip, user_agent, path)` tuple are sent to the same server instance, or use Redis as a shared cache.
-- TTL on cache entries is 300 seconds by default.
+When Redis is configured, the classify path attempts a Redis lookup before
+the in-process Moka cache. Redis failures fall back to the local cache. Cache
+identity includes the caller and all rule-relevant request fields, so use a
+representative request mix when measuring hit rate. The local TTL is 300
+seconds; Redis defaults to 300 seconds and is configurable with
+`MCP__REDIS__CACHE_TTL_SECS`. Check backend latency as well as hit rate.
 
 ## Resource Sizing
 
-| Load | CPU Request | Memory Request | Replicas |
-|------|------------|----------------|---------|
-| < 1k req/s | 100m | 128Mi | 2 |
-| 1k–5k req/s | 250m | 256Mi | 3–5 |
-| 5k–20k req/s | 500m | 512Mi | 5–10 |
-| > 20k req/s | 1000m | 1Gi | 10+ with HPA |
+Measure CPU, memory, p95/p99 latency and backend load under your own request
+mix and concurrency limit before sizing replicas. The private 512 MiB
+container qualification checks bounded wide-JSON and slow-header behavior; it
+does not establish requests-per-second capacity or a production replica count.

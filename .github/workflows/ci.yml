@@ -142,6 +142,7 @@ jobs:
       - run: python3 scripts/probe_score_breakdown.py target/release/request-guard-mcp
       - run: python3 scripts/probe_self_test_suite.py target/release/request-guard-mcp
       - run: python3 scripts/probe_canary_shape.py target/release/request-guard-mcp
+      - run: python3 scripts/probe_operational_tools.py target/release/request-guard-mcp
       - run: python3 scripts/probe_batch_details.py target/release/request-guard-mcp
       - run: python3 scripts/probe_sigterm_shutdown.py target/release/request-guard-mcp
       - run: python3 scripts/probe_accept_recovery.py target/release/request-guard-mcp
