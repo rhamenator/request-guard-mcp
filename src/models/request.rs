@@ -117,6 +117,7 @@ where
 
 /// Replay decision request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ReplayRequest {
     pub request_id: String,
     pub deterministic: Option<bool>,
@@ -132,18 +133,21 @@ pub struct RedactPreviewRequest {
 
 /// IP enrichment request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct EnrichIpRequest {
     pub ip: String,
 }
 
 /// ASN enrichment request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct EnrichAsnRequest {
     pub asn: u32,
 }
 
 /// User-agent enrichment request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct EnrichUaRequest {
     pub user_agent: String,
 }
@@ -193,6 +197,7 @@ where
 
 /// Validate payload request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ValidatePayloadRequest {
     pub tool: String,
     pub payload: serde_json::Value,
@@ -237,6 +242,7 @@ where
 
 /// Self-test request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SelfTestRequest {
     #[serde(default, deserialize_with = "deserialize_self_test_suite")]
     pub suite: Option<String>,
@@ -255,7 +261,41 @@ where
 
 #[cfg(test)]
 mod self_test_suite_tests {
-    use super::SelfTestRequest;
+    use super::{
+        EnrichAsnRequest, EnrichIpRequest, EnrichUaRequest, ReplayRequest, SelfTestRequest,
+        ValidatePayloadRequest,
+    };
+    use serde::de::DeserializeOwned;
+
+    fn rejects_unknown<T: DeserializeOwned>(valid: &str, unknown: &str) {
+        assert!(serde_json::from_str::<T>(valid).is_ok());
+        assert!(serde_json::from_str::<T>(unknown).is_err());
+    }
+
+    #[test]
+    fn remaining_tool_inputs_reject_unknown_fields() {
+        rejects_unknown::<ReplayRequest>(
+            r#"{"request_id":"id","deterministic":true}"#,
+            r#"{"request_id":"id","determinitsic":true}"#,
+        );
+        rejects_unknown::<EnrichIpRequest>(
+            r#"{"ip":"127.0.0.1"}"#,
+            r#"{"ip":"127.0.0.1","ipp":"x"}"#,
+        );
+        rejects_unknown::<EnrichAsnRequest>(r#"{"asn":64512}"#, r#"{"asn":64512,"asnn":1}"#);
+        rejects_unknown::<EnrichUaRequest>(
+            r#"{"user_agent":"Mozilla/5.0"}"#,
+            r#"{"user_agent":"Mozilla/5.0","user_agnet":"x"}"#,
+        );
+        rejects_unknown::<ValidatePayloadRequest>(
+            r#"{"tool":"self_test","payload":{}}"#,
+            r#"{"tool":"self_test","payload":{},"toool":"x"}"#,
+        );
+        rejects_unknown::<SelfTestRequest>(
+            r#"{"suite":"all"}"#,
+            r#"{"suite":"all","sutie":"all"}"#,
+        );
+    }
 
     #[test]
     fn only_all_or_omitted_suite_is_accepted() {

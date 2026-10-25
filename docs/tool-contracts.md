@@ -168,7 +168,9 @@ TLS fingerprint; use `classify` for the live verdict.
 Validate a payload against the schema for a named tool.
 **Request**: `{ "tool": "classify", "payload": {...} }`
 Development main also checks supported `feature_flags.flag` names and
-`warmup.target` values. A valid result does not execute the tool, establish
+`warmup.target` values and rejects unknown fields in replay, enrichment,
+validation and self-test requests. Published v0.1.5 can silently ignore some
+misspelled fields. A valid result does not execute the tool, establish
 that a feature is enabled, or test backend availability.
 
 ### `feature_flags`
