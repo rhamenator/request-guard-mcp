@@ -251,18 +251,32 @@ async fn only_fresh_attested_tls_fingerprints_affect_rules() {
 
 #[test]
 fn callers_cannot_deserialize_server_verified_provenance() {
-    let request: models::request::ClassifyRequest = serde_json::from_value(serde_json::json!({
+    let request = serde_json::from_value::<models::request::ClassifyRequest>(serde_json::json!({
         "ip": "198.51.100.7",
         "tls_ja3": "72a589da586844d7f0818ce684948eea",
         "tls_fingerprint_source": "client-claim",
         "tls_fingerprint_verified": true
-    }))
-    .unwrap();
-    assert!(!request.tls_fingerprint_verified);
+    }));
+    assert!(request.is_err());
 }
 
 #[test]
-fn persisted_request_shape_keeps_verified_tls_but_not_the_attestation() {
+fn classify_rejects_unknown_metadata_but_accepts_custom_extra() {
+    assert!(serde_json::from_value::<models::request::ClassifyRequest>(
+        serde_json::json!({"pah": "/admin"})
+    )
+    .is_err());
+    assert!(serde_json::from_value::<models::request::ClassifyRequest>(
+        serde_json::json!({"extra": {"custom_field": "synthetic"}})
+    )
+    .is_ok());
+    assert!(
+        serde_json::from_value::<models::request::ClassifyRequest>(serde_json::json!({})).is_ok()
+    );
+}
+
+#[test]
+fn serialized_request_omits_server_verified_tls_and_the_attestation() {
     let mut request = browser_request();
     request.tls_ja3 = Some("72a589da586844d7f0818ce684948eea".into());
     request.tls_fingerprint_source = Some("envoy".into());
@@ -270,8 +284,10 @@ fn persisted_request_shape_keeps_verified_tls_but_not_the_attestation() {
     request.tls_fingerprint_verified = true;
 
     let payload = serde_json::to_value(request).unwrap();
-    assert_eq!(payload["tls_fingerprint_verified"], true);
+    assert!(payload.get("tls_fingerprint_verified").is_none());
     assert_eq!(payload["tls_ja3"], "72a589da586844d7f0818ce684948eea");
     assert_eq!(payload["tls_fingerprint_source"], "envoy");
     assert!(payload.get("tls_fingerprint_attestation").is_none());
+    let replayed: models::request::ClassifyRequest = serde_json::from_value(payload).unwrap();
+    assert!(!replayed.tls_fingerprint_verified);
 }

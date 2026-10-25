@@ -58,6 +58,20 @@ fn replay_feature_snapshot(request: &ClassifyRequest) -> ClassifyRequest {
     }
 }
 
+// Older decision rows serialized this server-derived flag as false. Ignore
+// that one historical field when reading; caller JSON is still parsed strictly.
+fn decode_persisted_request(mut payload: serde_json::Value) -> serde_json::Result<ClassifyRequest> {
+    if let serde_json::Value::Object(fields) = &mut payload {
+        if fields
+            .get("tls_fingerprint_verified")
+            .is_some_and(serde_json::Value::is_boolean)
+        {
+            fields.remove("tls_fingerprint_verified");
+        }
+    }
+    serde_json::from_value(payload)
+}
+
 #[derive(Debug, Clone)]
 pub struct PersistedDecision {
     pub request: ClassifyRequest,
@@ -385,7 +399,7 @@ mod inner {
                 let request_payload: Value = row.try_get("request_payload")?;
                 let response_payload: Value = row.try_get("response_payload")?;
                 Ok(PersistedDecision {
-                    request: serde_json::from_value(request_payload.clone())?,
+                    request: decode_persisted_request(request_payload.clone())?,
                     response: serde_json::from_value(response_payload.clone())?,
                     request_payload,
                     response_payload,
@@ -666,7 +680,7 @@ pub use inner::PostgresClient;
 
 #[cfg(test)]
 mod scoped_key_tests {
-    use super::{replay_feature_snapshot, scoped_decision_key};
+    use super::{decode_persisted_request, replay_feature_snapshot, scoped_decision_key};
     use crate::{engines::RuleEngine, models::request::ClassifyRequest};
 
     #[test]
@@ -676,6 +690,28 @@ mod scoped_key_tests {
         assert_ne!(first, second);
         assert_eq!(first, scoped_decision_key("caller:first", "same-id"));
         assert!(!first.contains("same-id"));
+    }
+
+    #[test]
+    fn historical_replay_payload_ignores_only_server_derived_tls_flag() {
+        let request: ClassifyRequest = serde_json::from_value(serde_json::json!({
+            "path": "/admin",
+            "user_agent": "Nikto",
+            "method": "GET",
+            "headers": {"accept": ""}
+        }))
+        .unwrap();
+        let mut legacy = serde_json::to_value(replay_feature_snapshot(&request)).unwrap();
+        legacy["tls_fingerprint_verified"] = serde_json::json!(false);
+        let replayed = decode_persisted_request(legacy).unwrap();
+        assert_eq!(replayed.path.as_deref(), Some("/admin"));
+        assert_eq!(replayed.user_agent.as_deref(), Some("Nikto"));
+        assert!(!replayed.tls_fingerprint_verified);
+        assert!(decode_persisted_request(serde_json::json!({"pah": "/admin"})).is_err());
+        assert!(decode_persisted_request(serde_json::json!({
+            "tls_fingerprint_verified": "unexpected"
+        }))
+        .is_err());
     }
 
     #[test]

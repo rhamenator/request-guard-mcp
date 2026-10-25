@@ -29,6 +29,15 @@ verification status itself; callers cannot assert `tls_fingerprint_verified`.
 Only verified values affect TLS rules and cache identity. See
 [TLS fingerprint attestation](tls-fingerprint-attestation.md).
 
+Development main rejects unknown metadata names such as `pah` instead of
+classifying a partial request as clean; put custom metadata in `extra`.
+`tls_fingerprint_verified` is server-derived and rejected as caller input.
+Empty or partial requests are still accepted. Published v0.1.5 can silently
+ignore unknown names, so verify the input fields when using that release.
+Existing PostgreSQL decision rows with the older serialized server-derived
+TLS flag remain readable; the flag is ignored on replay and omitted from new
+stored snapshots.
+
 On development main, sensitive-path signals inspect bounded percent-decoded
 route and file-name boundaries, excluding raw query and fragment text.
 `/admin`, `/administrator`, `/prod.env`, and `/admin;jsessionid=1` remain
@@ -65,7 +74,7 @@ Responses produced by a different scoring version may also be rejected if their 
 ### `batch_classify`
 Classify multiple requests in one call (max batch size configurable, default 50).
 
-**Request**: `{ "items": [<ClassifyRequest>, ...], "options": { "fail_fast": false, "include_details": true } }`. The default maximum batch size is 50 and is configurable; an empty batch returns an empty result. On development main, `include_details: false` returns an empty `signals` array for each successful item. Omitting the option preserves the full result; unknown option names are rejected. Published v0.1.5 accepts but ignores `include_details` and always returns signal details.
+**Request**: `{ "items": [<ClassifyRequest>, ...], "options": { "fail_fast": false, "include_details": true } }`. The default maximum batch size is 50 and is configurable; an empty batch returns an empty result. On development main, `include_details: false` returns an empty `signals` array for each successful item. Omitting the option preserves the full result. Unknown batch, option and item field names reject the whole call during decoding, even with `fail_fast: false`; individual classification errors can still be returned per item. Published v0.1.5 accepts but ignores `include_details` and can silently ignore misspelled metadata.
 
 **Response**: `{ "results": [{ "index", "result", "error" }], "total", "processed", "errors", "latency_ms" }`. With `fail_fast: false`, inspect `errors` and each item `error`: an item error has no classification result even though the batch call succeeds. With `fail_fast: true`, the call returns an error at the first failing item and no partial batch response.
 
