@@ -7,11 +7,14 @@ use anyhow::Result;
 use dashmap::DashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::time::Instant;
 use tokio::sync::Semaphore;
 
 /// Shared application state passed to every request handler.
 #[derive(Clone)]
 pub struct AppState {
+    /// Monotonic origin for the lifetime of this initialized server state.
+    pub started_at: Instant,
     pub config: Arc<Config>,
     pub semaphore: Arc<Semaphore>,
     pub connection_semaphore: Arc<Semaphore>,
@@ -189,6 +192,7 @@ impl AppState {
         feature_flags.insert("geoip".to_string(), geoip.is_available());
 
         Self {
+            started_at: Instant::now(),
             config,
             semaphore,
             connection_semaphore,

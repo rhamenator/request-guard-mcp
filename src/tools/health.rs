@@ -1,11 +1,9 @@
 use crate::models::response::{ComponentHealth, HealthResponse};
 use crate::state::AppState;
-use crate::util::time::now_unix;
 use std::collections::HashMap;
 use std::future::Future;
 use std::time::Duration;
 
-static START_TIME: once_cell::sync::Lazy<u64> = once_cell::sync::Lazy::new(now_unix);
 const BACKEND_PING_TIMEOUT: Duration = Duration::from_secs(1);
 
 pub(crate) async fn bounded_backend_ping(ping: impl Future<Output = bool>) -> bool {
@@ -15,10 +13,7 @@ pub(crate) async fn bounded_backend_ping(ping: impl Future<Output = bool>) -> bo
 }
 
 pub async fn run(state: &AppState) -> HealthResponse {
-    // Trigger initialization of start time on first call.
-    let _ = *START_TIME;
-
-    let uptime = now_unix().saturating_sub(*START_TIME);
+    let uptime = state.started_at.elapsed().as_secs();
     let mut checks = HashMap::new();
 
     checks.insert(

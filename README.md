@@ -286,7 +286,7 @@ See [docs/architecture.md](docs/architecture.md) for a full system diagram and c
 | `classify` | Classify a request as bot/human |
 | `explain` | Explain a classification decision |
 | `batch_classify` | Classify multiple requests. On development main, `options.include_details: false` omits per-item signal details; omitted or `true` preserves the full result. Check `errors` and each item error when `fail_fast` is false. Published v0.1.5 accepts but ignores `include_details`. |
-| `health` | Server health check |
+| `health` | Server health check; on development main, `uptime_seconds` counts from server state initialization, including time before the first health call. Published v0.1.5 may begin counting at the first health call. |
 | `model_info` | Server and tool metadata |
 | `feedback` | Submit classification feedback |
 | `score_breakdown` | Diagnostic rule-engine score for optional `signals` containing an inbound classification request metadata object, such as `{"user_agent":"GPTBot/1.0","path":"/"}`. Development main rejects an unknown field, raw signal list, or wrong field type instead of reporting a clean zero; published v0.1.5 can return zero for malformed supplied `signals`. This diagnostic is not a persisted verdict and does not verify a caller-supplied TLS fingerprint. |
