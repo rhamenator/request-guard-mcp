@@ -84,12 +84,16 @@ Classify multiple requests in one call (max batch size configurable, default 50)
 ### `health`
 Server health check.
 
-**Request**: none
+**Request**: omit arguments or pass `{}`. Development main rejects unknown
+arguments; published v0.1.5 can silently ignore them.
 
 **Response**: `{ "status": "healthy", "version", "uptime_seconds", "checks": {} }`. `uptime_seconds` is monotonic elapsed time since application state initialization, including time before the first health call.
 
 ### `model_info`
 Return metadata about the server and available tools.
+
+**Request**: omit arguments or pass `{}`. Development main rejects unknown
+arguments; published v0.1.5 can silently ignore them.
 
 Each tool's `enabled` field reflects configured capability when server state
 was initialized. It does not poll a backend or change when Redis or PostgreSQL

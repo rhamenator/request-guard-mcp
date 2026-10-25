@@ -2,10 +2,10 @@ use crate::models::{
     request::{
         AbusePatternMatchRequest, BatchClassifyRequest, CalibrationReportRequest,
         CanaryEvalRequest, ClassifyRequest, ConfigSnapshotRequest, DriftReportRequest,
-        EnrichAsnRequest, EnrichIpRequest, EnrichUaRequest, ExplainRequest, FeatureFlagsRequest,
-        FeedbackRequest, QueueStatusRequest, RedactPreviewRequest, ReplayRequest,
-        ScoreBreakdownRequest, SelfTestRequest, ThreatLookupRequest, ValidatePayloadRequest,
-        WarmupRequest,
+        EmptyToolRequest, EnrichAsnRequest, EnrichIpRequest, EnrichUaRequest, ExplainRequest,
+        FeatureFlagsRequest, FeedbackRequest, QueueStatusRequest, RedactPreviewRequest,
+        ReplayRequest, ScoreBreakdownRequest, SelfTestRequest, ThreatLookupRequest,
+        ValidatePayloadRequest, WarmupRequest,
     },
     response::{ValidatePayloadResponse, ValidationError},
 };
@@ -50,7 +50,7 @@ fn decode<T: DeserializeOwned>(payload: &Value) -> Result<(), String> {
 
 fn validate_for_tool(tool: &str, payload: &Value) -> Result<(), String> {
     match tool {
-        "health" | "model_info" => Ok(()), // These wrappers ignore arguments.
+        "health" | "model_info" => decode::<EmptyToolRequest>(payload),
         "classify" => decode::<ClassifyRequest>(payload),
         "explain" => {
             let request: ExplainRequest = serde_json::from_value(payload.clone())
@@ -86,6 +86,15 @@ fn validate_for_tool(tool: &str, payload: &Value) -> Result<(), String> {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn zero_argument_tools_match_their_advertised_shape() {
+        for tool in ["health", "model_info"] {
+            assert!(validate_for_tool(tool, &json!({})).is_ok());
+            assert!(validate_for_tool(tool, &json!({"unknwon": "synthetic"})).is_err());
+            assert!(validate_for_tool(tool, &Value::Null).is_err());
+        }
+    }
 
     #[test]
     fn matches_callable_request_shapes() {
