@@ -3,6 +3,7 @@ use std::collections::HashMap;
 
 /// Primary classification request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ClassifyRequest {
     pub ip: Option<String>,
     pub user_agent: Option<String>,
@@ -21,13 +22,14 @@ pub struct ClassifyRequest {
     #[serde(default, skip_serializing)]
     pub tls_fingerprint_attestation: Option<String>,
     /// Server-derived provenance. JSON callers cannot set this field.
-    #[serde(default, skip_deserializing)]
+    #[serde(default, skip_serializing, skip_deserializing)]
     pub tls_fingerprint_verified: bool,
     pub extra: Option<serde_json::Value>,
 }
 
 /// Batch classification: list of classify requests.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct BatchClassifyRequest {
     pub items: Vec<ClassifyRequest>,
     pub options: Option<BatchOptions>,

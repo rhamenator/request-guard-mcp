@@ -150,6 +150,7 @@ jobs:
       - run: python3 scripts/probe_redact_preview_shape.py target/release/request-guard-mcp
       - run: python3 scripts/probe_enrich_ua_risk.py target/release/request-guard-mcp
       - run: python3 scripts/probe_sensitive_path_boundaries.py target/release/request-guard-mcp
+      - run: python3 scripts/probe_classify_unknown_fields.py target/release/request-guard-mcp
       - run: python3 scripts/probe_explain_consistency.py target/release/request-guard-mcp
       - run: python3 scripts/probe_threat_lookup_shape.py target/release/request-guard-mcp
       - run: python3 scripts/probe_operational_tools.py target/release/request-guard-mcp

@@ -177,3 +177,13 @@ async fn batch_partial_errors_and_fail_fast_are_explicit() {
     .await;
     assert!(matches!(error, Err(error::AppError::Validation(_))));
 }
+
+#[test]
+fn batch_rejects_unknown_top_level_and_item_fields() {
+    for payload in [
+        serde_json::json!({"items": [], "option": {"fail_fast": true}}),
+        serde_json::json!({"items": [{"pah": "/admin"}]}),
+    ] {
+        assert!(serde_json::from_value::<models::request::BatchClassifyRequest>(payload).is_err());
+    }
+}
