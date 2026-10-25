@@ -14,8 +14,8 @@ use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 pub async fn run(state: &AppState, req: ValidatePayloadRequest) -> ValidatePayloadResponse {
-    // Check the same request structs used by the tool wrappers. This is a
-    // Check supported names for operational diagnostics in addition to their
+    // Check the request structs used by the tool wrappers and supported names
+    // for operational diagnostics. This is a structural check in other cases;
     // request shapes. This does not run a tool, check whether a feature is
     // enabled, test backend availability, or apply other business rules.
     let error = validate_for_tool(&req.tool, &req.payload)
