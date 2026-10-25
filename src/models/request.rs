@@ -51,9 +51,23 @@ fn default_batch_include_details() -> bool {
 
 /// Explain tool request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ExplainRequest {
     pub classification: serde_json::Value,
+    #[serde(default, deserialize_with = "deserialize_explain_format")]
     pub format: Option<String>,
+}
+
+fn deserialize_explain_format<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let format = String::deserialize(deserializer)?;
+    if format == "json" {
+        Ok(Some(format))
+    } else {
+        Err(D::Error::custom("unsupported explain format"))
+    }
 }
 
 /// Feedback submission request.

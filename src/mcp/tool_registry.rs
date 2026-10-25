@@ -108,7 +108,7 @@ fn tool_input_schema(name: &str) -> Value {
             vec![],
         ),
         "explain" => (
-            serde_json::json!({"classification":{},"format":{"type":"string"}}),
+            serde_json::json!({"classification":{},"format":{"type":"string","enum":["json"],"description":"Only the structured JSON response is supported; omission is equivalent to json"}}),
             vec!["classification"],
         ),
         "replay_decision" => (
