@@ -45,9 +45,14 @@ pub(crate) fn user_agent_pattern(ua: &str) -> Option<UserAgentPattern> {
 
 static SENSITIVE_PATH: Lazy<Regex> = Lazy::new(|| {
     Regex::new(concat!(
-        r"(?i)(\.env|/admin|/api/internal|/wp-admin|/phpmyadmin|\.git/|",
-        r"/etc/passwd|/proc/|/debug|/actuator|/swagger|/graphql|/config|",
-        r"/internal(?:/|$|\?)|/xmlrpc\.php(?:/|$|\?))"
+        r"(?i)(?:^|/)(?:[^/]*\.env(?:[-_~][a-z0-9_-]+|rc|s|[0-9]+)?|[^/]*\.git|",
+        r"admin(?:istrator|istration|panel|s|[-_](?:panel|old|login|console|dashboard|area|ajax|api|users|cp|settings|portal|backup|dev|new|ui|v[0-9]+)|[0-9]+)?|",
+        r"adminer|api/internal(?:[-_](?:v[0-9]+|tools|api))?|",
+        r"wp-admin|phpmyadmin(?:[-_][a-z0-9.-]+|[0-9]+)?|",
+        r"etc/passwd(?:-[a-z0-9]+)?|debug(?:ger|_toolbar|_info|-info|-bar|-toolbar)?|actuator|",
+        r"swagger(?:-ui(?:-bundle|-dist)?|-resources|_ui|ui|-config|-docs)?|graphql(?:-playground|v?[0-9]+)?|",
+        r"config(?:uration|ure|s|[-_](?:backup|bak|dev|old|prod|local|staging|test|new))?)(?:[/;~\x00\s?#.]|$)|",
+        r"(?:^|/)proc(?:/|$)|(?:^|/)(?:internal|xmlrpc\.php)(?:[/;~\x00\s?#]|$)"
     ))
     .expect("compile regex")
 });
@@ -153,8 +158,15 @@ impl RuleEngine {
     }
 
     fn eval_path(&self, path: &str, signals: &mut SignalSet) {
-        let normalized = normalize_path_for_signals(path);
-        if SENSITIVE_PATH.is_match(&normalized) {
+        // Query and fragment text are not URL path segments. Decode the path
+        // portion only, so an indicator in a search parameter does not become
+        // a false path-sensitive verdict.
+        let path_only = path.split(['?', '#']).next().unwrap_or(path);
+        let normalized = normalize_path_for_signals(path_only);
+        // Encoded delimiters are path bytes to some origins; retain segments
+        // after them rather than hiding a sensitive route during decoding.
+        let route = normalized.as_str();
+        if SENSITIVE_PATH.is_match(route) {
             signals.push(Signal::new(
                 "path_sensitive",
                 1.0,
@@ -165,7 +177,7 @@ impl RuleEngine {
         }
 
         // Bulk / enumeration pattern: many path segments or numeric IDs
-        let segments = normalized.trim_matches('/').split('/').count();
+        let segments = route.trim_matches('/').split('/').count();
         if segments > 8 {
             signals.push(Signal::new(
                 "path_deep",
@@ -442,6 +454,21 @@ mod tests {
             .any(|signal| signal.name == "path_sensitive"));
         assert!(!SENSITIVE_PATH.is_match("/internalized"));
         assert!(!SENSITIVE_PATH.is_match("/xmlrpc.phpish"));
+        for ordinary in [
+            "/products/configurable-shirt",
+            "/docs/administrator-guide",
+            "/docs/admin-guide",
+            "/blog/node.environment-setup",
+            "/api/internalized",
+            "/xmlrpc.phpish",
+            "/internal.example.com",
+            "/proc.html",
+        ] {
+            assert!(
+                !SENSITIVE_PATH.is_match(ordinary),
+                "false positive {ordinary}"
+            );
+        }
     }
 
     #[test]
@@ -455,6 +482,60 @@ mod tests {
             "/%2fadmin",
             "\\admin",
             "/%255cadmin",
+            "/config.json",
+            "/.env.production",
+            "/.env-backup",
+            "/.env_prod",
+            "/.env_local",
+            "/.env-sample",
+            "/.envrc",
+            "/administrator",
+            "/admin-panel",
+            "/admin_old",
+            "/admin123",
+            "/adminer.php",
+            "/admin-login",
+            "/admin_console",
+            "/admin-dashboard",
+            "/admin_area",
+            "/admin-ajax.php",
+            "/admin-api",
+            "/admin-users",
+            "/adminpanel",
+            "/admin-settings",
+            "/admin-portal",
+            "/admin_backup",
+            "/api/internal-api",
+            "/.envs/",
+            "/administration",
+            "/admin;jsessionid=1",
+            "/admin%00.png",
+            "/admin%3fx",
+            "/%3f/admin",
+            "/x%23/admin",
+            "/etc/passwd%00.jpg",
+            "/phpMyAdmin-4.9.1",
+            "/phpmyadmin2",
+            "/prod.env",
+            "/repo.git/config",
+            "/configuration.php",
+            "/config-prod",
+            "/config_local",
+            "/config-staging",
+            "/config-bak",
+            "/configs",
+            "/debug_toolbar",
+            "/debug-info",
+            "/graphql-playground",
+            "/graphqlv1",
+            "/swagger-ui-dist/",
+            "/swagger-docs",
+            "/debug-toolbar",
+            "/api/internal-v2",
+            "/.env~1",
+            "/swagger-ui.html",
+            "/swagger-ui/index.html",
+            "/swagger-resources",
         ] {
             let signals = RuleEngine::new().evaluate(&make_req(Some("Mozilla/5.0"), Some(path)));
             assert!(
@@ -470,6 +551,24 @@ mod tests {
             .as_slice()
             .iter()
             .any(|signal| signal.name == "path_sensitive"));
+        for path in [
+            "/products/configurable-shirt",
+            "/docs/administrator-guide",
+            "/docs/admin-guide",
+            "/blog/node.environment-setup",
+            "/search?q=/admin",
+            "/search?q=/%61dmin",
+            "/search#fragment=/admin",
+        ] {
+            let signals = RuleEngine::new().evaluate(&make_req(Some("Mozilla/5.0"), Some(path)));
+            assert!(
+                !signals
+                    .as_slice()
+                    .iter()
+                    .any(|signal| signal.name == "path_sensitive"),
+                "false positive {path}"
+            );
+        }
     }
 
     #[test]

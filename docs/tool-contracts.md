@@ -1,6 +1,6 @@
 # Tool Contracts
 
-All tools are called via JSON-RPC 2.0 over WebSocket or HTTP POST at `/mcp`. The method name is the tool name (optionally prefixed with `tools/`).
+All tools are called via JSON-RPC 2.0 over WebSocket or HTTP POST at `/mcp`, or over process-local stdio. The method name is the tool name (optionally prefixed with `tools/`).
 
 ## Core Tools
 
@@ -28,6 +28,15 @@ valid `tls_fingerprint_attestation`. The server consumes the token and derives
 verification status itself; callers cannot assert `tls_fingerprint_verified`.
 Only verified values affect TLS rules and cache identity. See
 [TLS fingerprint attestation](tls-fingerprint-attestation.md).
+
+On development main, sensitive-path signals inspect bounded percent-decoded
+route and file-name boundaries, excluding raw query and fragment text.
+`/admin`, `/administrator`, `/prod.env`, and `/admin;jsessionid=1` remain
+suspicious; `/products/configurable-shirt` and `/search?q=/admin` do not
+receive a path-sensitive signal. Published v0.1.5 can still match sensitive
+prefixes inside an ordinary path segment. Caller and origin URL normalization
+can differ, so this signal is a heuristic rather than authorization or route
+enforcement.
 
 **Response**
 ```json
