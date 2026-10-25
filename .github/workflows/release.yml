@@ -251,6 +251,12 @@ jobs:
         run: |
           python scripts/probe_explain_consistency.py \
             "verified-release/request-guard-mcp-${RELEASE_VERSION}-${{ matrix.platform }}/request-guard-mcp${{ matrix.suffix }}"
+      - name: Check packaged explanation format
+        if: matrix.target == 'x86_64-unknown-linux-gnu' || matrix.target == 'x86_64-unknown-linux-musl'
+        shell: bash
+        run: |
+          python scripts/probe_explain_format.py \
+            "verified-release/request-guard-mcp-${RELEASE_VERSION}-${{ matrix.platform }}/request-guard-mcp${{ matrix.suffix }}"
       - name: Check packaged operational tool inputs
         if: matrix.target == 'x86_64-unknown-linux-gnu' || matrix.target == 'x86_64-unknown-linux-musl'
         shell: bash

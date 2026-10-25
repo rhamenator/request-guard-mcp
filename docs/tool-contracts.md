@@ -65,6 +65,9 @@ enforcement.
 Generate a human-readable explanation for a classification.
 
 **Request**: `{ "classification": <ClassifyRequest or complete ClassifyResponse> }`. On development main, a supplied response is explained using its verdict, score and signals; it is caller-supplied and is not verified against a stored decision. Its score and verdict must agree with its bounded signals, whose descriptions remain unverified caller data. Request metadata is reclassified using the configured rules and TLS attestation without persisting a decision. Unknown request fields and incomplete response shapes are rejected. Published v0.1.5 can instead misread a response as an empty request; send the original request metadata to that release.
+Development main accepts an optional case-sensitive `"format":"json"`, equivalent to omission;
+other formats, explicit null and unknown top-level fields are rejected. Published
+v0.1.5 may accept and ignore an unsupported format string.
 
 A batch result with `include_details: false` lacks its signal details and cannot be explained as a supplied response; pass original request metadata instead.
 Responses produced by a different scoring version may also be rejected if their score or verdict differs from current rules; pass request metadata to recompute under this build.

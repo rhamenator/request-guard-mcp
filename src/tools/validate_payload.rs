@@ -96,6 +96,26 @@ mod tests {
         )
         .is_err());
         assert!(validate_for_tool("explain", &json!({"classification":{"pah":"/admin"}})).is_err());
+        assert!(validate_for_tool(
+            "explain",
+            &json!({"classification":{"path":"/admin"},"format":"json"})
+        )
+        .is_ok());
+        assert!(validate_for_tool(
+            "explain",
+            &json!({"classification":{"path":"/admin"},"format":"html"})
+        )
+        .is_err());
+        assert!(validate_for_tool(
+            "explain",
+            &json!({"classification":{"path":"/admin"},"format":null})
+        )
+        .is_err());
+        assert!(validate_for_tool(
+            "explain",
+            &json!({"classification":{"path":"/admin"},"fomat":"json"})
+        )
+        .is_err());
         assert!(validate_for_tool("classify", &json!({})).is_ok());
         assert!(validate_for_tool("batch_classify", &json!({"items": []})).is_ok());
         assert!(validate_for_tool(
