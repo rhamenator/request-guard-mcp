@@ -301,9 +301,9 @@ See [docs/architecture.md](docs/architecture.md) for a full system diagram and c
 | `threat_lookup` | Exact Redis threat-record lookup, not a safety verdict. Development main rejects unknown arguments, folds one trailing domain dot and domain case, rejects uppercase URL schemes, and checks the canonical IP key before the exact supplied spelling for legacy IPv6 records. Seed new IPv6 keys canonically; other aliases are not searched. URL keys otherwise match exact strings. Published v0.1.5 lacks these corrections. |
 | `canary_eval` | Canary token evaluation. Development main rejects unknown arguments such as a misspelled `context`; published v0.1.5 may silently omit that context. Matched context is stored in Redis unredacted. |
 | `abuse_pattern_match` | Heuristic abuse pattern detection. Development main accepts the optional categories `injection`, `traversal`, `ai_attack`, `data_extraction` without regard to ASCII case and rejects unknown categories; published v0.1.5 can return a false-clean result for an unknown category or multiline SQL text. This tool does not enforce a blocking policy. |
-| `drift_report` | Score drift over time |
-| `calibration_report` | Precision/recall report |
-| `queue_status` | Best-effort Redis tool-operation telemetry, not a backlog. `depth` counts observed active records, which can lag or remain stale; `consumers` is the configured global concurrency ceiling, not live workers or free permits. A requested name with no records returns zero activity, which does not prove the queue exists or is healthy. Published v0.1.5 advertises this tool as queue status but uses the same field semantics. |
+| `drift_report` | Score drift over time. Development main rejects unknown request fields; published v0.1.5 may silently use the default window after a typo. |
+| `calibration_report` | Precision/recall report. Development main rejects unknown request fields; published v0.1.5 may silently use the default window after a typo. |
+| `queue_status` | Best-effort Redis tool-operation telemetry, not a backlog. Development main rejects unknown request fields; published v0.1.5 may silently treat a misspelled `queue` as omitted. `depth` counts observed active records, which can lag or remain stale; `consumers` is the configured global concurrency ceiling, not live workers or free permits. A requested name with no records returns zero activity, which does not prove the queue exists or is healthy. |
 | `config_snapshot` | Running config snapshot |
 | `self_test` | Built-in test suite (`suite: "all"` or omitted) |
 

@@ -123,6 +123,12 @@ mod tests {
         assert!(validate_for_tool("warmup", &json!({"target": null})).is_err());
         assert!(validate_for_tool("config_snapshot", &json!({"redact_secret": false})).is_err());
         assert!(validate_for_tool("config_snapshot", &json!({"redact_secrets": null})).is_err());
+        assert!(validate_for_tool("drift_report", &json!({"window_hors": 48})).is_err());
+        assert!(validate_for_tool("calibration_report", &json!({"window_hors": 48})).is_err());
+        assert!(validate_for_tool("queue_status", &json!({"queu": "target"})).is_err());
+        assert!(validate_for_tool("drift_report", &json!({"window_hours": 48})).is_ok());
+        assert!(validate_for_tool("calibration_report", &json!({"window_hours": 48})).is_ok());
+        assert!(validate_for_tool("queue_status", &json!({"queue": "target"})).is_ok());
         assert!(validate_for_tool(
             "canary_eval",
             &json!({"token": "synthetic", "context": {"path": "/protected"}})

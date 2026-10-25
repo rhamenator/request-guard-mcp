@@ -184,6 +184,7 @@ pub struct ValidatePayloadRequest {
 
 /// Drift report request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct DriftReportRequest {
     pub since: Option<String>,
     pub window_hours: Option<u32>,
@@ -191,12 +192,14 @@ pub struct DriftReportRequest {
 
 /// Calibration report request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CalibrationReportRequest {
     pub window_hours: Option<u32>,
 }
 
 /// Queue status request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct QueueStatusRequest {
     pub queue: Option<String>,
 }

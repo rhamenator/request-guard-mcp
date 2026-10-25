@@ -173,12 +173,16 @@ startup configuration and backend presence, not live backend health. Use
 ### `drift_report`
 Statistical drift report over a time window.
 **Request**: `{ "window_hours": 24 }`
+Development main rejects unknown request fields instead of silently using the
+default 24-hour window; published v0.1.5 may ignore a misspelled field.
 **Response metrics** include real persisted `samples`, current-half score mean,
 window standard deviation, verdict distribution, and per-signal frequency change.
 
 ### `calibration_report`
 Precision/recall calibration report.
 **Request**: `{ "window_hours": 24 }`
+Development main rejects unknown request fields instead of silently using the
+default 24-hour window; published v0.1.5 may ignore a misspelled field.
 **Response** includes labelled `samples`, precision, recall, F1, false-positive
 and false-negative rates computed from the latest feedback per decision.
 
@@ -187,6 +191,8 @@ Best-effort Redis tool-operation telemetry. With no `queue` argument, the
 response lists names observed in Redis active-operation records. With a name,
 the response includes that name even when Redis has no matching record;
 zero activity does not establish that the queue exists or is healthy.
+Development main rejects unknown request fields instead of silently treating
+a misspelled `queue` as omitted; published v0.1.5 may ignore that typo.
 `depth` counts observed active-operation records, not waiting work; timed-out
 records can remain active until Redis trim or expiry. `consumers`
 is the configured global concurrency ceiling, not a live worker count or the

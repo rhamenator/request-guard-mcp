@@ -45,6 +45,10 @@ trim/expiry; Redis-dependent tools still need a healthy backend.
 in-flight tools rather than waiting work, and `consumers` is the configured
 global concurrency ceiling rather than free workers. A zero result for a
 requested name does not prove that name exists or that ingress is healthy.
+Development main rejects unknown `drift_report`, `calibration_report`, and
+`queue_status` fields rather than silently defaulting a misspelled time window
+or queue name. Published v0.1.5 may ignore those unknown fields; check the
+response window or selected queue when using that release.
 Development main also bounds concurrent Redis/PostgreSQL pings on the unauthenticated
 `/health` and `/ready` endpoints to one second per request. A stalled backend
 makes `/health` return HTTP 200 with an unhealthy JSON status, and `/ready` return HTTP 503.
