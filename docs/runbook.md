@@ -160,6 +160,12 @@ key (`198.51.100.9`) first for IPv4-mapped IPv6 input
 absent. Store new IPv4 threat and blocklist entries under the IPv4 spelling;
 existing mapped keys remain readable. Published v0.1.5 does not perform this
 alias lookup.
+On development main, seed new IPv6 threat and blocklist keys in canonical
+compressed spelling (for example, `2001:db8::1`). If an older record uses a
+valid noncanonical spelling such as `2001:0db8::1`, `threat_lookup` and
+`enrich_ip` try the canonical key first and then that exact supplied spelling.
+This fallback does not enumerate other IPv6 aliases: migrate legacy keys to
+canonical spelling so callers need not know how each record was seeded.
 Canary tokens are never stored raw: SHA-256 the token and store a JSON record
 in the `request_guard:canaries` hash. Successful evaluations append a bounded
 event record to `request_guard:canary_events`. The event list keeps at most
