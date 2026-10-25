@@ -59,7 +59,7 @@ fn explain_response(response: ClassifyResponse, supplied: bool) -> ExplainRespon
 }
 
 pub(crate) enum ClassificationInput {
-    Request(ClassifyRequest),
+    Request(Box<ClassifyRequest>),
     Response(ClassifyResponse),
 }
 
@@ -140,7 +140,7 @@ pub(crate) fn parse_classification(value: Value) -> Result<ClassificationInput, 
     }
     let request: ClassifyRequest = serde_json::from_value(value)
         .map_err(|_| AppError::InvalidRequest("classification must be a ClassifyRequest".into()))?;
-    Ok(ClassificationInput::Request(request))
+    Ok(ClassificationInput::Request(Box::new(request)))
 }
 
 pub async fn run(state: &AppState, req: ExplainRequest) -> Result<ExplainResponse, AppError> {
@@ -149,7 +149,7 @@ pub async fn run(state: &AppState, req: ExplainRequest) -> Result<ExplainRespons
         ClassificationInput::Request(request) => {
             // Use classify's TLS attestation, configured rules, scoring and
             // cache domain without writing a PostgreSQL decision.
-            let response = crate::tools::classify::run_ephemeral(state, request).await?;
+            let response = crate::tools::classify::run_ephemeral(state, *request).await?;
             Ok(explain_response(response, false))
         }
     }
