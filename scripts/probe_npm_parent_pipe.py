@@ -32,7 +32,8 @@ def process_identity(pid):
     try:
         fields = Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()
         return fields[19], fields[0]
-    except FileNotFoundError:
+    except (FileNotFoundError, ProcessLookupError):
+        # procfs may discard a short-lived child between lookup and read.
         return None
 
 

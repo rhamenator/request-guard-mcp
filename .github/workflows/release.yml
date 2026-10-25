@@ -192,6 +192,11 @@ jobs:
         run: |
           python scripts/probe_npm_parent_pipe_portable.py \
             "verified-release/request-guard-mcp-${RELEASE_VERSION}-${{ matrix.platform }}/request-guard-mcp${{ matrix.suffix }}"
+      - name: Check clean installed npm shim forced-kill cleanup
+        shell: bash
+        run: |
+          python scripts/probe_npm_installed_shim.py \
+            "verified-release/request-guard-mcp-${RELEASE_VERSION}-${{ matrix.platform }}/request-guard-mcp${{ matrix.suffix }}"
       - name: Check packaged payload validation
         if: matrix.target == 'x86_64-unknown-linux-gnu' || matrix.target == 'x86_64-unknown-linux-musl'
         shell: bash
