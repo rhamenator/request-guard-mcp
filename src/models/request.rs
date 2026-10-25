@@ -116,6 +116,7 @@ pub struct ThreatLookupRequest {
 
 /// Canary eval request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CanaryEvalRequest {
     pub token: String,
     pub context: Option<serde_json::Value>,

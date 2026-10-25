@@ -299,7 +299,7 @@ See [docs/architecture.md](docs/architecture.md) for a full system diagram and c
 | `enrich_asn` | ASN organization enrichment |
 | `enrich_ua` | User-agent parsing |
 | `threat_lookup` | Threat indicator lookup; development main checks the IPv4 Redis key before the literal mapped key for IPv4-mapped IPv6 input. Published v0.1.5 uses the literal mapped key. |
-| `canary_eval` | Canary token evaluation |
+| `canary_eval` | Canary token evaluation. Development main rejects unknown arguments such as a misspelled `context`; published v0.1.5 may silently omit that context. Matched context is stored in Redis unredacted. |
 | `abuse_pattern_match` | Heuristic abuse pattern detection. Development main accepts the optional categories `injection`, `traversal`, `ai_attack`, `data_extraction` without regard to ASCII case and rejects unknown categories; published v0.1.5 can return a false-clean result for an unknown category or multiline SQL text. This tool does not enforce a blocking policy. |
 | `drift_report` | Score drift over time |
 | `calibration_report` | Precision/recall report |

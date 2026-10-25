@@ -88,6 +88,16 @@ mod tests {
         )
         .is_err());
         assert!(validate_for_tool("enrich_ip", &json!({"ip": 1})).is_err());
+        assert!(validate_for_tool(
+            "canary_eval",
+            &json!({"token": "synthetic", "context": {"path": "/protected"}})
+        )
+        .is_ok());
+        assert!(validate_for_tool(
+            "canary_eval",
+            &json!({"token": "synthetic", "contex": {"path": "/protected"}})
+        )
+        .is_err());
         assert!(validate_for_tool("not_a_tool", &json!({})).is_err());
     }
 

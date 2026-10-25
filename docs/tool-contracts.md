@@ -159,6 +159,10 @@ unsupported suite is rejected instead of returning a passing result.
 
 ### `canary_eval`
 **Request**: `{ "token": "canary-token-value" }`
+To record optional caller context, use exactly `{"token":"canary-token-value","context":{"path":"/protected"}}`.
+Development main rejects unknown top-level fields, including a misspelled
+`context`; published v0.1.5 may silently ignore them. A matched context is
+persisted unredacted in Redis subject to the configured event retention policy.
 
 ### `abuse_pattern_match`
 **Request**: `{ "text": "...", "categories": ["injection", "ai_attack"] }`
