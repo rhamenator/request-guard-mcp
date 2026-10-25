@@ -52,7 +52,13 @@ fn validate_for_tool(tool: &str, payload: &Value) -> Result<(), String> {
     match tool {
         "health" | "model_info" => Ok(()), // These wrappers ignore arguments.
         "classify" => decode::<ClassifyRequest>(payload),
-        "explain" => decode::<ExplainRequest>(payload),
+        "explain" => {
+            let request: ExplainRequest = serde_json::from_value(payload.clone())
+                .map_err(|_| "payload does not match the tool's request shape".to_string())?;
+            crate::tools::explain::parse_classification(request.classification)
+                .map(|_| ())
+                .map_err(|_| "classification must be a complete request or response".to_string())
+        }
         "batch_classify" => decode::<BatchClassifyRequest>(payload),
         "feedback" => decode::<FeedbackRequest>(payload),
         "feature_flags" => decode::<FeatureFlagsRequest>(payload),
@@ -83,6 +89,13 @@ mod tests {
 
     #[test]
     fn matches_callable_request_shapes() {
+        assert!(validate_for_tool("explain", &json!({"classification":{"path":"/admin"}})).is_ok());
+        assert!(validate_for_tool(
+            "explain",
+            &json!({"classification":{"verdict":"block","score":0.9}})
+        )
+        .is_err());
+        assert!(validate_for_tool("explain", &json!({"classification":{"pah":"/admin"}})).is_err());
         assert!(validate_for_tool("classify", &json!({})).is_ok());
         assert!(validate_for_tool("batch_classify", &json!({"items": []})).is_ok());
         assert!(validate_for_tool(

@@ -284,7 +284,7 @@ See [docs/architecture.md](docs/architecture.md) for a full system diagram and c
 | Tool | Description |
 |------|-------------|
 | `classify` | Classify an inbound request. Development main uses decoded route and file-name boundaries for sensitive paths, while ignoring query/fragment text; `/products/configurable-shirt` stays ordinary, and `/admin`, `/administrator`, `/prod.env`, and `/admin;jsessionid=1` stay sensitive. Published v0.1.5 can match a sensitive prefix inside an ordinary segment. The heuristic is not site authorization. |
-| `explain` | Explain a classification decision |
+| `explain` | Explain a supplied classification response or recompute from nested request metadata. Development main labels caller-supplied results and does not retrieve a stored decision; published v0.1.5 should receive request metadata because a response can be misread as an empty request. |
 | `batch_classify` | Classify multiple requests. On development main, `options.include_details: false` omits per-item signal details; omitted or `true` preserves the full result. Check `errors` and each item error when `fail_fast` is false. Published v0.1.5 accepts but ignores `include_details`. |
 | `health` | Server health check; on development main, `uptime_seconds` counts from server state initialization, including time before the first health call. Published v0.1.5 may begin counting at the first health call. |
 | `model_info` | Server and tool metadata; `enabled` reflects configured startup capability, not live backend health. Check `health` or `/ready` before relying on a backend. |

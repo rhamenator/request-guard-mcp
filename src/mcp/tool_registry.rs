@@ -285,7 +285,7 @@ impl McpTool for ExplainTool {
         "explain"
     }
     fn description(&self) -> &str {
-        "Explain a classification decision"
+        "Explain a complete supplied classification or recompute from request metadata; no stored-decision lookup"
     }
     async fn call(&self, state: Arc<AppState>, params: Option<Value>) -> Result<Value, AppError> {
         let req: crate::models::request::ExplainRequest = params
@@ -293,7 +293,7 @@ impl McpTool for ExplainTool {
             .and_then(|v| {
                 serde_json::from_value(v).map_err(|e| AppError::InvalidRequest(e.to_string()))
             })?;
-        let result = crate::tools::explain::run(&state, req).await;
+        let result = crate::tools::explain::run(&state, req).await?;
         serde_json::to_value(result).map_err(AppError::from)
     }
 }
