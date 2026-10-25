@@ -23,6 +23,8 @@ pub async fn run(state: &AppState, req: EnrichAsnRequest) -> Result<EnrichAsnRes
         .map_err(|error| AppError::Upstream(error.to_string()))?;
     Ok(EnrichAsnResponse {
         asn: req.asn,
+        asn_data_found: enrichment.is_some(),
+        reputation_listed: reputation.listed,
         organization: enrichment.and_then(|value| value.organization),
         country: None,
         risk_score: (if is_hosting { 0.6_f64 } else { 0.1_f64 }).max(reputation.score),

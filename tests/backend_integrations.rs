@@ -160,6 +160,9 @@ async fn maxmind_city_asn_and_anonymous_databases_enrich_real_records() {
         .unwrap();
     assert_eq!(asn.organization.as_deref(), Some("Google Inc."));
     assert!(asn.is_hosting);
+    assert!(asn.asn_data_found);
+    assert!(!asn.reputation_listed);
+    assert_eq!(asn.country, None);
 }
 
 #[tokio::test]
@@ -477,6 +480,16 @@ async fn redis_and_postgres_backed_tools_complete_real_round_trip() {
             .unwrap();
     }
 
+    let unknown_asn = tools::enrich_asn::run(&state, EnrichAsnRequest { asn: 64502 })
+        .await
+        .unwrap();
+    assert_eq!(unknown_asn.organization, None);
+    assert_eq!(unknown_asn.country, None);
+    assert!(!unknown_asn.is_hosting);
+    assert!(!unknown_asn.asn_data_found);
+    assert!(!unknown_asn.reputation_listed);
+    assert_eq!(unknown_asn.risk_score, 0.1);
+
     state
         .redis
         .store_threat(
@@ -496,6 +509,8 @@ async fn redis_and_postgres_backed_tools_complete_real_round_trip() {
         .await
         .unwrap();
     assert_eq!(asn_reputation.risk_score, 1.0);
+    assert!(asn_reputation.reputation_listed);
+    assert!(!asn_reputation.asn_data_found);
 
     let canary_token = format!("canary-secret-{suffix}");
     state

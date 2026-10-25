@@ -92,7 +92,17 @@ baseline without requiring an optional enrichment backend. This applies to
 
 ### `enrich_asn`
 **Request**: `{ "asn": 15169 }`
-**Response**: `{ "asn", "organization", "country", "risk_score", "is_hosting" }`
+**Response on development main**: `{ "asn", "organization", "country", "risk_score", "is_hosting", "asn_data_found", "reputation_listed" }`
+
+`asn_data_found` means the configured MaxMind ASN index contained a record;
+`reputation_listed` means Redis returned a threat record for the bare numeric ASN
+key (for example `15169`, not `AS15169`). With neither source providing a record,
+`risk_score: 0.1` is an unverified baseline, not a safe verdict. In Redis-only
+mode, `organization: null` and `is_hosting: false` do not mean that an ASN was
+checked for hosting. When ASN data is present, `is_hosting` is a coarse
+organization-name substring heuristic, not a provider attestation. `country`
+is currently always `null`. Published v0.1.5 has the older response without
+the two evidence flags. This diagnostic does not change inbound `classify`.
 
 ### `enrich_ua`
 **Request**: `{ "user_agent": "..." }`

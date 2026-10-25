@@ -158,6 +158,8 @@ pub struct EnrichAsnResponse {
     pub country: Option<String>,
     pub risk_score: f64,
     pub is_hosting: bool,
+    pub asn_data_found: bool,
+    pub reputation_listed: bool,
 }
 
 /// User-agent enrichment response.

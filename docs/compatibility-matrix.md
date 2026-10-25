@@ -181,7 +181,7 @@ that boundary.
 | `batch_classify` | `enable_batch` | enabled |
 | `feedback` | PostgreSQL + `enable_feedback` | enabled when configured |
 | `enrich_ip` | MaxMind or Redis reputation + `enable_enrichment` | enabled when configured |
-| `enrich_asn` | MaxMind ASN or Redis reputation + `enable_enrichment` | enabled when configured |
+| `enrich_asn` | MaxMind ASN or Redis reputation + `enable_enrichment` | enabled when configured; development main reports separate ASN-data and Redis-listing evidence flags. Redis alone cannot supply organization or hosting status. |
 | `enrich_ua` | `enable_enrichment` | enabled |
 | `replay_decision`, `drift_report`, `calibration_report` | PostgreSQL | enabled when configured |
 | `threat_lookup`, `canary_eval`, `queue_status` | Redis | enabled when configured |

@@ -108,6 +108,10 @@ jobs:
           grep -Fq 'running real Redis and PostgreSQL integration round trip' <<< "$output"
           grep -Eq 'test result: ok\. 1 passed;' <<< "$output"
       - run: cargo test --all-features
+      - name: Check running ASN evidence contract with real Redis
+        run: |
+          cargo build --locked --all-features --bin request-guard-mcp
+          python3 scripts/probe_asn_evidence.py target/debug/request-guard-mcp
 
   msrv:
     name: MSRV (1.89)
