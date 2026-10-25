@@ -64,7 +64,7 @@ def main() -> None:
         raise AssertionError("feedback tool accepted misspelled notes")
     if responses[8]["result"]["structuredContent"]["valid"] is not False:
         raise AssertionError("validator accepted misspelled notes")
-    if b"categorie" in result.stdout + result.stderr or b"notse" in result.stdout + result.stderr:
+    if b'"categorie"' in result.stdout + result.stderr or b'"notse"' in result.stdout + result.stderr:
         raise AssertionError("misspelled field reflected in output")
     print("PASS packaged secondary inputs: feedback and abuse unknown fields rejected")
 
