@@ -95,6 +95,14 @@ baseline without requiring an optional enrichment backend. This applies to
 ### `enrich_ua`
 **Request**: `{ "user_agent": "..." }`
 **Response**: `{ "user_agent", "browser", "os", "device_type", "is_bot", "bot_name", "risk_score" }`
+`is_bot` reports the user-agent parser's crawler category. On development main,
+the diagnostic `risk_score` also reflects the rule engine's AI-bot and
+scraper patterns, including some generic HTTP client strings; a scanner may
+therefore have `is_bot: false` and a raised score. Broad substring patterns
+can produce false positives. Published v0.1.5 may instead score those
+scanners at 0.1. This hint is
+not a safety verdict; use `classify` for an inbound request decision. User-agent
+strings can be spoofed or omitted.
 
 ## Analytical Tools
 

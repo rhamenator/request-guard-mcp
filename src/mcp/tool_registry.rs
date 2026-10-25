@@ -502,7 +502,7 @@ impl McpTool for EnrichUaTool {
         "enrich_ua"
     }
     fn description(&self) -> &str {
-        "Enrich a user-agent"
+        "Parse a user-agent; diagnostic risk score includes rule-engine automation patterns, while is_bot reflects parser crawler category (not a classify verdict)"
     }
     async fn call(&self, state: Arc<AppState>, params: Option<Value>) -> Result<Value, AppError> {
         if !state.config.features.enable_enrichment {
