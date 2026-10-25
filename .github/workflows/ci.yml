@@ -145,6 +145,7 @@ jobs:
       - run: python3 scripts/probe_validate_payload.py target/release/request-guard-mcp
       - run: python3 scripts/probe_score_breakdown.py target/release/request-guard-mcp
       - run: python3 scripts/probe_self_test_suite.py target/release/request-guard-mcp
+      - run: python3 scripts/probe_health_uptime.py target/release/request-guard-mcp
       - run: python3 scripts/probe_canary_shape.py target/release/request-guard-mcp
       - run: python3 scripts/probe_redact_preview_shape.py target/release/request-guard-mcp
       - run: python3 scripts/probe_enrich_ua_risk.py target/release/request-guard-mcp

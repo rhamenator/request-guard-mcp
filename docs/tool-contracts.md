@@ -62,7 +62,7 @@ Server health check.
 
 **Request**: none
 
-**Response**: `{ "status": "healthy", "version", "uptime_seconds", "checks": {} }`
+**Response**: `{ "status": "healthy", "version", "uptime_seconds", "checks": {} }`. `uptime_seconds` is monotonic elapsed time since application state initialization, including time before the first health call.
 
 ### `model_info`
 Return metadata about the server and available tools.
