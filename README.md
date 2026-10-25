@@ -298,7 +298,7 @@ See [docs/architecture.md](docs/architecture.md) for a full system diagram and c
 | `enrich_ip` | IP geolocation/ASN enrichment; development main looks up IPv4-mapped IPv6 under its IPv4 key and treats IPv6 unique-local/link-local as local addresses. Published v0.1.5 does not include this correction. |
 | `enrich_asn` | ASN organization enrichment |
 | `enrich_ua` | User-agent parsing |
-| `threat_lookup` | Threat indicator lookup; development main checks the IPv4 Redis key before the literal mapped key for IPv4-mapped IPv6 input. Published v0.1.5 uses the literal mapped key. |
+| `threat_lookup` | Exact Redis threat-record lookup, not a safety verdict. Development main rejects unknown arguments, folds one trailing domain dot and domain case, rejects uppercase URL schemes, and checks the IPv4 key before the literal mapped key for IPv4-mapped IPv6. URL keys otherwise match exact strings. Published v0.1.5 lacks these corrections. |
 | `canary_eval` | Canary token evaluation. Development main rejects unknown arguments such as a misspelled `context`; published v0.1.5 may silently omit that context. Matched context is stored in Redis unredacted. |
 | `abuse_pattern_match` | Heuristic abuse pattern detection. Development main accepts the optional categories `injection`, `traversal`, `ai_attack`, `data_extraction` without regard to ASCII case and rejects unknown categories; published v0.1.5 can return a false-clean result for an unknown category or multiline SQL text. This tool does not enforce a blocking policy. |
 | `drift_report` | Score drift over time |

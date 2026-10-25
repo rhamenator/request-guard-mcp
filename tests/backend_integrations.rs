@@ -282,6 +282,40 @@ async fn redis_and_postgres_backed_tools_complete_real_round_trip() {
     .unwrap();
     assert!(threat.found);
     assert_eq!(threat.source.as_deref(), Some("integration-test"));
+    state
+        .redis
+        .store_threat(
+            "domain",
+            "evil.example",
+            &ThreatRecord {
+                threat_type: "scanner".to_string(),
+                severity: "high".to_string(),
+                source: "integration-test".to_string(),
+                last_seen: None,
+                metadata: None,
+            },
+        )
+        .await
+        .unwrap();
+    let trailing_dot = tools::threat_lookup::run(
+        &state,
+        ThreatLookupRequest {
+            indicator: "Evil.Example.".to_string(),
+            indicator_type: None,
+        },
+    )
+    .await
+    .unwrap();
+    assert!(trailing_dot.found);
+    assert!(tools::threat_lookup::run(
+        &state,
+        ThreatLookupRequest {
+            indicator: "HTTP://evil.example/".to_string(),
+            indicator_type: None,
+        },
+    )
+    .await
+    .is_err());
     let mapped_threat = tools::threat_lookup::run(
         &state,
         ThreatLookupRequest {

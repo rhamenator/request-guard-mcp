@@ -131,6 +131,7 @@ pub struct EnrichUaRequest {
 
 /// Threat lookup request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ThreatLookupRequest {
     pub indicator: String,
     #[serde(rename = "type")]

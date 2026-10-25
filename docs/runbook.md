@@ -142,6 +142,13 @@ intended database using a credential method that does not place passwords in
 process arguments. Threat records are JSON values in the
 `request_guard:threats:<type>` hash, keyed by normalized indicators:
 
+For domain records, seed lowercase ASCII keys without a trailing DNS dot; use
+punycode for internationalized domains. Existing noncanonical keys need
+operator migration because the lookup uses the normalized spelling. For URL
+records, use the exact lookup string with a lowercase `http://` or `https://`
+scheme; URL path and host spelling are not otherwise canonicalized. A lookup
+miss is not a general safety verdict.
+
 ```text
 HSET request_guard:threats:ip 198.51.100.9 '{"threat_type":"scanner","severity":"high","source":"operator","last_seen":"2026-08-11T00:00:00Z"}'
 ```
