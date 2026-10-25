@@ -39,6 +39,12 @@ def main():
         requests.append({"jsonrpc": "2.0", "id": index, "method": "tools/call", "params": {
             "name": "score_breakdown", "arguments": arguments,
         }})
+    for index, payload in enumerate(cases, 10):
+        requests.append({"jsonrpc": "2.0", "id": index, "method": "tools/call", "params": {
+            "name": "validate_payload", "arguments": {
+                "tool": "score_breakdown", "payload": payload,
+            },
+        }})
     with tempfile.TemporaryDirectory(prefix="rg-score-breakdown-") as cwd:
         env = {"PATH": os.environ.get("PATH", ""), "HOME": cwd}
         result = subprocess.run(
@@ -49,7 +55,7 @@ def main():
     if result.returncode != 0:
         raise AssertionError(f"stdio child exited {result.returncode}")
     responses = [json.loads(line) for line in result.stdout.splitlines()]
-    if [response.get("id") for response in responses] != list(range(1, 10)):
+    if [response.get("id") for response in responses] != list(range(1, 17)):
         raise AssertionError("unexpected stdio response count/order")
     tool = next(tool for tool in responses[1]["result"]["tools"]
                 if tool["name"] == "score_breakdown")
@@ -66,9 +72,15 @@ def main():
     absent = responses[8]["result"]["structuredContent"]
     if absent["total_score"] != 0 or absent["breakdown"]:
         raise AssertionError("absent optional signals changed behavior")
+    for response in responses[9:14]:
+        if response["result"]["structuredContent"]["valid"]:
+            raise AssertionError("validate_payload accepted malformed score_breakdown signals")
+    for response in responses[14:16]:
+        if not response["result"]["structuredContent"]["valid"]:
+            raise AssertionError("validate_payload rejected valid score_breakdown signals")
     if marker.encode() in result.stdout + result.stderr:
         raise AssertionError("invalid field name was reflected into output")
-    print("PASS packaged score_breakdown: malformed supplied signals rejected, valid metadata scored, absent field preserved")
+    print("PASS packaged score_breakdown and validate_payload: malformed supplied signals rejected, valid metadata scored, absent field preserved")
 
 
 if __name__ == "__main__":

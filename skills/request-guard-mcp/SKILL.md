@@ -45,6 +45,10 @@ trim/expiry; Redis-dependent tools still need a healthy backend.
 in-flight tools rather than waiting work, and `consumers` is the configured
 global concurrency ceiling rather than free workers. A zero result for a
 requested name does not prove that name exists or that ingress is healthy.
+On development main, `validate_payload` checks supplied nested
+`score_breakdown.signals` metadata against the classification request shape;
+published v0.1.5 may report malformed nested signals as valid even though the
+callable rejects them. Validation does not run scoring or test backend health.
 Development main rejects unknown `drift_report`, `calibration_report`, and
 `queue_status` fields rather than silently defaulting a misspelled time window
 or queue name. Published v0.1.5 may ignore those unknown fields; check the
