@@ -124,6 +124,17 @@ async fn batch_details_option_preserves_default_and_omits_signals_when_false() {
         serde_json::from_value(serde_json::json!({"items": [], "options": {"fail_fast": false}}))
             .unwrap();
     assert!(parsed.options.unwrap().include_details);
+
+    for unknown in ["include_detail", "failfast"] {
+        let malformed = serde_json::json!({
+            "items": [],
+            "options": {unknown: false}
+        });
+        assert!(
+            serde_json::from_value::<models::request::BatchClassifyRequest>(malformed).is_err(),
+            "unknown batch option {unknown} was accepted"
+        );
+    }
 }
 
 #[tokio::test]

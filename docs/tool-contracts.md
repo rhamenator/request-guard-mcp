@@ -65,7 +65,7 @@ Responses produced by a different scoring version may also be rejected if their 
 ### `batch_classify`
 Classify multiple requests in one call (max batch size configurable, default 50).
 
-**Request**: `{ "items": [<ClassifyRequest>, ...], "options": { "fail_fast": false, "include_details": true } }`. The default maximum batch size is 50 and is configurable; an empty batch returns an empty result. On development main, `include_details: false` returns an empty `signals` array for each successful item. Omitting the option preserves the full result. Published v0.1.5 accepts but ignores `include_details` and always returns signal details.
+**Request**: `{ "items": [<ClassifyRequest>, ...], "options": { "fail_fast": false, "include_details": true } }`. The default maximum batch size is 50 and is configurable; an empty batch returns an empty result. On development main, `include_details: false` returns an empty `signals` array for each successful item. Omitting the option preserves the full result; unknown option names are rejected. Published v0.1.5 accepts but ignores `include_details` and always returns signal details.
 
 **Response**: `{ "results": [{ "index", "result", "error" }], "total", "processed", "errors", "latency_ms" }`. With `fail_fast: false`, inspect `errors` and each item `error`: an item error has no classification result even though the batch call succeeds. With `fail_fast: true`, the call returns an error at the first failing item and no partial batch response.
 
