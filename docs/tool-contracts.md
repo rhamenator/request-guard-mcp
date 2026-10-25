@@ -67,6 +67,10 @@ Server health check.
 ### `model_info`
 Return metadata about the server and available tools.
 
+Each tool's `enabled` field reflects configured capability when server state
+was initialized. It does not poll a backend or change when Redis or PostgreSQL
+goes down later. Check `health` or `/ready` for current backend status.
+
 **Response**: `{ "model_version", "tool_count", "tools": [...], "build_info": {} }`
 
 ### `feedback`
