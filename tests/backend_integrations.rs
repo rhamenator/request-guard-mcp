@@ -409,6 +409,21 @@ async fn redis_and_postgres_backed_tools_complete_real_round_trip() {
     .await
     .unwrap();
     assert!(canary.triggered);
+    #[cfg(feature = "redis-integration")]
+    {
+        let client =
+            deadpool_redis::redis::Client::open(state.config.redis.url.as_ref().unwrap().as_str())
+                .unwrap();
+        let mut redis = client.get_multiplexed_async_connection().await.unwrap();
+        let event: Option<String> = deadpool_redis::redis::cmd("LINDEX")
+            .arg(format!("{}:canary_events", state.config.redis.key_prefix))
+            .arg(0)
+            .query_async(&mut redis)
+            .await
+            .unwrap();
+        let event: serde_json::Value = serde_json::from_str(&event.unwrap()).unwrap();
+        assert_eq!(event["context"], json!({"path": "/protected"}));
+    }
 
     let operation_id = state
         .redis
