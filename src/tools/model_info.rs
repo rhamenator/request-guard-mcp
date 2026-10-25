@@ -46,7 +46,7 @@ pub async fn run(state: &AppState) -> ModelInfoResponse {
         ),
         tool(
             "enrich_ua",
-            "Enrich a user-agent string",
+            "Parse a user-agent with a diagnostic rule-pattern risk hint; not a classify verdict",
             state.config.features.enable_enrichment,
         ),
         tool(

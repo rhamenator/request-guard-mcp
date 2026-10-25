@@ -25,6 +25,24 @@ static SCRAPING_UA: Lazy<Regex> = Lazy::new(|| {
     .expect("compile regex")
 });
 
+/// The same automation patterns drive rule signals and the standalone
+/// user-agent enrichment risk hint. A match is a heuristic, not an identity.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum UserAgentPattern {
+    AiBot,
+    Scraper,
+}
+
+pub(crate) fn user_agent_pattern(ua: &str) -> Option<UserAgentPattern> {
+    if AI_BOT_UA.is_match(ua) {
+        Some(UserAgentPattern::AiBot)
+    } else if SCRAPING_UA.is_match(ua) {
+        Some(UserAgentPattern::Scraper)
+    } else {
+        None
+    }
+}
+
 static SENSITIVE_PATH: Lazy<Regex> = Lazy::new(|| {
     Regex::new(concat!(
         r"(?i)(\.env|/admin|/api/internal|/wp-admin|/phpmyadmin|\.git/|",
@@ -93,7 +111,8 @@ impl RuleEngine {
     }
 
     fn eval_user_agent(&self, ua: &str, signals: &mut SignalSet) {
-        if AI_BOT_UA.is_match(ua) {
+        let pattern = user_agent_pattern(ua);
+        if pattern == Some(UserAgentPattern::AiBot) {
             signals.push(Signal::new(
                 "ua_ai_bot",
                 1.0,
@@ -101,7 +120,7 @@ impl RuleEngine {
                 SignalSource::RuleEngine,
                 "User-agent matches known AI bot pattern",
             ));
-        } else if SCRAPING_UA.is_match(ua) {
+        } else if pattern == Some(UserAgentPattern::Scraper) {
             signals.push(Signal::new(
                 "ua_scraper",
                 1.0,
