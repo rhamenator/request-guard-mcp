@@ -18,6 +18,7 @@ pub async fn run(
             "indicator cannot be empty".to_string(),
         ));
     }
+    let lower_indicator = indicator.to_ascii_lowercase();
     let indicator_type = req
         .indicator_type
         .as_deref()
@@ -25,7 +26,9 @@ pub async fn run(
         .unwrap_or_else(|| {
             if indicator.parse::<IpAddr>().is_ok() {
                 "ip".to_string()
-            } else if indicator.starts_with("http://") || indicator.starts_with("https://") {
+            } else if lower_indicator.starts_with("http://")
+                || lower_indicator.starts_with("https://")
+            {
                 "url".to_string()
             } else {
                 "domain".to_string()
@@ -46,7 +49,8 @@ pub async fn run(
                 AppError::InvalidRequest("indicator is not a valid IP address".to_string())
             })?
             .to_string(),
-        "domain" | "hash" => indicator.to_ascii_lowercase(),
+        "domain" => normalize_domain(indicator)?,
+        "hash" => indicator.to_ascii_lowercase(),
         "asn" => indicator
             .strip_prefix("AS")
             .or_else(|| indicator.strip_prefix("as"))
@@ -54,7 +58,7 @@ pub async fn run(
             .parse::<u32>()
             .map_err(|_| AppError::InvalidRequest("indicator is not a valid ASN".to_string()))?
             .to_string(),
-        "url" => indicator.to_string(),
+        "url" => normalize_url(indicator)?,
         _ => unreachable!("indicator type was validated"),
     };
     let record = state
@@ -70,4 +74,71 @@ pub async fn run(
         source: record.as_ref().map(|value| value.source.clone()),
         last_seen: record.and_then(|value| value.last_seen),
     })
+}
+
+fn normalize_domain(indicator: &str) -> Result<String, AppError> {
+    let domain = indicator.strip_suffix('.').unwrap_or(indicator);
+    if domain.is_empty()
+        || !domain.is_ascii()
+        || domain.ends_with('.')
+        || domain.split('.').any(str::is_empty)
+        || domain
+            .bytes()
+            .any(|byte| !(byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'-' | b'_')))
+    {
+        return Err(AppError::InvalidRequest(
+            "indicator is not a valid domain spelling".to_string(),
+        ));
+    }
+    Ok(domain.to_ascii_lowercase())
+}
+
+fn normalize_url(indicator: &str) -> Result<String, AppError> {
+    let authority_and_path = indicator
+        .strip_prefix("http://")
+        .or_else(|| indicator.strip_prefix("https://"));
+    let valid = authority_and_path.is_some_and(|value| {
+        !value.split(['/', '?', '#']).next().unwrap_or("").is_empty()
+            && !indicator.bytes().any(|byte| byte.is_ascii_whitespace())
+    });
+    if !valid {
+        return Err(AppError::InvalidRequest(
+            "URL indicator must have a host and lowercase http:// or https:// scheme".to_string(),
+        ));
+    }
+    Ok(indicator.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rejects_misspelled_type_before_lookup() {
+        let request = serde_json::from_value::<ThreatLookupRequest>(serde_json::json!({
+            "indicator": "AS64500",
+            "typ": "asn"
+        }));
+        assert!(request.is_err());
+    }
+
+    #[test]
+    fn normalizes_one_dns_dot_and_rejects_ambiguous_indicators() {
+        assert_eq!(normalize_domain("Evil.Example.").unwrap(), "evil.example");
+        for domain in [
+            "evil.example..",
+            "a..b",
+            ".",
+            "evil.example:80",
+            "é.example",
+        ] {
+            assert!(normalize_domain(domain).is_err(), "{domain}");
+        }
+        assert_eq!(
+            normalize_url("https://evil.example/").unwrap(),
+            "https://evil.example/"
+        );
+        assert!(normalize_url("HTTP://evil.example/").is_err());
+        assert!(normalize_url("http://").is_err());
+    }
 }

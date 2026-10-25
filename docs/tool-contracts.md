@@ -166,6 +166,17 @@ unsupported suite is rejected instead of returning a passing result.
 
 ### `threat_lookup`
 **Request**: `{ "indicator": "1.2.3.4", "type": "ip" }`
+`found:false` means no matching Redis record, not that an indicator is safe.
+Always pass `type` for hash and ASN indicators; omitted `type` infers only IP,
+lowercase-scheme URL, or domain.
+Development main rejects unknown fields such as `typ`, lowercases domain names
+and folds one trailing DNS dot, and rejects ambiguous domain spellings and
+uppercase URL schemes. Domain indicators use ASCII letters, digits, dots,
+hyphens and underscores; send internationalized domains as punycode. URL keys
+remain exact strings: seed and query the same
+lowercase-scheme spelling. Published v0.1.5 lacks these request checks.
+`validate_payload` checks the request shape, including unknown fields, but
+does not pre-check the indicator's semantic spelling or Redis availability.
 
 ### `canary_eval`
 **Request**: `{ "token": "canary-token-value" }`

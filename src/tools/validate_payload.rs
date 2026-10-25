@@ -100,6 +100,10 @@ mod tests {
         )
         .is_err());
         assert!(validate_for_tool("enrich_ip", &json!({"ip": 1})).is_err());
+        assert!(
+            validate_for_tool("threat_lookup", &json!({"indicator":"AS64500","typ":"asn"}))
+                .is_err()
+        );
         assert!(validate_for_tool("feature_flags", &json!({"flags": "enrichment"})).is_err());
         assert!(validate_for_tool("warmup", &json!({"targt": "cache"})).is_err());
         assert!(validate_for_tool("warmup", &json!({"target": "bogus"})).is_err());

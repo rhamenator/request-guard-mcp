@@ -139,7 +139,7 @@ fn tool_input_schema(name: &str) -> Value {
             vec!["user_agent"],
         ),
         "threat_lookup" => (
-            serde_json::json!({"indicator":{"type":"string"},"type":{"type":"string"}}),
+            serde_json::json!({"indicator":{"type":"string"},"type":{"type":"string","description":"Optional indicator kind: ip, domain, url, hash, or asn (case-insensitive); unknown field names are rejected"}}),
             vec!["indicator"],
         ),
         "canary_eval" => (
