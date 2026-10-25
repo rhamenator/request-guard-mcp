@@ -102,6 +102,11 @@ Submit a correction to a prior classification.
 
 **Request**: `{ "request_id": "uuid", "correct_verdict": "allow", "notes": "..." }`
 
+`notes` and `reporter` are optional. On development main, unknown field names
+are rejected by both the callable tool and `validate_payload`; published
+v0.1.5 can silently discard a misspelled optional field. Feedback needs
+PostgreSQL; shape validation alone does not establish backend availability.
+
 **Response**: `{ "accepted": true, "feedback_id": "uuid", "message": "..." }`
 
 ## Enrichment Tools
@@ -249,9 +254,11 @@ persisted unredacted in Redis subject to the configured event retention policy.
 development main, accepted values are `injection`, `traversal`, `ai_attack`,
 and `data_extraction` (ASCII case-insensitive, with surrounding whitespace
 ignored); unknown values return an
-invalid-request error. Development main checks SQL patterns across line breaks.
+invalid-request error. Development main also rejects misspelled request fields;
+omitting `categories` checks all patterns. It checks SQL patterns across line breaks.
 Published v0.1.5 may report a clean result for an unknown category or multiline
-SQL. Results are heuristic signals, not a blocking decision.
+SQL, and can silently ignore a misspelled filter. Results are heuristic signals,
+not a blocking decision.
 
 ## Operational Tools
 

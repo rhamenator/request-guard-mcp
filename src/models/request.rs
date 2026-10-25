@@ -72,6 +72,7 @@ where
 
 /// Feedback submission request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct FeedbackRequest {
     pub request_id: String,
     pub correct_verdict: String,
@@ -166,6 +167,7 @@ pub struct CanaryEvalRequest {
 
 /// Abuse pattern match request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct AbusePatternMatchRequest {
     pub text: String,
     pub categories: Option<Vec<String>>,

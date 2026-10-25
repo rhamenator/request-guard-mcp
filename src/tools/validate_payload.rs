@@ -132,6 +132,31 @@ mod tests {
             })
         )
         .is_err());
+        assert!(validate_for_tool(
+            "feedback",
+            &json!({"request_id":"synthetic-id","correct_verdict":"allow","notes":"ok","reporter":"operator"})
+        )
+        .is_ok());
+        assert!(validate_for_tool(
+            "feedback",
+            &json!({"request_id":"synthetic-id","correct_verdict":"allow","notse":"lost"})
+        )
+        .is_err());
+        assert!(validate_for_tool(
+            "feedback",
+            &json!({"request_id":"synthetic-id","correct_verdict":"allow","reportre":"lost"})
+        )
+        .is_err());
+        assert!(validate_for_tool(
+            "abuse_pattern_match",
+            &json!({"text":"SELECT a FROM t","categories":["injection"]})
+        )
+        .is_ok());
+        assert!(validate_for_tool(
+            "abuse_pattern_match",
+            &json!({"text":"SELECT a FROM t","categorie":["injection"]})
+        )
+        .is_err());
         assert!(validate_for_tool("enrich_ip", &json!({"ip": 1})).is_err());
         assert!(
             validate_for_tool("threat_lookup", &json!({"indicator":"AS64500","typ":"asn"}))
