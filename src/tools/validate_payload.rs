@@ -71,7 +71,16 @@ fn validate_for_tool(tool: &str, payload: &Value) -> Result<(), String> {
         "threat_lookup" => decode::<ThreatLookupRequest>(payload),
         "canary_eval" => decode::<CanaryEvalRequest>(payload),
         "abuse_pattern_match" => decode::<AbusePatternMatchRequest>(payload),
-        "score_breakdown" => decode::<ScoreBreakdownRequest>(payload),
+        "score_breakdown" => {
+            let request: ScoreBreakdownRequest = serde_json::from_value(payload.clone())
+                .map_err(|_| "payload does not match the tool's request shape".to_string())?;
+            if let Some(signals) = request.signals {
+                crate::tools::score_breakdown::parse_signals(signals).map_err(|_| {
+                    "score_breakdown.signals must match a classification request".to_string()
+                })?;
+            }
+            Ok(())
+        }
         "validate_payload" => decode::<ValidatePayloadRequest>(payload),
         "drift_report" => decode::<DriftReportRequest>(payload),
         "calibration_report" => decode::<CalibrationReportRequest>(payload),
@@ -167,6 +176,15 @@ mod tests {
         )
         .is_err());
         assert!(validate_for_tool("enrich_ip", &json!({"ip": 1})).is_err());
+        assert!(validate_for_tool("score_breakdown", &json!({})).is_ok());
+        assert!(
+            validate_for_tool("score_breakdown", &json!({"signals":{"path":"/admin"}})).is_ok()
+        );
+        assert!(
+            validate_for_tool("score_breakdown", &json!({"signals":{"__unknown__":1}})).is_err()
+        );
+        assert!(validate_for_tool("score_breakdown", &json!({"signals":null})).is_err());
+        assert!(validate_for_tool("score_breakdown", &json!({"signals":{"path":1}})).is_err());
         assert!(
             validate_for_tool("threat_lookup", &json!({"indicator":"AS64500","typ":"asn"}))
                 .is_err()
