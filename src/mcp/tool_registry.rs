@@ -480,7 +480,7 @@ impl McpTool for EnrichAsnTool {
         "enrich_asn"
     }
     fn description(&self) -> &str {
-        "Enrich an ASN"
+        "Diagnostic ASN enrichment; check asn_data_found and reputation_listed before interpreting the baseline risk_score or is_hosting heuristic"
     }
     async fn call(&self, state: Arc<AppState>, params: Option<Value>) -> Result<Value, AppError> {
         if !state.config.features.enable_enrichment {

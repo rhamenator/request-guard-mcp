@@ -154,6 +154,10 @@ HSET request_guard:threats:ip 198.51.100.9 '{"threat_type":"scanner","severity":
 ```
 
 For simple IP blocklists, add addresses to `request_guard:blocklist:ips`.
+For ASN reputation, seed `request_guard:threats:asn` with a bare decimal ASN
+field such as `15169`, not `AS15169`. On development main, `enrich_asn`
+separately reports whether that Redis record or an ASN MMDB record was found;
+an absent record yields an unverified 0.1 baseline, not a safe verdict.
 On development main, `enrich_ip` and `threat_lookup` check the canonical IPv4
 key (`198.51.100.9`) first for IPv4-mapped IPv6 input
 (`::ffff:198.51.100.9`), then the literal mapped key if the canonical key is
