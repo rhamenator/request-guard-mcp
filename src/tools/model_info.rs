@@ -24,8 +24,8 @@ pub async fn run(state: &AppState) -> ModelInfoResponse {
             "Validate a tool payload against its schema",
             true,
         ),
-        tool("feature_flags", "List or get feature flags", true),
-        tool("warmup", "Warm up caches and engines", true),
+        tool("feature_flags", "List or get startup feature flags; not live backend health", true),
+        tool("warmup", "Run best-effort synthetic classify or local-cache warmup; not a backend health check", true),
         tool(
             "replay_decision",
             "Replay a previous decision",

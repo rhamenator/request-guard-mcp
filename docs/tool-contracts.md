@@ -114,9 +114,16 @@ TLS fingerprint; use `classify` for the live verdict.
 ### `validate_payload`
 Validate a payload against the schema for a named tool.
 **Request**: `{ "tool": "classify", "payload": {...} }`
+Development main also checks supported `feature_flags.flag` names and
+`warmup.target` values. A valid result does not execute the tool, establish
+that a feature is enabled, or test backend availability.
 
 ### `feature_flags`
 List or get feature flags. **Request**: `{ "flag": "batch_classify" }` (omit for all).
+Development main rejects unknown argument names and unsupported flag names;
+published v0.1.5 may treat an unknown name as disabled. Values describe
+startup configuration and backend presence, not live backend health. Use
+`/ready` for live readiness; a disabled flag is not the same as an outage.
 
 ### `drift_report`
 Statistical drift report over a time window.
@@ -145,6 +152,9 @@ these fields are not an audit trail or an ingress saturation signal.
 ### `config_snapshot`
 Snapshot of current running configuration (secrets redacted by default).
 **Request**: `{ "redact_secrets": true }`
+Development main rejects unknown argument names. The `configured` fields
+report configuration presence, not a live backend check; `features` are raw
+configuration settings and may differ from effective `feature_flags` values.
 
 ### `self_test`
 Run the built-in test suite.
@@ -177,8 +187,14 @@ SQL. Results are heuristic signals, not a blocking decision.
 ## Operational Tools
 
 ### `warmup`
-Warm up caches and engines.
+Run a best-effort synthetic classify or write a local cache marker. This does
+not establish Redis health. Rule evaluation still occurs on a classification
+cache hit, while scoring can be skipped. The `warmed` list means the warmup
+call completed successfully, not that each component was exercised from a
+cold start.
 **Request**: `{ "target": "all|rule_engine|scorer|cache" }`
+Development main rejects unknown argument names and unsupported targets;
+published v0.1.5 can return an unknown target in `skipped`.
 
 ### `replay_decision`
 Replay a prior decision deterministically.
