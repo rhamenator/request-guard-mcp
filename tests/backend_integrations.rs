@@ -373,6 +373,82 @@ async fn redis_and_postgres_backed_tools_complete_real_round_trip() {
     .unwrap();
     assert_eq!(legacy_mapped.threat_type.as_deref(), Some("legacy_mapped"));
 
+    // Older operator-seeded IPv6 keys may use a valid but noncanonical spelling.
+    // The lookup must try the canonical key, then the caller's literal spelling.
+    state
+        .redis
+        .store_threat(
+            "ip",
+            "2001:0db8::1",
+            &ThreatRecord {
+                threat_type: "legacy_ipv6".to_string(),
+                severity: "high".to_string(),
+                source: "integration-test".to_string(),
+                last_seen: None,
+                metadata: None,
+            },
+        )
+        .await
+        .unwrap();
+    let literal_ipv6 = tools::threat_lookup::run(
+        &state,
+        ThreatLookupRequest {
+            indicator: "2001:0db8::1".to_string(),
+            indicator_type: Some("ip".to_string()),
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(literal_ipv6.threat_type.as_deref(), Some("legacy_ipv6"));
+    let literal_ipv6_reputation = tools::enrich_ip::run(
+        &state,
+        EnrichIpRequest {
+            ip: "2001:0db8::1".to_string(),
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(literal_ipv6_reputation.risk_score, 0.9);
+    assert_eq!(literal_ipv6_reputation.ip, "2001:db8::1");
+
+    state
+        .redis
+        .store_threat(
+            "ip",
+            "2001:db8::1",
+            &ThreatRecord {
+                threat_type: "canonical_ipv6".to_string(),
+                severity: "low".to_string(),
+                source: "integration-test".to_string(),
+                last_seen: None,
+                metadata: None,
+            },
+        )
+        .await
+        .unwrap();
+    let canonical_first = tools::threat_lookup::run(
+        &state,
+        ThreatLookupRequest {
+            indicator: "2001:0db8::1".to_string(),
+            indicator_type: Some("ip".to_string()),
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        canonical_first.threat_type.as_deref(),
+        Some("canonical_ipv6")
+    );
+    let canonical_first_reputation = tools::enrich_ip::run(
+        &state,
+        EnrichIpRequest {
+            ip: "2001:0db8::1".to_string(),
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(canonical_first_reputation.risk_score, 0.3);
+
     #[cfg(feature = "redis-integration")]
     {
         let client = deadpool_redis::redis::Client::open(redis_url).unwrap();

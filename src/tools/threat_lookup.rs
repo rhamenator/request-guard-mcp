@@ -43,12 +43,13 @@ pub async fn run(
         ));
     }
     let normalized = match indicator_type.as_str() {
-        "ip" => indicator
-            .parse::<IpAddr>()
-            .map_err(|_| {
+        "ip" => {
+            indicator.parse::<IpAddr>().map_err(|_| {
                 AppError::InvalidRequest("indicator is not a valid IP address".to_string())
-            })?
-            .to_string(),
+            })?;
+            // Redis tries the canonical key first, then this exact seeded spelling.
+            indicator.to_string()
+        }
         "domain" => normalize_domain(indicator)?,
         "hash" => indicator.to_ascii_lowercase(),
         "asn" => indicator

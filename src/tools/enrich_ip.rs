@@ -22,7 +22,7 @@ pub async fn run(state: &AppState, req: EnrichIpRequest) -> Result<EnrichIpRespo
     };
     let reputation = state
         .reputation
-        .lookup_ip(&parsed.to_string())
+        .lookup_ip(&req.ip)
         .await
         .map_err(|error| AppError::Upstream(error.to_string()))?;
     let geoip_risk: f64 = if is_private {

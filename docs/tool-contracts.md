@@ -83,7 +83,9 @@ Submit a correction to a prior classification.
 **Response**: `{ "ip", "country", "city", "asn", "org", "is_proxy", "is_datacenter", "is_tor", "risk_score" }`
 
 On development main, IPv4-mapped IPv6 inputs use their IPv4 form for MaxMind
-and Redis reputation lookup; `ip` still echoes the parsed input spelling.
+and Redis reputation lookup; `ip` echoes the parsed address in canonical spelling.
+For valid noncanonical IPv6 input, development main checks the canonical Redis
+key before the exact supplied spelling; it does not search other aliases.
 IPv6 unique-local and link-local addresses, plus mapped private IPv4 addresses, receive the local/private
 baseline without requiring an optional enrichment backend. This applies to
 `enrich_ip`, not to the inbound `classify` verdict.
@@ -183,6 +185,10 @@ uppercase URL schemes. Domain indicators use ASCII letters, digits, dots,
 hyphens and underscores; send internationalized domains as punycode. URL keys
 remain exact strings: seed and query the same
 lowercase-scheme spelling. Published v0.1.5 lacks these request checks.
+For IP indicators on development main, the canonical Redis key takes priority,
+then the exact supplied spelling is tried for a legacy record. Seed new IPv6
+keys canonically; other valid aliases are not searched. Published v0.1.5 lacks
+this legacy IPv6 fallback.
 `validate_payload` checks the request shape, including unknown fields, but
 does not pre-check the indicator's semantic spelling or Redis availability.
 
