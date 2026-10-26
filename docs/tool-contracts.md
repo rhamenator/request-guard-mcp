@@ -264,6 +264,9 @@ and `data_extraction` (ASCII case-insensitive, with surrounding whitespace
 ignored); unknown values return an
 invalid-request error. Development main also rejects misspelled request fields;
 omitting `categories` checks all patterns. It checks SQL patterns across line breaks.
+The traversal pattern accepts ASCII case variants of encoded `..` and an
+encoded slash or backslash after literal `..`; it does not fully URL-decode
+free text.
 Published v0.1.5 may report a clean result for an unknown category or multiline
 SQL, and can silently ignore a misspelled filter. Results are heuristic signals,
 not a blocking decision.
