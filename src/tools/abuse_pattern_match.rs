@@ -28,7 +28,7 @@ static PATTERNS: Lazy<Vec<AbusePattern>> = Lazy::new(|| {
         AbusePattern {
             name: "path_traversal",
             category: "traversal",
-            regex: Regex::new(r"(\.\./|\.\.\\|%2e%2e)").unwrap(),
+            regex: Regex::new(r"(?i)(\.\./|\.\.\\|\.\.%2f|\.\.%5c|%2e%2e)").unwrap(),
         },
         AbusePattern {
             name: "ai_prompt_injection",
@@ -122,6 +122,29 @@ mod tests {
         let result = match_patterns(request("SELECT a\nFROM t", &["injection"])).unwrap();
         assert!(result.matched);
         assert_eq!(result.patterns[0].pattern, "sql_injection");
+    }
+
+    #[test]
+    fn encoded_traversal_case_and_separators_are_detected() {
+        for text in [
+            "%2E%2E%2Fetc/passwd",
+            "%2e%2e%2fetc/passwd",
+            "..%2fetc/passwd",
+            "..%2Fetc/passwd",
+            "..%5cwindows",
+            "..%5Cwindows",
+        ] {
+            let result = match_patterns(request(text, &["traversal"])).unwrap();
+            assert!(result.matched, "{text}");
+            assert_eq!(result.patterns[0].pattern, "path_traversal", "{text}");
+        }
+        for text in ["see the 2e2 results", "ordinary/docs/path"] {
+            assert!(
+                !match_patterns(request(text, &["traversal"]))
+                    .unwrap()
+                    .matched
+            );
+        }
     }
 
     #[test]

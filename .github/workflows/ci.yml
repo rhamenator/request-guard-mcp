@@ -153,6 +153,7 @@ jobs:
       - run: python3 scripts/probe_classify_unknown_fields.py target/release/request-guard-mcp
       - run: python3 scripts/probe_reporting_input_fields.py target/release/request-guard-mcp
       - run: python3 scripts/probe_secondary_input_fields.py target/release/request-guard-mcp
+      - run: python3 scripts/probe_abuse_encoded_traversal.py target/release/request-guard-mcp
       - run: python3 scripts/probe_remaining_input_fields.py target/release/request-guard-mcp
       - run: python3 scripts/probe_zero_argument_tools.py target/release/request-guard-mcp
       - run: python3 scripts/probe_explain_consistency.py target/release/request-guard-mcp
