@@ -56,7 +56,10 @@ digests with GitHub's signed release-workflow provenance, and verify that the
 attestations bind each archive to the repository, tag ref, and source commit
 before creating a release. The build jobs have no OIDC or attestation-write
 permission. An archive sidecar is a same-workflow corruption check, not a
-signature. Published v0.1.5 predates native attestations.
+signature. For v1+ tags, the workflow creates a draft GitHub Release. Verify
+the exact tagged assets and attestations before publishing that draft. Tagged
+native builds do not restore cached Rust build outputs. Published v0.1.5
+predates native attestations.
 
 "Private" describes publication status, not confidentiality: signed-in readers
 with access to this public repository can download the Actions candidate

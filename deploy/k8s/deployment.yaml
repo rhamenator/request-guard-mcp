@@ -171,4 +171,6 @@ spec:
             readOnlyRootFilesystem: true
             capabilities:
               drop: ["ALL"]
+      # This example pins v0.1.4, which predates the graceful drain. For
+      # development main or v1+ images, allow at least 75 seconds at defaults.
       terminationGracePeriodSeconds: 30

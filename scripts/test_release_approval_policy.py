@@ -41,6 +41,9 @@ assert job_line(approval, (
     "&& !startsWith(github.ref_name, 'v0.')"
 )), "all v1+ tags, including prereleases, must pause for owner approval"
 assert job_line(build, "needs: [verify-release-ref, stable-tag-approval]")
+assert "        if: github.event_name != 'push' || github.ref_type != 'tag'" in active_lines(build), (
+    "tagged native builds must not restore cached Rust build outputs"
+)
 assert job_line(build, (
     "if: ${{ !cancelled() && needs.verify-release-ref.result == 'success' "
     "&& (needs.stable-tag-approval.result == 'success' || "
@@ -56,6 +59,9 @@ assert job_line(attest, (
 ))
 assert job_line(publish, "needs: [verify-release-ref, build-release, attest-native-provenance]")
 assert job_line(publish, "if: github.event_name == 'push' && github.ref_type == 'tag'")
+assert "          draft: ${{ !startsWith(github.ref_name, 'v0.') }}" in active_lines(publish), (
+    "v1+ native assets must remain in a draft until exact tagged-byte review"
+)
 assert "environment: stable-release" not in jobs.get("verify-release-ref", "")
 
 for name, job in jobs.items():

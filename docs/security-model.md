@@ -146,9 +146,11 @@ trust boundary.
   server-derived `tls_fingerprint_verified`; only verified values affect rules
   and cache identity. See [TLS fingerprint attestation](tls-fingerprint-attestation.md).
 
-## No Panics on Request Path
+## Request-path error handling
 
-- All engine code returns `Result<_, AppError>` and handles errors gracefully.
+- Fallible tool and integration operations return `Result<_, AppError>` and
+  surface bounded protocol errors. A Rust panic aborts this release build;
+  these checks do not prove that every request path is panic-free.
 - `AppError` variants carry non-leaky messages for clients.
 - Development main logs categorical tool error codes rather than rendered
   `AppError` text, which can include caller-supplied request IDs. Published
@@ -174,10 +176,10 @@ trust boundary.
 ## Dependency Security
 
 - `cargo audit` runs in CI to check for known vulnerabilities.
-- `cargo deny` enforces license allowlists and blocks duplicate/yanked crates.
+- `cargo deny` enforces license and source allowlists; duplicate and yanked crates currently warn.
 - Container image is scanned with Trivy in the security workflow.
 - Base image: `debian:bookworm-slim` (minimal attack surface).
-- Process runs as a non-root user (`mcp`, UID 10001).
+- Process runs as a non-root user (`mcp`); the Dockerfile does not pin its numeric UID.
 - `readOnlyRootFilesystem: true` in Kubernetes pod spec.
 - All Linux capabilities dropped in the pod security context.
 

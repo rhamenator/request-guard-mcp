@@ -120,7 +120,7 @@ fn tool_input_schema(name: &str) -> Value {
             vec!["items"],
         ),
         "feedback" => (
-            serde_json::json!({"request_id":{"type":"string"},"correct_verdict":{"type":"string"},"notes":{"type":"string"},"reporter":{"type":"string"}}),
+            serde_json::json!({"request_id":{"type":"string"},"correct_verdict":{"type":"string","enum":["allow","block","flag","challenge"]},"notes":{"type":"string"},"reporter":{"type":"string"}}),
             vec!["request_id", "correct_verdict"],
         ),
         "feature_flags" => (serde_json::json!({"flag":{"type":"string"}}), vec![]),
@@ -165,7 +165,7 @@ fn tool_input_schema(name: &str) -> Value {
             vec!["tool", "payload"],
         ),
         "drift_report" => (
-            serde_json::json!({"since":{"type":"string"},"window_hours":{"type":"integer","minimum":1}}),
+            serde_json::json!({"since":{"type":"string","description":"Mutually exclusive with window_hours"},"window_hours":{"type":"integer","minimum":1,"maximum":8760,"description":"Mutually exclusive with since"}}),
             vec![],
         ),
         "calibration_report" => (

@@ -36,7 +36,10 @@ fn replay_feature_snapshot(request: &ClassifyRequest) -> ClassifyRequest {
     ClassifyRequest {
         ip: None,
         user_agent: request.user_agent.clone(),
-        path: request.path.clone(),
+        path: request
+            .path
+            .as_ref()
+            .map(|path| path.split(['?', '#']).next().unwrap_or(path).to_string()),
         method: request.method.clone(),
         headers,
         body_snippet: None,
@@ -719,7 +722,7 @@ mod scoped_key_tests {
         let request: ClassifyRequest = serde_json::from_value(serde_json::json!({
             "ip": "198.51.100.42",
             "user_agent": "Nikto",
-            "path": "/internal",
+            "path": "/internal?token=synthetic-query-secret#synthetic-fragment-secret",
             "method": "GET",
             "headers": {
                 "ACCEPT": "application/json; synthetic-header-secret",
@@ -746,6 +749,8 @@ mod scoped_key_tests {
             "synthetic-timestamp-secret",
             "synthetic-extra-secret",
             "synthetic-request-id-secret",
+            "synthetic-query-secret",
+            "synthetic-fragment-secret",
             "198.51.100.42",
         ] {
             assert!(
