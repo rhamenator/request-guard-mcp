@@ -43,6 +43,19 @@ New native build archives and sidecars, including tagged builds, are retained
 for up to seven days. Keep secrets and sensitive lab evidence out of those
 artifacts; a passing private candidate still does not authorize publication.
 
+For v1+ tags, the native Release workflow stages a **draft** GitHub Release
+after its five packaged build/client jobs and signed-attestation checks pass.
+The tag-built archives have a new UTC build date and therefore different bytes
+from a private candidate. Before making the draft public, download its exact
+five archives and sidecars, verify all SHA-256 values and signed source
+attestations, inspect the embedded full commit, toolchain and build date, and
+repeat the bounded packaged client/adversarial checks on those bytes. Record
+the tag, digests and results in #125, then publish the reviewed draft. The
+Container tag workflow independently publishes its index only after both
+native platform digests pass its client smoke; verify the exact public index
+and platform digests before describing container support. No private candidate
+digest is a substitute for these tagged/public checks.
+
 At minimum, exercise authentication boundaries, malformed JSON-RPC and MCP frames, invalid and oversized inputs, prompt-injection text treated as request data, bot-evasion variations, concurrency and slow clients, backend failure and recovery, and logging of sensitive fields. Use Kali and Ubuntu lab VMs when available; scope scanners to the owned test endpoint, record their request counts, and bound runtime and rate to preserve shared host responsiveness. Confirm each exploit or anomaly with a regression test, rerun the affected probe, then rerun the full gate. Reconcile independent Claude Code and Codex reviews with the observed runtime results and document remaining limits before a release.
 
 The HTTP transport regression suite checks that valid JSON with an invalid JSON-RPC

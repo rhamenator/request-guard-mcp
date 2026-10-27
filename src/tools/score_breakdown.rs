@@ -37,8 +37,8 @@ pub async fn run(
         request_id: req.request_id,
         total_score: result.score,
         breakdown,
-        threshold_allow: 0.0,
-        threshold_block: 0.75,
+        threshold_allow: crate::engines::scorer::THRESHOLD_CHALLENGE,
+        threshold_block: crate::engines::scorer::THRESHOLD_BLOCK,
     })
 }
 

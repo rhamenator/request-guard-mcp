@@ -16,6 +16,9 @@ def main() -> None:
         ("/docs/administrator-guide", False),
         ("/blog/node.environment-setup", False),
         ("/proc.html", False),
+        ("/wp-config.phpish", False),
+        ("/backup.sqlish", False),
+        ("/docs/server-status-guide", False),
         ("/search?q=/admin", False),
         ("/search%3Fq=/admin", True),
         ("/%3f/admin", True),
@@ -46,6 +49,18 @@ def main() -> None:
         ("/etc/passwd%00.jpg", True),
         ("/prod.env", True),
         ("/repo.git/config", True),
+        ("/wp-config.php", True),
+        ("/wp-config.php.bak", True),
+        ("/wp-login.php", True),
+        ("/.aws/credentials", True),
+        ("/.ssh/id_rsa", True),
+        ("/.svn/entries", True),
+        ("/.htaccess", True),
+        ("/server-status", True),
+        ("/phpinfo.php", True),
+        ("/cgi-bin/status", True),
+        ("/backup.sql", True),
+        ("/.git-credentials", True),
     ]
     messages = [
         {"jsonrpc": "2.0", "id": index + 1, "method": "tools/call", "params": {

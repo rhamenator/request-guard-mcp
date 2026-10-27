@@ -56,6 +56,9 @@ assert job_line(attest, (
 ))
 assert job_line(publish, "needs: [verify-release-ref, build-release, attest-native-provenance]")
 assert job_line(publish, "if: github.event_name == 'push' && github.ref_type == 'tag'")
+assert "          draft: ${{ !startsWith(github.ref_name, 'v0.') }}" in active_lines(publish), (
+    "v1+ native assets must remain in a draft until exact tagged-byte review"
+)
 assert "environment: stable-release" not in jobs.get("verify-release-ref", "")
 
 for name, job in jobs.items():

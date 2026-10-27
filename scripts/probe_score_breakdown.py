@@ -69,6 +69,8 @@ def main():
     valid = responses[7]["result"]["structuredContent"]
     if valid["total_score"] <= 0 or not valid["breakdown"]:
         raise AssertionError("valid metadata did not produce a rule breakdown")
+    if valid["threshold_allow"] != 0.4 or valid["threshold_block"] != 0.75:
+        raise AssertionError("score thresholds do not match the live scorer")
     absent = responses[8]["result"]["structuredContent"]
     if absent["total_score"] != 0 or absent["breakdown"]:
         raise AssertionError("absent optional signals changed behavior")

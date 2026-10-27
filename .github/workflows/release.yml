@@ -500,5 +500,7 @@ jobs:
           generate_release_notes: true
           fail_on_unmatched_files: true
           overwrite_files: false
-          draft: false
+          # Keep v1+ assets private until their tagged bytes and attestations
+          # are checked by the owner after this workflow completes.
+          draft: ${{ !startsWith(github.ref_name, 'v0.') }}
           prerelease: ${{ startsWith(github.ref_name, 'v0.') || contains(github.ref_name, '-') }}

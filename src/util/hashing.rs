@@ -1,6 +1,6 @@
 use hmac::{Hmac, KeyInit, Mac};
 use sha2::{Digest, Sha256};
-use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 
 use crate::config::TlsFingerprintConfig;
 use crate::models::request::ClassifyRequest;
@@ -31,11 +31,13 @@ pub fn request_fingerprint(
     request: &ClassifyRequest,
     cache_domain: &str,
 ) -> String {
-    let canonical_headers = request.headers.as_ref().map(|values| {
+    // The rule engine checks header presence only. Values and unrelated
+    // metadata must not churn the distributed cache or its shared Redis DB.
+    let header_names = request.headers.as_ref().map(|values| {
         values
-            .iter()
-            .map(|(key, value)| (key.to_ascii_lowercase(), value.trim()))
-            .collect::<BTreeMap<_, _>>()
+            .keys()
+            .map(|key| key.to_ascii_lowercase())
+            .collect::<BTreeSet<_>>()
     });
     let verified_tls = request.tls_fingerprint_verified.then(|| {
         serde_json::json!({
@@ -47,15 +49,10 @@ pub fn request_fingerprint(
     let input = serde_json::json!({
         "cache_domain": cache_domain,
         "caller_scope": caller_scope,
-        "ip": request.ip,
         "user_agent": request.user_agent,
         "path": request.path,
         "method": request.method.as_deref().map(str::to_ascii_uppercase),
-        "headers": canonical_headers,
-        "body_snippet": request.body_snippet,
-        "referer": request.referer,
-        "accept": request.accept,
-        "extra": request.extra,
+        "header_names": header_names,
         "verified_tls": verified_tls,
     });
     sha256_hex(input.to_string().as_bytes())
@@ -84,7 +81,7 @@ pub fn classification_cache_domain(
     ja4.sort_unstable();
     ja4.dedup();
     let input = serde_json::json!({
-        "schema": "classification-v2",
+        "schema": "classification-v3",
         "version": version,
         "git_commit": git_commit,
         "known_bad_ja3": ja3,
@@ -140,21 +137,45 @@ mod tests {
     }
 
     #[test]
-    fn all_decision_inputs_partition_cache_identity() {
+    fn only_rule_inputs_partition_cache_identity() {
         let base = request();
         let original = request_fingerprint("caller", &base, "domain");
 
         let mut changed = base.clone();
         changed.body_snippet = Some("payload".into());
-        assert_ne!(original, request_fingerprint("caller", &changed, "domain"));
+        assert_eq!(original, request_fingerprint("caller", &changed, "domain"));
 
         let mut changed = base.clone();
         changed.referer = Some("https://example.test".into());
+        assert_eq!(original, request_fingerprint("caller", &changed, "domain"));
+
+        let mut changed = base.clone();
+        changed.extra = Some(serde_json::json!({"risk": "high"}));
+        assert_eq!(original, request_fingerprint("caller", &changed, "domain"));
+
+        let mut changed = base.clone();
+        changed.ip = Some("203.0.113.5".into());
+        assert_eq!(original, request_fingerprint("caller", &changed, "domain"));
+
+        let mut changed = base.clone();
+        changed.path = Some("/admin".into());
         assert_ne!(original, request_fingerprint("caller", &changed, "domain"));
 
-        let mut changed = base;
-        changed.extra = Some(serde_json::json!({"risk": "high"}));
+        let mut changed = base.clone();
+        changed.headers = Some(std::collections::HashMap::from([(
+            "Accept".into(),
+            "text/html".into(),
+        )]));
         assert_ne!(original, request_fingerprint("caller", &changed, "domain"));
+        let first_header_key = request_fingerprint("caller", &changed, "domain");
+        changed.headers = Some(std::collections::HashMap::from([(
+            "accept".into(),
+            "application/json".into(),
+        )]));
+        assert_eq!(
+            first_header_key,
+            request_fingerprint("caller", &changed, "domain")
+        );
     }
 
     #[test]

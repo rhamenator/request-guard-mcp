@@ -37,6 +37,11 @@ v0.1.5 predates this change and has no such native attestation.
 Extract the archive, then work inside its `request-guard-mcp-<version>-<platform>`
 folder. The server binary is already built; Rust, Cargo, Redis, PostgreSQL, and
 MaxMind data are not needed for the core `classify` and `explain` tools.
+If Redis or PostgreSQL is configured, the server requires it to be reachable
+at startup. PostgreSQL decision persistence is on the `classify` success path:
+a failed write returns an upstream error rather than the computed verdict.
+Disable an optional backend when its availability and retention cannot be
+supported; do not interpret a backend error as an allow verdict.
 
 1. Create `.env` with access limited to the account running the server. On
    Linux/macOS, run `(umask 077; cp .env.example .env); chmod 600 .env` before
