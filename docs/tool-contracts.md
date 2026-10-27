@@ -57,7 +57,7 @@ enforcement.
   "threat_category": "ai_scraping|bot_traffic|scraping|...",
   "signals": [{ "name": "ua_ai_bot", "value": 1.0, "weight": 0.8, "description": "..." }],
   "latency_ms": 2,
-  "model_version": "0.1.0"
+  "model_version": "0.1.5"
 }
 ```
 
@@ -189,6 +189,7 @@ startup configuration and backend presence, not live backend health. Use
 ### `drift_report`
 Statistical drift report over a time window.
 **Request**: `{ "window_hours": 24 }`
+Use either `window_hours` (1–8760) or an RFC 3339 `since` timestamp, not both.
 Development main rejects unknown request fields instead of silently using the
 default 24-hour window; published v0.1.5 may ignore a misspelled field.
 **Response metrics** include real persisted `samples`, current-half score mean,

@@ -8,6 +8,10 @@ musl archive, that release does not support Alpine.
 Download the archive for your operating system and CPU from the GitHub release,
 along with its matching `.sha256` file. Verify the archive before extracting it:
 
+For v1+ releases, the tagged workflow first stages these assets in a draft
+release. The owner verifies the exact tagged assets and signed attestations
+before publishing the draft; install only from the published release.
+
 - Linux: `sha256sum -c request-guard-mcp-*.tar.gz.sha256`
 - macOS: `shasum -a 256 -c request-guard-mcp-*.tar.gz.sha256`
 - Windows PowerShell: compare `(Get-FileHash .\request-guard-mcp-*.zip -Algorithm SHA256).Hash`
@@ -146,7 +150,7 @@ an older/incomplete schema still runs migrations and may need a quiet write
 window. Published v0.1.5 does not have this startup fast path.
 
 When PostgreSQL is enabled, this bundle stores a reduced replay snapshot:
-user agent, path, method, and whether the request supplied Accept
+user agent, path without query or fragment, method, and whether the request supplied Accept
 or Accept-Language headers. It discards header values, bodies, arbitrary
 `extra`, IP, referrer, timestamp, request ID and TLS fingerprint/attestation
 material before storing the request JSON. The stored response still contains

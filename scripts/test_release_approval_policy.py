@@ -41,6 +41,9 @@ assert job_line(approval, (
     "&& !startsWith(github.ref_name, 'v0.')"
 )), "all v1+ tags, including prereleases, must pause for owner approval"
 assert job_line(build, "needs: [verify-release-ref, stable-tag-approval]")
+assert "        if: github.event_name != 'push' || github.ref_type != 'tag'" in active_lines(build), (
+    "tagged native builds must not restore cached Rust build outputs"
+)
 assert job_line(build, (
     "if: ${{ !cancelled() && needs.verify-release-ref.result == 'success' "
     "&& (needs.stable-tag-approval.result == 'success' || "
