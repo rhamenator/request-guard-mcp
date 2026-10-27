@@ -2,20 +2,18 @@
 
 The GitHub Packages entry for `request-guard-mcp` is a container image. The npm
 package is a separate installation option for the official native release.
+The stable [1.0.0 package](https://www.npmjs.com/package/request-guard-mcp/v/1.0.0)
+is assembled from the five final tagged native archives and their checksum
+sidecars. A clean tarball install and a fresh public-registry install passed
+MCP Inspector authentication, initialization, discovery of 23 tools,
+`classify`, `explain`, and bounded stdio smoke on Linux x64. The exact tagged
+assets, source identity, and release gate are recorded in [issue #125](https://github.com/rhamenator/request-guard-mcp/issues/125).
 The experimental [0.1.5 package](https://www.npmjs.com/package/request-guard-mcp/v/0.1.5)
-is published. A fresh registry install with an empty npm cache
-passed Inspector authentication, initialization, listing 23 tools,
-`classify`, `explain`, and bounded stdio smoke on Linux x64. This is an experimental release;
-the adversarial production-readiness gate remains open.
-The v0.1.5 package was assembled from all five final public native release
-archives and their checksum sidecars. Both a clean local tarball install and a
-fresh public-registry install passed MCP Inspector authentication,
-initialization, tool listing, `classify`, and `explain`, plus the bounded
-stdio smoke on Linux x64.
+remains available for existing installations.
 
 ## Install and connect
 
-Run `npm install -g request-guard-mcp@0.1.5`. Set a unique random
+Run `npm install -g request-guard-mcp@1.0.0`. Set a unique random
 `AUTH_TOKENS` bearer token of at least 32 characters and bind locally before
 starting the globally installed command. On Linux/macOS:
 
@@ -41,25 +39,28 @@ npm package does not include `.env.example`; [INSTALL.md](../INSTALL.md)
 describes the separate native release bundle. For remote access, put a
 trusted TLS endpoint in front of the server and restrict who can reach it.
 
-The published v0.1.5 package was built from five native release archives and
-their SHA-256 sidecars, including Linux x64 musl. It verifies every checksum and extracts only the
-expected binary from each archive. Installation does not run a `postinstall` script
-or download executable code. The small Node launcher selects the bundled
+The published v1.0.0 package was built from five native release archives and
+their SHA-256 sidecars, including Linux x64 musl. The tagged npm packaging
+step verified all ten checksums and extracted only the expected binary from
+each archive. The public nine-file tarball has no install scripts or runtime
+dependencies; installation does not download executable code. The small Node launcher selects the bundled
 binary and forwards arguments, environment, stdio, and termination signals.
-On Linux development main, HTTP mode gives the native child a private stdin pipe.
+On Linux v1.0.0, HTTP mode gives the native child a private stdin pipe.
 If the launcher is forcibly killed, closing that pipe starts a bounded server
 drain. Published v0.1.5 lacks this safeguard; when forcibly killing its npm
 launcher in HTTP mode, also stop the native child or the whole process group
 so the listener does not remain active. Forced-kill child lifetime on macOS
 and Windows has not been qualified by this Linux probe.
-The published 0.1.5 launcher selects the musl binary on Alpine and the glibc
-binary on glibc Linux hosts. A clean install on Alpine and on glibc Linux passed
-the official five-check MCP Inspector smoke test.
+The v1.0.0 launcher selects the musl binary on Alpine and the glibc binary
+on glibc Linux hosts. The exact tagged musl native archive passed the pinned
+Alpine MCP Inspector smoke; the public npm launcher passed Inspector on glibc
+Linux x64. npm launcher runtime smoke on Alpine, macOS, and Windows was not
+part of this final public-registry install check.
 
 For a trusted local stdio client, configure its command as `request-guard-mcp`
 and arguments as `["--stdio"]`. The launching process is the trust boundary:
 stdio has no HTTP bearer authentication, no listener, and no PostgreSQL
-integration. A clean public-registry 0.1.5 install passed the bounded stdio
+integration. A clean public-registry 1.0.0 install passed the bounded stdio
 smoke. The older 0.1.4 package does not support stdio.
 
 For each later approved npm release, after its native assets are published:
