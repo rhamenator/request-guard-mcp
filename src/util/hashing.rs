@@ -1,6 +1,5 @@
 use hmac::{Hmac, KeyInit, Mac};
 use sha2::{Digest, Sha256};
-use std::collections::BTreeSet;
 
 use crate::config::TlsFingerprintConfig;
 use crate::models::request::ClassifyRequest;
@@ -33,12 +32,15 @@ pub fn request_fingerprint(
 ) -> String {
     // The rule engine checks header presence only. Values and unrelated
     // metadata must not churn the distributed cache or its shared Redis DB.
-    let header_names = request.headers.as_ref().map(|values| {
-        values
-            .keys()
-            .map(|key| key.to_ascii_lowercase())
-            .collect::<BTreeSet<_>>()
+    let header_presence = request.headers.as_ref().map(|values| {
+        let has = |name: &str| values.keys().any(|key| key.to_lowercase() == name);
+        (has("accept"), has("accept-language"))
     });
+    // The rule engine ignores query and fragment text before path decoding.
+    let path_only = request
+        .path
+        .as_deref()
+        .map(|path| path.split(['?', '#']).next().unwrap_or(path));
     let verified_tls = request.tls_fingerprint_verified.then(|| {
         serde_json::json!({
             "ja3": request.tls_ja3,
@@ -50,9 +52,9 @@ pub fn request_fingerprint(
         "cache_domain": cache_domain,
         "caller_scope": caller_scope,
         "user_agent": request.user_agent,
-        "path": request.path,
+        "path": path_only,
         "method": request.method.as_deref().map(str::to_ascii_uppercase),
-        "header_names": header_names,
+        "header_presence": header_presence,
         "verified_tls": verified_tls,
     });
     sha256_hex(input.to_string().as_bytes())
@@ -174,6 +176,29 @@ mod tests {
         )]));
         assert_eq!(
             first_header_key,
+            request_fingerprint("caller", &changed, "domain")
+        );
+
+        changed.headers = Some(std::collections::HashMap::from([(
+            "X-Request-ID".into(),
+            "one".into(),
+        )]));
+        let unrelated_header_key = request_fingerprint("caller", &changed, "domain");
+        changed.headers = Some(std::collections::HashMap::from([(
+            "X-Random".into(),
+            "two".into(),
+        )]));
+        assert_eq!(
+            unrelated_header_key,
+            request_fingerprint("caller", &changed, "domain")
+        );
+
+        changed = base.clone();
+        changed.path = Some("/p?a=1".into());
+        let first_query_key = request_fingerprint("caller", &changed, "domain");
+        changed.path = Some("/p?a=2#fragment".into());
+        assert_eq!(
+            first_query_key,
             request_fingerprint("caller", &changed, "domain")
         );
     }

@@ -3,7 +3,7 @@
   "title": "ClassifyRequest",
   "type": "object",
   "properties": {
-    "ip": { "type": "string", "description": "Client IP address for correlation or separate enrichment; current classify rules do not score it" },
+    "ip": { "type": "string", "description": "Client IP is not scored directly, but is bound into trusted TLS attestation verification; also usable for separate enrichment" },
     "user_agent": { "type": "string", "description": "HTTP User-Agent header value" },
     "path": { "type": "string", "description": "Request path" },
     "method": { "type": "string", "description": "HTTP method; uncommon values create a heuristic signal" },
