@@ -9,7 +9,8 @@ This companion skill tells an agent when and how to use the separately
 installed Request Guard MCP server for **inbound** HTTP request classification.
 It does not include the server binary, intercept live traffic, enforce a site
 policy, or guard the agent's outbound fetches. Stable v1.0.0 passed the
-repository's adversarial release gate; its evidence and limits are in issue #125.
+repository's adversarial release gate; its evidence and limits are in
+[release issue #125](https://github.com/rhamenator/request-guard-mcp/issues/125).
 
 For v1.0.0, install the matching native release bundle and follow its bundled
 `INSTALL.md`, or install the verified `request-guard-mcp@1.0.0` npm package.
