@@ -8,16 +8,17 @@ description: Use a connected request-guard-mcp server to classify observed HTTP 
 This companion skill tells an agent when and how to use the separately
 installed Request Guard MCP server for **inbound** HTTP request classification.
 It does not include the server binary, intercept live traffic, enforce a site
-policy, or guard the agent's outbound fetches. Stable release readiness still
-depends on the repository's adversarial release gate.
+policy, or guard the agent's outbound fetches. Stable v1.0.0 passed the
+repository's adversarial release gate; its evidence and limits are in issue #125.
 
-For v0.1.5, install the matching native release bundle and follow its bundled
-`INSTALL.md`, or install the verified `request-guard-mcp@0.1.5` npm package.
+For v1.0.0, install the matching native release bundle and follow its bundled
+`INSTALL.md`, or install the verified `request-guard-mcp@1.0.0` npm package.
 The npm package passed a fresh public-registry Inspector and stdio smoke;
-v0.1.4 on npm lacks stdio. Linux x64 has
+v0.1.5 remains an experimental historical release, and v0.1.4 on npm lacks
+stdio. Linux x64 has
 separate glibc and musl/Alpine bundles;
 Windows x64, macOS Intel, and macOS Apple Silicon are also packaged. Verify
-native archive checksums. The skill ZIP contains instructions only. For HTTP
+native archive checksums and signed v1.0.0 attestations. The skill ZIP contains instructions only. For HTTP
 or custom WebSocket, configure a unique `AUTH_TOKENS` bearer token of at least
 32 characters, start the server, and connect the client to `/mcp` with that
 token. Confirm every example bearer, HMAC, TLS attestation, and backend password has been
