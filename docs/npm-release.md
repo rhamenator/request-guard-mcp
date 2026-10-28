@@ -8,6 +8,17 @@ sidecars. A clean tarball install and a fresh public-registry install passed
 MCP Inspector authentication, initialization, discovery of 23 tools,
 `classify`, `explain`, and bounded stdio smoke on Linux x64. The exact tagged
 assets, source identity, and release gate are recorded in [issue #125](https://github.com/rhamenator/request-guard-mcp/issues/125).
+A later [five-platform GitHub qualification](https://github.com/rhamenator/request-guard-mcp/actions/runs/40632345730)
+passed a clean global public-registry install and uninstall on Linux x64 glibc,
+Linux x64 musl/Alpine, Windows x64, macOS Intel, and macOS Apple Silicon.
+Every lane compared the registry tarball with its SHA-512 integrity, matched
+the installed native binary byte-for-byte with its checksum-verified tagged
+release archive, and ran the installed command through bounded stdio and the
+pinned official MCP Inspector for authenticated initialization, tool discovery,
+`classify`, and `explain`. It checked that the global package and shims were
+removed. This run used ephemeral GitHub runners and a disposable Alpine
+container; it did not test OS signing/notarization prompts or an upgrade path.
+Each later candidate needs its own exact-artifact qualification.
 The experimental [0.1.5 package](https://www.npmjs.com/package/request-guard-mcp/v/0.1.5)
 remains available for existing installations.
 
@@ -54,8 +65,8 @@ and Windows has not been qualified by this Linux probe.
 The v1.0.0 launcher selects the musl binary on Alpine and the glibc binary
 on glibc Linux hosts. The exact tagged musl native archive passed the pinned
 Alpine MCP Inspector smoke; the public npm launcher passed Inspector on glibc
-Linux x64. npm launcher runtime smoke on Alpine, macOS, and Windows was not
-part of this final public-registry install check.
+Linux x64 during release-day qualification. The later five-platform run above
+also exercised the public npm launcher on Alpine, macOS, and Windows.
 
 For a trusted local stdio client, configure its command as `request-guard-mcp`
 and arguments as `["--stdio"]`. The launching process is the trust boundary:
