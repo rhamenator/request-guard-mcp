@@ -73,3 +73,34 @@ expired candidate's digests.
 This pins the Rust toolchain and main musl-specific inputs; hosted runner
 images, the Ubuntu apt repository, and platform SDKs can still change. Review
 the workflow summary, archive hashes and tagged attestations for every release.
+
+## Container image input policy
+
+`docker/Dockerfile` pins the multiarchitecture Rust 1.99.1 builder and Debian
+Bookworm runtime base image indexes by SHA-256. The Docker build asserts the
+Bookworm codename and compiler version, does not run a blanket `apt-get
+upgrade`, and saves the resolved builder/runtime package inventories and
+toolchain versions inside each image. Dependabot proposes base-image refreshes
+for review. The native amd64 and arm64 container workflows build and smoke
+each immutable platform digest before assembling a multiarchitecture index.
+
+**Decision for issue #165:** retain live Debian package resolution for
+`apt-get update && apt-get install` rather than pinning an apt snapshot. This
+keeps the Dockerfile simple and allows a reviewed rebuild to pick up current
+Bookworm package fixes, but it means that the same source commit can resolve
+different package versions later. The embedded UTC build date and other build
+inputs also prevent a bit-for-bit reproducibility claim. A base-image digest
+alone does not pin installed apt packages. We therefore identify and qualify
+**the exact published image digest**, not an assumed reproducible rebuild.
+
+For the immutable v1.0.0 source commit
+`22a199a8cd0f7faf5f3e4493dc770e79d859680b`, the
+[tagged container workflow](https://github.com/rhamenator/request-guard-mcp/actions/runs/40596296683)
+passed native amd64 and arm64 client checks and published index
+`sha256:8c3f2f4d72b673d1c1f103fc374e15f049945d1af75c8c2ed6f66e02347bca14`.
+The separate [published-index qualification](https://github.com/rhamenator/request-guard-mcp/actions/runs/40597201881)
+passed both architectures against that same index. These results qualify
+those observed bytes and architectures; they do not prove future rebuilds
+identical or automatically qualify a later release. Review each later image's
+package inventories, platform digests, source-bound attestations, scanner
+results, and native client tests before publishing its tag.
