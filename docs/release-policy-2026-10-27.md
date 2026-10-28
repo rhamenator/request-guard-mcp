@@ -31,6 +31,10 @@ The npm package can satisfy a platform only after its launcher is tested from
 a clean registry install and removed cleanly on that platform; its Node.js
 prerequisite must be disclosed. Do not infer an npm platform pass from a native
 archive pass.
+The manual `Qualify Published npm Install` workflow provides a five-platform
+public-registry install, installed-launcher stdio and Inspector smoke, and
+uninstall/residue check. It is preliminary evidence for a published version,
+not a substitute for exact candidate installer qualification or owner review.
 
 Commercial code signing and notarization are deferred for lack of funding.
 Label unsigned installers explicitly. Keep SHA-256 sidecars and GitHub
