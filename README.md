@@ -12,6 +12,8 @@ A **Rust MCP (Model Context Protocol) server** for request risk classification, 
 
 The [stable v1.0.0 release](https://github.com/rhamenator/request-guard-mcp/releases/tag/v1.0.0) provides checksum-protected native archives for Linux x64 (glibc and musl/Alpine), Windows x64, macOS Intel, and macOS Apple Silicon, plus a multiarch [container](https://github.com/rhamenator/request-guard-mcp/pkgs/container/request-guard-mcp). Follow the [tagged installation guide](https://github.com/rhamenator/request-guard-mcp/blob/v1.0.0/INSTALL.md), verify its signed native attestation, and pin the container's reviewed digest. The npm installer is `request-guard-mcp@1.0.0`. Historical references to "development main" below describe features included in v1.0.0; comparisons with published v0.1.5 describe the older experimental release.
 
+For releases after v1.0.0, the [current release policy](docs/release-policy-2026-10-27.md) requires a qualified clean-install/uninstall package on every advertised platform. Portable archives alone do not meet that future gate. The public v1.0.0 tag and artifacts remain immutable.
+
 The experimental [v0.1.5 native release](https://github.com/rhamenator/request-guard-mcp/releases/tag/v0.1.5) and matching [npm package](https://www.npmjs.com/package/request-guard-mcp/v/0.1.5) remain available for existing installations. Use their tagged instructions when maintaining that version. v0.1.4 does not contain stdio.
 
 The v0.1.5 release retains the Linux x64 musl archive for Alpine and the [PostgreSQL TLS behavior qualified for v0.1.4](docs/releases/v0.1.4-postgres-tls-evidence.md). Choose `linux-x64-musl` on Alpine and `linux-x64` on glibc hosts.

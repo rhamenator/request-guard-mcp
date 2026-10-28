@@ -1,5 +1,14 @@
 # Adversarial release gate
 
+For releases after the immutable public v1.0.0, apply the
+[2026-10-27 release policy](release-policy-2026-10-27.md). It keeps versions
+moving forward, removes independent **human** review as a hard gate for this
+project, and requires qualified clean-install/uninstall packages on every
+advertised platform before another public tag. The publication workflows
+currently fail closed for new tags until that installer gate is implemented.
+The v1.0.0 paragraphs below record the historical gate that was completed;
+issue #125 is closed.
+
 Stable releases require a repeatable adversarial run against the packaged server's actual HTTP and WebSocket interfaces in an authorized lab. Record the tested commit and binary digest, configuration with secrets redacted, exact commands, tool versions, expected and observed outcomes, resource measurements, fixes, and residual limits. A passing unit suite or vulnerability scan alone does not satisfy this gate.
 
 The [v1.0 evidence map](releases/v1-gate-evidence-map.md) distinguishes existing experimental-release results from checks that must be repeated on the exact stable candidate.
