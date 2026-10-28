@@ -14,6 +14,7 @@ import os
 import re
 import secrets
 import shutil
+import signal
 import socket
 import subprocess
 import tempfile
@@ -103,8 +104,11 @@ def main() -> None:
     env.update({"MCP__HOST": "127.0.0.1", "MCP__PORT": str(port),
                 "MCP__AUTH__ENABLED": "true", "AUTH_TOKENS": token})
     clean_cwd = tempfile.TemporaryDirectory(prefix="request-guard-inspector-")
+    group_options = ({"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
+                     if os.name == "nt" else {"start_new_session": True})
     server = subprocess.Popen([str(binary)], cwd=clean_cwd.name, env=env,
-                              stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+                              stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+                              text=True, **group_options)
     try:
         for _ in range(100):
             if server.poll() is not None:
@@ -159,12 +163,23 @@ def main() -> None:
                 "explain omitted contributing factors")
         print("PASS tools/call explain: contributing factors")
     finally:
-        server.terminate()
+        # The installed npm command can be a Windows .cmd wrapper around Node
+        # and a native child. Terminating cmd.exe alone leaves both descendants
+        # holding stderr and the listener. Stop the entire owned process tree.
+        if os.name == "nt":
+            subprocess.run(["taskkill", "/PID", str(server.pid), "/T", "/F"],
+                           capture_output=True, timeout=15, check=False)
+        elif server.poll() is None:
+            os.killpg(server.pid, signal.SIGTERM)
         try:
             server.communicate(timeout=5)
         except subprocess.TimeoutExpired:
-            server.kill()
-            server.communicate()
+            if os.name == "nt":
+                subprocess.run(["taskkill", "/PID", str(server.pid), "/T", "/F"],
+                               capture_output=True, timeout=15, check=False)
+            else:
+                os.killpg(server.pid, signal.SIGKILL)
+            server.communicate(timeout=5)
         clean_cwd.cleanup()
 
 

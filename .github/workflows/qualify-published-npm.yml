@@ -1,0 +1,64 @@
+name: Qualify Published npm Install
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Exact public npm version to install and remove
+        required: true
+        default: "1.0.0"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  native-install:
+    name: global npm install/uninstall (${{ matrix.platform }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux-x64
+            runner: ubuntu-24.04
+          - platform: windows-x64
+            runner: windows-2025
+          - platform: macos-x64
+            runner: macos-15-intel
+          - platform: macos-arm64
+            runner: macos-15
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22.20.0"
+      - name: Exercise public installed launcher and uninstall
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+        run: python scripts/qualify_published_npm.py --version "$VERSION"
+
+  alpine-install:
+    name: global npm install/uninstall (linux-x64-musl)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Exercise public installed launcher in disposable Alpine
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          docker run --rm --cpus 2 --memory 1g \
+            -e VERSION \
+            -v "$PWD:/source:ro" -w /source \
+            node:22.20.0-alpine3.22 sh -ec \
+            'apk add --no-cache python3 && python3 scripts/qualify_published_npm.py --version "$VERSION"'
