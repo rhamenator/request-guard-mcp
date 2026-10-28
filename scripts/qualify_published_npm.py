@@ -27,7 +27,8 @@ def run(*args, env=None, show_output=False):
     options = ({"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
                if os.name == "nt" else {"start_new_session": True})
     process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                               text=True, env=env, **options)
+                               text=True, encoding="utf-8", errors="replace",
+                               env=env, **options)
     try:
         stdout, stderr = process.communicate(timeout=600)
     except subprocess.TimeoutExpired as error:
