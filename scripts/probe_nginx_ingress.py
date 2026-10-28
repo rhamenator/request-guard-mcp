@@ -7,6 +7,7 @@ it does not modify the host nginx service or test production TLS settings.
 
 import argparse
 import base64
+import http.client
 import os
 from pathlib import Path
 import secrets
@@ -32,6 +33,19 @@ def status(port):
         return error.code
     except (urllib.error.URLError, OSError):
         return None
+
+
+def sourced_status(port, source):
+    """Use distinct loopback source addresses to test per-address proxy limits."""
+    connection = http.client.HTTPConnection("127.0.0.1", port, timeout=2,
+                                            source_address=(source, 0))
+    try:
+        connection.request("GET", "/health", headers={"Connection": "close"})
+        reply = connection.getresponse()
+        reply.read()
+        return reply.status
+    finally:
+        connection.close()
 
 
 def stop(process):
@@ -144,6 +158,20 @@ http {{
                     outcomes = [status(proxy_port) for _ in range(12)]
                     if 200 not in outcomes or 429 not in outcomes:
                         raise RuntimeError(f"rate wave {wave + 1}: {outcomes}")
+                # Repeated connections from several loopback addresses model
+                # distinct sources, while one separate source must recover.
+                # This checks the fixture's per-address behavior; it is not a
+                # proof against a real distributed attack or NAT contention.
+                for wave in range(3):
+                    time.sleep(1.2)
+                    for source in ("127.0.0.2", "127.0.0.3", "127.0.0.4"):
+                        outcomes = [sourced_status(proxy_port, source) for _ in range(6)]
+                        if (200 not in outcomes or 429 not in outcomes or
+                                not set(outcomes) <= {200, 429}):
+                            raise RuntimeError(
+                                f"multi-source wave {wave + 1}, {source}: {outcomes}")
+                    if sourced_status(proxy_port, "127.0.0.10") != 200:
+                        raise RuntimeError(f"fresh source did not recover in wave {wave + 1}")
                 time.sleep(1.2)
                 with socket.create_connection(("127.0.0.1", proxy_port), timeout=2) as held:
                     held.sendall(
@@ -193,7 +221,8 @@ http {{
                         raise RuntimeError("authenticated WebSocket upgrade failed")
                 if server.poll() is not None or proxy.poll() is not None:
                     raise RuntimeError("server or proxy exited")
-                print("PASS ingress: three rate waves (429) and concurrent limit (430), partial-header deadline, "
+                print("PASS ingress: three rate waves and three multi-source reconnect waves (429), "
+                      "concurrent limit (430), partial-header deadline, "
                       "health recovery, MCP initialize, WebSocket upgrade")
             except Exception:
                 error_log = root / "nginx-error.log"
