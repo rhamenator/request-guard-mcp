@@ -15,10 +15,10 @@ quota can unfairly throttle clients sharing NAT. Also constrain requests
 from distributed sources at the edge. Do not expose the plain HTTP/WebSocket
 backend directly to untrusted networks.
 
-`scripts/probe_nginx_ingress.py /path/to/request-guard-mcp` runs a disposable
-loopback nginx proxy and packaged binary with two backend slots. It checks
+`scripts/probe_nginx_ingress.py /path/to/request-guard-mcp` runs on Linux with
+a disposable loopback nginx proxy and packaged binary with two backend slots. It checks
 three bursts of fresh client requests, a concurrent-request rejection, a
-partial-header deadline, three further reconnect waves from separate loopback
+partial-header deadline, three further sequential reconnect waves from separate loopback
 source addresses, fresh-source recovery, authenticated MCP initialization,
 and an authenticated WebSocket upgrade. The temporary config uses distinct
 429 and test-only 430 responses to distinguish proxy rate and concurrency
@@ -30,13 +30,15 @@ service, use Docker, or set up TLS. The temporary config is a test fixture,
 not a hardened deployment template. It includes WebSocket
 Upgrade forwarding and closes non-upgraded upstream HTTP connections.
 
-The expanded probe passed against the checksum-verified public v1.0.0 Linux
-x64 archive on 2026-10-28. The three multi-source waves used `127.0.0.2` to
+The expanded probe passed locally against the checksum-verified public v1.0.0
+Linux x64 archive on 2026-10-28 ([PR #340](https://github.com/rhamenator/request-guard-mcp/pull/340)).
+The three multi-source waves used `127.0.0.2` to
 `127.0.0.4`, with `127.0.0.10` as a fresh-source recovery check. These are
 loopback aliases on one host, so this result does not model independent
 networks, a real CDN/WAF, or production TLS ingress.
 
 This bounded check does not prove fairness across distributed IPs, sustained
-large-client workloads, NAT sharing, a full WebSocket tool exchange, production TLS policy,
+large-client workloads, NAT sharing, a full WebSocket tool exchange, or
+production TLS policy,
 or that your deployed ingress limits remain effective after changes. Qualify
 your own proxy configuration and legitimate MCP clients before relying on it.

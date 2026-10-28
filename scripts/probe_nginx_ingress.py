@@ -166,7 +166,8 @@ http {{
                     time.sleep(1.2)
                     for source in ("127.0.0.2", "127.0.0.3", "127.0.0.4"):
                         outcomes = [sourced_status(proxy_port, source) for _ in range(6)]
-                        if 200 not in outcomes or 429 not in outcomes:
+                        if (200 not in outcomes or 429 not in outcomes or
+                                not set(outcomes) <= {200, 429}):
                             raise RuntimeError(
                                 f"multi-source wave {wave + 1}, {source}: {outcomes}")
                     if sourced_status(proxy_port, "127.0.0.10") != 200:
