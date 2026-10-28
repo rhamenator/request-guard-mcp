@@ -31,7 +31,9 @@ jobs:
       - name: Validate version, lockfile, and tag ancestry
         env:
           INPUT_CANDIDATE_VERSION: ${{ inputs.candidate_version }}
-        run: python scripts/verify_release_ref.py
+        run: |
+          python scripts/verify_release_ref.py
+          python scripts/verify_installer_release_gate.py
       - name: Verify Windows icon resource matches source
         run: python3 scripts/verify_icon_resource.py
 

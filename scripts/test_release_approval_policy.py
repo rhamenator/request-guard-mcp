@@ -63,6 +63,9 @@ assert "          draft: ${{ !startsWith(github.ref_name, 'v0.') }}" in active_l
     "v1+ native assets must remain in a draft until exact tagged-byte review"
 )
 assert "environment: stable-release" not in jobs.get("verify-release-ref", "")
+assert "          python scripts/verify_installer_release_gate.py" in active_lines(
+    jobs["verify-release-ref"]
+), "future public native tags must pass the installer gate"
 
 for name, job in jobs.items():
     lines = [line.strip() for line in active_lines(job)]
@@ -73,6 +76,9 @@ for name, job in jobs.items():
         assert name == "attest-native-provenance", name
 
 container_source = (Path(__file__).resolve().parents[1] / ".github/workflows/container.yml").read_text()
+assert "          python3 scripts/verify_installer_release_gate.py" in container_source, (
+    "future public container tags must pass the installer gate"
+)
 assert "permissions: write-all" not in container_source
 container_workflow = container_source.split("\njobs:\n", 1)[1]
 container_matches = list(re.finditer(r"^  ([A-Za-z_][A-Za-z0-9_-]*):\n", container_workflow, re.MULTILINE))
