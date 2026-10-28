@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   native-install:
-    name: npm install/uninstall (${{ matrix.platform }})
+    name: global npm install/uninstall (${{ matrix.platform }})
     strategy:
       fail-fast: false
       matrix:
@@ -30,6 +30,8 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
@@ -43,10 +45,12 @@ jobs:
         run: python scripts/qualify_published_npm.py --version "$VERSION"
 
   alpine-install:
-    name: npm install/uninstall (linux-x64-musl)
+    name: global npm install/uninstall (linux-x64-musl)
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
       - name: Exercise public installed launcher in disposable Alpine
         env:
           VERSION: ${{ inputs.version }}
