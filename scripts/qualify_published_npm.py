@@ -91,6 +91,8 @@ def platform_binary():
             raise RuntimeError("unsupported macOS architecture")
         return ("macos-arm64" if platform.machine() == "arm64" else "macos-x64"), "request-guard-mcp"
     if sys.platform == "linux":
+        if platform.machine() not in {"x86_64", "AMD64"}:
+            raise RuntimeError(f"unsupported Linux architecture: {platform.machine()}")
         libc = platform.libc_ver()[0]
         if libc not in {"glibc", ""}:
             raise RuntimeError(f"unrecognized Linux libc: {libc}")
