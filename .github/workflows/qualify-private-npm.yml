@@ -1,0 +1,161 @@
+name: Qualify Private npm Candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_run_id:
+        description: Successful private Release workflow run containing five native archives
+        required: true
+        type: string
+      candidate_version:
+        description: Candidate package/archive label without v, such as 1.1.0-rc.1
+        required: true
+        type: string
+      native_version:
+        description: Cargo/native version reported by the binary, such as 1.1.0
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  prepare:
+    name: Verify source and pack private candidate
+    runs-on: ubuntu-24.04
+    outputs:
+      source_sha: ${{ steps.source.outputs.sha }}
+      tarball_sha256: ${{ steps.pack.outputs.sha256 }}
+    steps:
+      - name: Verify private Release run and version relationship
+        id: source
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ inputs.release_run_id }}
+          LABEL: ${{ inputs.candidate_version }}
+          NATIVE_VERSION: ${{ inputs.native_version }}
+        run: |
+          set -euo pipefail
+          [[ "$RUN_ID" =~ ^[0-9]+$ ]]
+          [[ "$NATIVE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          [[ "$LABEL" =~ ^[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$ ]]
+          [[ "$LABEL" == "$NATIVE_VERSION"-rc.* ]]
+          expected_workflow=$(gh api "repos/$REPO/actions/workflows/release.yml" --jq .id)
+          gh api "repos/$REPO/actions/runs/$RUN_ID" > "$RUNNER_TEMP/release-run.json"
+          jq -e --argjson workflow "$expected_workflow" --arg repo "$REPO" \
+            '.workflow_id == $workflow and .event == "workflow_dispatch" and
+             .conclusion == "success" and .head_repository.full_name == $repo and
+             (.head_sha | test("^[0-9a-f]{40}$"))' \
+            "$RUNNER_TEMP/release-run.json" >/dev/null
+          echo "sha=$(jq -r .head_sha "$RUNNER_TEMP/release-run.json")" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ steps.source.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22.20.0"
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          run-id: ${{ inputs.release_run_id }}
+          github-token: ${{ github.token }}
+          pattern: request-guard-mcp-*
+          path: inputs/assets
+          merge-multiple: true
+      - name: Verify five native archives and pack npm tarball
+        id: pack
+        shell: bash
+        env:
+          LABEL: ${{ inputs.candidate_version }}
+        run: |
+          set -euo pipefail
+          [[ $(find inputs/assets -maxdepth 1 -type f -name '*.sha256' | wc -l) -eq 5 ]]
+          [[ $(find inputs/assets -maxdepth 1 -type f -name '*.tar.gz' | wc -l) -eq 4 ]]
+          [[ $(find inputs/assets -maxdepth 1 -type f -name '*.zip' | wc -l) -eq 1 ]]
+          (cd inputs/assets && sha256sum -c ./*.sha256)
+          python3 scripts/package_npm.py --name request-guard-mcp --version "$LABEL" \
+            --assets inputs/assets --output "$RUNNER_TEMP/npm-package"
+          mkdir -p inputs/npm
+          (cd "$RUNNER_TEMP/npm-package" && npm pack --pack-destination "$GITHUB_WORKSPACE/inputs/npm" --ignore-scripts)
+          tarball="inputs/npm/request-guard-mcp-${LABEL}.tgz"
+          [[ -f "$tarball" ]]
+          echo "sha256=$(sha256sum "$tarball" | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: private-npm-candidate-inputs
+          path: inputs/
+          if-no-files-found: error
+          retention-days: 7
+
+  native-install:
+    name: private npm install/uninstall (${{ matrix.platform }})
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux-x64
+            runner: ubuntu-24.04
+          - platform: windows-x64
+            runner: windows-2025
+          - platform: macos-x64
+            runner: macos-15-intel
+          - platform: macos-arm64
+            runner: macos-15
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.prepare.outputs.source_sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22.20.0"
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: private-npm-candidate-inputs
+          path: inputs
+      - name: Exercise installed candidate and uninstall
+        shell: bash
+        env:
+          LABEL: ${{ inputs.candidate_version }}
+          NATIVE_VERSION: ${{ inputs.native_version }}
+          DIGEST: ${{ needs.prepare.outputs.tarball_sha256 }}
+        run: |
+          python scripts/qualify_published_npm.py --version "$LABEL" \
+            --native-version "$NATIVE_VERSION" \
+            --tarball "inputs/npm/request-guard-mcp-${LABEL}.tgz" \
+            --tarball-sha256 "$DIGEST" --assets inputs/assets
+
+  alpine-install:
+    name: private npm install/uninstall (linux-x64-musl)
+    needs: prepare
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.prepare.outputs.source_sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: private-npm-candidate-inputs
+          path: inputs
+      - name: Exercise installed candidate in disposable Alpine
+        env:
+          LABEL: ${{ inputs.candidate_version }}
+          NATIVE_VERSION: ${{ inputs.native_version }}
+          DIGEST: ${{ needs.prepare.outputs.tarball_sha256 }}
+        run: |
+          docker run --rm --cpus 2 --memory 1g \
+            -e LABEL -e NATIVE_VERSION -e DIGEST \
+            -v "$PWD:/source:ro" -w /source \
+            node:22.20.0-alpine3.22 sh -ec \
+            'apk add --no-cache python3 && python3 scripts/qualify_published_npm.py --version "$LABEL" --native-version "$NATIVE_VERSION" --tarball "inputs/npm/request-guard-mcp-${LABEL}.tgz" --tarball-sha256 "$DIGEST" --assets inputs/assets'
