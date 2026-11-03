@@ -82,9 +82,12 @@ For each later approved npm release, after its native assets are published:
    <matching-tag> --assets <asset-directory> --output <new-package-directory>`.
 3. Run `npm pack --dry-run --json` in the generated directory and inspect its
    file list. Pack the candidate, record its SHA-256, and on each supported
-   platform run `python3 scripts/qualify_published_npm.py --version <version>
-   --tarball <candidate.tgz> --tarball-sha256 <digest> --assets
-   <asset-directory>`. This installs into a clean temporary npm prefix,
+   platform run `python3 scripts/qualify_published_npm.py --version
+   <candidate-label> --native-version <Cargo-version> --tarball
+   <candidate.tgz> --tarball-sha256 <digest> --assets <asset-directory>`.
+   A private label such as `1.1.0-rc.1` can contain a native binary that
+   reports `1.1.0`; pass those two versions separately. The command installs
+   into a clean temporary npm prefix,
    compares its native binary with the matching checksum-verified candidate
    archive, runs the installed command through stdio and the pinned official
    MCP Inspector, then checks global uninstall residue. Use the same candidate

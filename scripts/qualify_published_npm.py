@@ -53,6 +53,14 @@ def download(url, destination):
         destination.write_bytes(response.read())
 
 
+def sha256_file(path):
+    digest = hashlib.sha256()
+    with path.open("rb") as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def expected_release_binary(root, version, folder, binary, assets=None):
     extension = "zip" if folder.startswith("windows") else "tar.gz"
     name = f"request-guard-mcp-v{version}-{folder}.{extension}"
@@ -62,10 +70,12 @@ def expected_release_binary(root, version, folder, binary, assets=None):
         base = f"{RELEASE_ROOT}/v{version}"
         download(f"{base}/{name}", archive)
         download(f"{base}/{name}.sha256", sidecar)
+    elif not archive.is_file() or not sidecar.is_file():
+        raise AssertionError(f"candidate native archive or sidecar missing: {archive}, {sidecar}")
     listed_hash = sidecar.read_text().split()[0]
     if not re.fullmatch(r"[0-9a-f]{64}", listed_hash):
         raise AssertionError("release sidecar has no SHA-256 digest")
-    if hashlib.sha256(archive.read_bytes()).hexdigest() != listed_hash:
+    if sha256_file(archive) != listed_hash:
         raise AssertionError("release archive does not match its SHA-256 sidecar")
     if extension == "zip":
         with zipfile.ZipFile(archive) as package:
@@ -107,6 +117,8 @@ def main():
     parser.add_argument("--version", required=True)
     parser.add_argument("--tarball", type=Path,
                         help="local unpublished candidate npm tarball")
+    parser.add_argument("--native-version",
+                        help="Cargo/native version shown by the candidate binary")
     parser.add_argument("--tarball-sha256",
                         help="expected SHA-256 of the local candidate tarball")
     parser.add_argument("--assets", type=Path,
@@ -114,10 +126,17 @@ def main():
     args = parser.parse_args()
     if not re.fullmatch(r"\d+\.\d+\.\d+(?:-rc\.\d+)?", args.version):
         parser.error("expected a numeric release or rc version")
-    if bool(args.tarball) != bool(args.assets) or bool(args.tarball) != bool(args.tarball_sha256):
-        parser.error("--tarball, --tarball-sha256, and --assets must be supplied together")
+    if len({bool(args.tarball), bool(args.assets), bool(args.tarball_sha256),
+            bool(args.native_version)}) != 1:
+        parser.error("--tarball, --tarball-sha256, --assets, and --native-version must be supplied together")
     if args.tarball and not re.fullmatch(r"[0-9a-f]{64}", args.tarball_sha256):
         parser.error("--tarball-sha256 must be a lowercase SHA-256 digest")
+    if args.native_version and not re.fullmatch(r"\d+\.\d+\.\d+(?:-rc\.\d+)?", args.native_version):
+        parser.error("--native-version must be a numeric release or rc version")
+    if args.tarball and not args.tarball.is_file():
+        parser.error(f"candidate npm tarball is not a file: {args.tarball}")
+    if args.assets and not args.assets.is_dir():
+        parser.error(f"candidate native assets directory is missing: {args.assets}")
     npm = shutil.which("npm.cmd" if os.name == "nt" else "npm")
     if not npm:
         raise RuntimeError("npm is required")
@@ -133,8 +152,8 @@ def main():
         env["NPM_CONFIG_IGNORE_SCRIPTS"] = "true"
         package_spec = f"{PACKAGE}@{args.version}"
         if args.tarball:
-            tarball = args.tarball.resolve(strict=True)
-            if hashlib.sha256(tarball.read_bytes()).hexdigest() != args.tarball_sha256:
+            tarball = args.tarball.resolve()
+            if sha256_file(tarball) != args.tarball_sha256:
                 raise AssertionError("candidate npm tarball does not match expected SHA-256")
             package_spec = str(tarball)
         else:
@@ -177,10 +196,10 @@ def main():
                 raise AssertionError("npm native binary differs from expected native archive")
             digest = hashlib.sha256(expected).hexdigest()
             run(sys.executable, str(ROOT / "scripts/stdio_release_smoke.py"),
-                "--binary", str(shim), "--expected-version", args.version,
+                "--binary", str(shim), "--expected-version", args.native_version or args.version,
                 env=env, show_output=True)
             run(sys.executable, str(ROOT / "scripts/inspector_smoke.py"),
-                "--expected-version", args.version, str(shim),
+                "--expected-version", args.native_version or args.version, str(shim),
                 env=env, show_output=True)
         finally:
             if installed_successfully:
