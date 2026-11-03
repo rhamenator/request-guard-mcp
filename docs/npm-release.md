@@ -21,7 +21,9 @@ container; it did not test OS signing/notarization prompts or an upgrade path.
 Each later candidate needs its own exact-artifact qualification.
 For an unpublished candidate, the manual `Qualify Private npm Candidate`
 workflow accepts the successful private `Release` run ID, its candidate label
-without `v`, and the Cargo/native version. It verifies the source run and all
+without `v`, and the Cargo/native version. Dispatch this workflow on the same
+candidate commit used by the `Release` run; a source SHA mismatch fails before
+packaging. It verifies the source run and all
 five native archive sidecars, packs one npm tarball from that source, records
 its SHA-256, then installs and uninstalls that same tarball on ephemeral Linux
 glibc, Alpine/musl, Windows x64, macOS Intel, and macOS Apple Silicon jobs.
