@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Globally install, exercise, and uninstall an exact public npm release."""
+"""Globally install, exercise, and uninstall a public or local candidate npm package."""
 
 import argparse
 import base64
@@ -53,14 +53,15 @@ def download(url, destination):
         destination.write_bytes(response.read())
 
 
-def expected_release_binary(root, version, folder, binary):
+def expected_release_binary(root, version, folder, binary, assets=None):
     extension = "zip" if folder.startswith("windows") else "tar.gz"
     name = f"request-guard-mcp-v{version}-{folder}.{extension}"
-    archive = root / name
-    sidecar = root / f"{name}.sha256"
-    base = f"{RELEASE_ROOT}/v{version}"
-    download(f"{base}/{name}", archive)
-    download(f"{base}/{name}.sha256", sidecar)
+    archive = assets / name if assets else root / name
+    sidecar = assets / f"{name}.sha256" if assets else root / f"{name}.sha256"
+    if assets is None:
+        base = f"{RELEASE_ROOT}/v{version}"
+        download(f"{base}/{name}", archive)
+        download(f"{base}/{name}.sha256", sidecar)
     listed_hash = sidecar.read_text().split()[0]
     if not re.fullmatch(r"[0-9a-f]{64}", listed_hash):
         raise AssertionError("release sidecar has no SHA-256 digest")
@@ -104,9 +105,19 @@ def platform_binary():
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--version", required=True)
+    parser.add_argument("--tarball", type=Path,
+                        help="local unpublished candidate npm tarball")
+    parser.add_argument("--tarball-sha256",
+                        help="expected SHA-256 of the local candidate tarball")
+    parser.add_argument("--assets", type=Path,
+                        help="local native archives and SHA-256 sidecars from the same candidate run")
     args = parser.parse_args()
     if not re.fullmatch(r"\d+\.\d+\.\d+(?:-rc\.\d+)?", args.version):
         parser.error("expected a numeric release or rc version")
+    if bool(args.tarball) != bool(args.assets) or bool(args.tarball) != bool(args.tarball_sha256):
+        parser.error("--tarball, --tarball-sha256, and --assets must be supplied together")
+    if args.tarball and not re.fullmatch(r"[0-9a-f]{64}", args.tarball_sha256):
+        parser.error("--tarball-sha256 must be a lowercase SHA-256 digest")
     npm = shutil.which("npm.cmd" if os.name == "nt" else "npm")
     if not npm:
         raise RuntimeError("npm is required")
@@ -121,17 +132,23 @@ def main():
         env["NPM_CONFIG_REGISTRY"] = "https://registry.npmjs.org/"
         env["NPM_CONFIG_IGNORE_SCRIPTS"] = "true"
         package_spec = f"{PACKAGE}@{args.version}"
-        metadata = json.loads(run(npm, "view", package_spec, "dist.integrity", "--json", env=env))
-        if not isinstance(metadata, str) or not metadata.startswith("sha512-"):
-            raise AssertionError("registry did not return a SHA-512 integrity value")
-        tarball_name = run(npm, "pack", package_spec, "--pack-destination", str(root),
-                           "--json", "--ignore-scripts", env=env)
-        packed = json.loads(tarball_name)
-        tarball = root / packed[0]["filename"]
-        actual_integrity = "sha512-" + base64.b64encode(
-            hashlib.sha512(tarball.read_bytes()).digest()).decode()
-        if actual_integrity != metadata:
-            raise AssertionError("registry tarball does not match dist.integrity")
+        if args.tarball:
+            tarball = args.tarball.resolve(strict=True)
+            if hashlib.sha256(tarball.read_bytes()).hexdigest() != args.tarball_sha256:
+                raise AssertionError("candidate npm tarball does not match expected SHA-256")
+            package_spec = str(tarball)
+        else:
+            metadata = json.loads(run(npm, "view", package_spec, "dist.integrity", "--json", env=env))
+            if not isinstance(metadata, str) or not metadata.startswith("sha512-"):
+                raise AssertionError("registry did not return a SHA-512 integrity value")
+            tarball_name = run(npm, "pack", package_spec, "--pack-destination", str(root),
+                               "--json", "--ignore-scripts", env=env)
+            packed = json.loads(tarball_name)
+            tarball = root / packed[0]["filename"]
+            actual_integrity = "sha512-" + base64.b64encode(
+                hashlib.sha512(tarball.read_bytes()).digest()).decode()
+            if actual_integrity != metadata:
+                raise AssertionError("registry tarball does not match dist.integrity")
 
         installed = (prefix / "node_modules" / PACKAGE if os.name == "nt"
                      else prefix / "lib" / "node_modules" / PACKAGE)
@@ -155,9 +172,9 @@ def main():
             native = installed / "vendor" / folder / binary
             if not native.is_file():
                 raise AssertionError(f"missing installed native binary for {folder}")
-            expected = expected_release_binary(root, args.version, folder, binary)
+            expected = expected_release_binary(root, args.version, folder, binary, args.assets)
             if native.read_bytes() != expected:
-                raise AssertionError("npm native binary differs from tagged release binary")
+                raise AssertionError("npm native binary differs from expected native archive")
             digest = hashlib.sha256(expected).hexdigest()
             run(sys.executable, str(ROOT / "scripts/stdio_release_smoke.py"),
                 "--binary", str(shim), "--expected-version", args.version,
@@ -174,7 +191,8 @@ def main():
                      if os.name == "nt" else [shim])
             if installed.exists() or any(os.path.lexists(path) for path in shims):
                 raise AssertionError("npm uninstall left the package or global shim behind")
-        print(f"PASS public global npm {package_spec}: {folder} sha256:{digest}; "
+        mode = "candidate" if args.tarball else "public"
+        print(f"PASS {mode} global npm {PACKAGE}@{args.version}: {folder} sha256:{digest}; "
               "stdio, Inspector, uninstall, no package/shim residue")
 
 

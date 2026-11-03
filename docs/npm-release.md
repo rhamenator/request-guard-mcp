@@ -81,13 +81,16 @@ For each later approved npm release, after its native assets are published:
 2. Run `python3 scripts/package_npm.py --name request-guard-mcp --version
    <matching-tag> --assets <asset-directory> --output <new-package-directory>`.
 3. Run `npm pack --dry-run --json` in the generated directory and inspect its
-   file list. Install the resulting tarball into a clean temporary npm prefix,
-   start the packaged command with a fresh bearer token, and repeat the HTTP
-   MCP Inspector smoke test against that installed command. For v0.1.5 and
-   later, also run `python3 scripts/stdio_release_smoke.py --binary <installed-command>
-   --expected-version <version>` against the clean install. Verify the npm
-   launcher forwards the caller's `--stdio` flag and keeps protocol output free
-   of diagnostics.
+   file list. Pack the candidate, record its SHA-256, and on each supported
+   platform run `python3 scripts/qualify_published_npm.py --version <version>
+   --tarball <candidate.tgz> --tarball-sha256 <digest> --assets
+   <asset-directory>`. This installs into a clean temporary npm prefix,
+   compares its native binary with the matching checksum-verified candidate
+   archive, runs the installed command through stdio and the pinned official
+   MCP Inspector, then checks global uninstall residue. Use the same candidate
+   tarball and five native assets on every platform. This local-tarball mode
+   is private qualification; it does not prove public-registry installation,
+   upgrade behavior, or artifact attestation.
 4. Confirm the npm account owns the intended package name, configure npm
    publishing credentials or trusted publishing, and publish the matching
    version only after its release is approved. Verify the published tarball
