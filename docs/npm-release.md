@@ -19,6 +19,17 @@ pinned official MCP Inspector for authenticated initialization, tool discovery,
 removed. This run used ephemeral GitHub runners and a disposable Alpine
 container; it did not test OS signing/notarization prompts or an upgrade path.
 Each later candidate needs its own exact-artifact qualification.
+For an unpublished candidate, the manual `Qualify Private npm Candidate`
+workflow accepts the successful private `Release` run ID, its candidate label
+without `v`, and the Cargo/native version. Dispatch this workflow on the same
+candidate commit used by the `Release` run; a source SHA mismatch fails before
+packaging. It verifies the source run and all
+five native archive sidecars, packs one npm tarball from that source, records
+its SHA-256, then installs and uninstalls that same tarball on ephemeral Linux
+glibc, Alpine/musl, Windows x64, macOS Intel, and macOS Apple Silicon jobs.
+The workflow does not publish npm or create a release tag. Preserve its run ID,
+source SHA, package digest, and per-platform results as candidate evidence;
+upgrade testing and artifact attestations remain separate gates.
 The experimental [0.1.5 package](https://www.npmjs.com/package/request-guard-mcp/v/0.1.5)
 remains available for existing installations.
 
