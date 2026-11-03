@@ -15,6 +15,11 @@ on:
         description: Cargo/native version reported by the binary, such as 1.1.0
         required: true
         type: string
+      upgrade_from:
+        description: Existing public npm version to replace in the clean prefix
+        required: true
+        default: "1.0.0"
+        type: string
 
 permissions:
   actions: read
@@ -35,12 +40,15 @@ jobs:
           RUN_ID: ${{ inputs.release_run_id }}
           LABEL: ${{ inputs.candidate_version }}
           NATIVE_VERSION: ${{ inputs.native_version }}
+          UPGRADE_FROM: ${{ inputs.upgrade_from }}
           SOURCE_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
           [[ "$RUN_ID" =~ ^[0-9]+$ ]]
           [[ "$NATIVE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
           [[ "$LABEL" =~ ^[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$ ]]
+          [[ "$UPGRADE_FROM" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          [[ "$UPGRADE_FROM" != "$LABEL" ]]
           [[ "$LABEL" == "$NATIVE_VERSION"-rc.* ]]
           expected_workflow=$(gh api "repos/$REPO/actions/workflows/release.yml" --jq .id)
           gh api "repos/$REPO/actions/runs/$RUN_ID" > "$RUNNER_TEMP/release-run.json"
@@ -124,12 +132,14 @@ jobs:
         env:
           LABEL: ${{ inputs.candidate_version }}
           NATIVE_VERSION: ${{ inputs.native_version }}
+          UPGRADE_FROM: ${{ inputs.upgrade_from }}
           DIGEST: ${{ needs.prepare.outputs.tarball_sha256 }}
         run: |
           python scripts/qualify_published_npm.py --version "$LABEL" \
             --native-version "$NATIVE_VERSION" \
             --tarball "inputs/npm/request-guard-mcp-${LABEL}.tgz" \
-            --tarball-sha256 "$DIGEST" --assets inputs/assets
+            --tarball-sha256 "$DIGEST" --assets inputs/assets \
+            --upgrade-from "$UPGRADE_FROM"
 
   alpine-install:
     name: private npm install/uninstall (linux-x64-musl)
@@ -148,10 +158,11 @@ jobs:
         env:
           LABEL: ${{ inputs.candidate_version }}
           NATIVE_VERSION: ${{ inputs.native_version }}
+          UPGRADE_FROM: ${{ inputs.upgrade_from }}
           DIGEST: ${{ needs.prepare.outputs.tarball_sha256 }}
         run: |
           docker run --rm --cpus 2 --memory 1g \
-            -e LABEL -e NATIVE_VERSION -e DIGEST \
+            -e LABEL -e NATIVE_VERSION -e UPGRADE_FROM -e DIGEST \
             -v "$PWD:/source:ro" -w /source \
             node:22.20.0-alpine3.22 sh -ec \
-            'apk add --no-cache python3 && python3 scripts/qualify_published_npm.py --version "$LABEL" --native-version "$NATIVE_VERSION" --tarball "inputs/npm/request-guard-mcp-${LABEL}.tgz" --tarball-sha256 "$DIGEST" --assets inputs/assets'
+            'apk add --no-cache python3 && python3 scripts/qualify_published_npm.py --version "$LABEL" --native-version "$NATIVE_VERSION" --tarball "inputs/npm/request-guard-mcp-${LABEL}.tgz" --tarball-sha256 "$DIGEST" --assets inputs/assets --upgrade-from "$UPGRADE_FROM"'

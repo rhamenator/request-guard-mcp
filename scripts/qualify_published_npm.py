@@ -123,6 +123,8 @@ def main():
                         help="expected SHA-256 of the local candidate tarball")
     parser.add_argument("--assets", type=Path,
                         help="local native archives and SHA-256 sidecars from the same candidate run")
+    parser.add_argument("--upgrade-from",
+                        help="public npm version to install before replacing it with the candidate")
     args = parser.parse_args()
     if not re.fullmatch(r"\d+\.\d+\.\d+(?:-rc\.\d+)?", args.version):
         parser.error("expected a numeric release or rc version")
@@ -133,6 +135,12 @@ def main():
         parser.error("--tarball-sha256 must be a lowercase SHA-256 digest")
     if args.native_version and not re.fullmatch(r"\d+\.\d+\.\d+(?:-rc\.\d+)?", args.native_version):
         parser.error("--native-version must be a numeric release or rc version")
+    if args.upgrade_from and not re.fullmatch(r"\d+\.\d+\.\d+(?:-rc\.\d+)?", args.upgrade_from):
+        parser.error("--upgrade-from must be a numeric release or rc version")
+    if args.upgrade_from and not args.tarball:
+        parser.error("--upgrade-from requires a local candidate tarball")
+    if args.upgrade_from == args.version:
+        parser.error("--upgrade-from must differ from the candidate version")
     if args.tarball and not args.tarball.is_file():
         parser.error(f"candidate npm tarball is not a file: {args.tarball}")
     if args.assets and not args.assets.is_dir():
@@ -176,12 +184,24 @@ def main():
                            else "request-guard-mcp")
         installed_successfully = False
         try:
+            if args.upgrade_from:
+                run(npm, "install", "-g", "--prefix", str(prefix), "--no-audit",
+                    "--no-fund", "--ignore-scripts", f"{PACKAGE}@{args.upgrade_from}", env=env)
+                installed_successfully = True
+                old_manifest = json.loads((installed / "package.json").read_text())
+                if old_manifest["name"] != PACKAGE or old_manifest["version"] != args.upgrade_from:
+                    raise AssertionError("pre-upgrade install returned a different package")
+                if not shim.is_file():
+                    raise AssertionError("pre-upgrade command shim is missing")
+                run(sys.executable, str(ROOT / "scripts/stdio_release_smoke.py"),
+                    "--binary", str(shim), "--expected-version", args.upgrade_from,
+                    env=env, show_output=True)
             run(npm, "install", "-g", "--prefix", str(prefix), "--no-audit",
                 "--no-fund", "--ignore-scripts", package_spec, env=env)
             installed_successfully = True
             manifest = json.loads((installed / "package.json").read_text())
             if manifest["name"] != PACKAGE or manifest["version"] != args.version:
-                raise AssertionError("registry install returned a different package")
+                raise AssertionError("candidate install returned a different package")
             if (manifest.get("scripts") or manifest.get("dependencies") or
                     manifest.get("optionalDependencies") or manifest.get("bundledDependencies") or
                     (installed / "binding.gyp").exists()):
@@ -211,8 +231,9 @@ def main():
             if installed.exists() or any(os.path.lexists(path) for path in shims):
                 raise AssertionError("npm uninstall left the package or global shim behind")
         mode = "candidate" if args.tarball else "public"
+        upgrade = f"upgraded from {args.upgrade_from}; " if args.upgrade_from else ""
         print(f"PASS {mode} global npm {PACKAGE}@{args.version}: {folder} sha256:{digest}; "
-              "stdio, Inspector, uninstall, no package/shim residue")
+              f"{upgrade}stdio, Inspector, uninstall, no package/shim residue")
 
 
 if __name__ == "__main__":

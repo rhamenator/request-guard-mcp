@@ -21,15 +21,19 @@ container; it did not test OS signing/notarization prompts or an upgrade path.
 Each later candidate needs its own exact-artifact qualification.
 For an unpublished candidate, the manual `Qualify Private npm Candidate`
 workflow accepts the successful private `Release` run ID, its candidate label
-without `v`, and the Cargo/native version. Dispatch this workflow on the same
+without `v`, the Cargo/native version, and a public npm version to replace.
+Dispatch this workflow on the same
 candidate commit used by the `Release` run; a source SHA mismatch fails before
 packaging. It verifies the source run and all
 five native archive sidecars, packs one npm tarball from that source, records
-its SHA-256, then installs and uninstalls that same tarball on ephemeral Linux
+its SHA-256, then installs the public version, replaces it with that same
+candidate tarball, and uninstalls it on ephemeral Linux
 glibc, Alpine/musl, Windows x64, macOS Intel, and macOS Apple Silicon jobs.
 The workflow does not publish npm or create a release tag. Preserve its run ID,
 source SHA, package digest, and per-platform results as candidate evidence;
-upgrade testing and artifact attestations remain separate gates.
+This tests an npm package replacement in a fresh prefix; existing user
+configuration, live listener/child cleanup, and artifact attestations remain
+separate gates.
 The experimental [0.1.5 package](https://www.npmjs.com/package/request-guard-mcp/v/0.1.5)
 remains available for existing installations.
 
@@ -95,7 +99,8 @@ For each later approved npm release, after its native assets are published:
    file list. Pack the candidate, record its SHA-256, and on each supported
    platform run `python3 scripts/qualify_published_npm.py --version
    <candidate-label> --native-version <Cargo-version> --tarball
-   <candidate.tgz> --tarball-sha256 <digest> --assets <asset-directory>`.
+   <candidate.tgz> --tarball-sha256 <digest> --assets <asset-directory>
+   --upgrade-from <public-version>`.
    A private label such as `1.1.0-rc.1` can contain a native binary that
    reports `1.1.0`; pass those two versions separately. The command installs
    into a clean temporary npm prefix,
@@ -104,7 +109,7 @@ For each later approved npm release, after its native assets are published:
    MCP Inspector, then checks global uninstall residue. Use the same candidate
    tarball and five native assets on every platform. This local-tarball mode
    is private qualification; it does not prove public-registry installation,
-   upgrade behavior, or artifact attestation.
+   upgrade of a user's existing configuration, or artifact attestation.
 4. Confirm the npm account owns the intended package name, configure npm
    publishing credentials or trusted publishing, and publish the matching
    version only after its release is approved. Verify the published tarball
