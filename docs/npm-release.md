@@ -106,7 +106,8 @@ For each later approved npm release, after its native assets are published:
    into a clean temporary npm prefix,
    compares its native binary with the matching checksum-verified candidate
    archive, runs the installed command through stdio and the pinned official
-   MCP Inspector, then checks global uninstall residue. Use the same candidate
+   MCP Inspector, kills the installed HTTP wrapper and verifies its native child
+   and listener exit, then checks global uninstall residue. Use the same candidate
    tarball and five native assets on every platform. This local-tarball mode
    is private qualification; it does not prove public-registry installation,
    upgrade of a user's existing configuration, or artifact attestation.

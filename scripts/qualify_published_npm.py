@@ -221,6 +221,8 @@ def main():
             run(sys.executable, str(ROOT / "scripts/inspector_smoke.py"),
                 "--expected-version", args.native_version or args.version, str(shim),
                 env=env, show_output=True)
+            run(sys.executable, str(ROOT / "scripts/probe_npm_installed_shim.py"),
+                "--installed-shim", str(shim), env=env, show_output=True)
         finally:
             if installed_successfully:
                 run(npm, "uninstall", "-g", "--prefix", str(prefix), "--no-audit",
@@ -233,7 +235,8 @@ def main():
         mode = "candidate" if args.tarball else "public"
         upgrade = f"upgraded from {args.upgrade_from}; " if args.upgrade_from else ""
         print(f"PASS {mode} global npm {PACKAGE}@{args.version}: {folder} sha256:{digest}; "
-              f"{upgrade}stdio, Inspector, uninstall, no package/shim residue")
+              f"{upgrade}stdio, Inspector, forced-kill child/listener cleanup, "
+              "uninstall, no package/shim residue")
 
 
 if __name__ == "__main__":
