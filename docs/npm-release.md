@@ -30,9 +30,9 @@ its SHA-256, then installs the public version, replaces it with that same
 candidate tarball, and uninstalls it on ephemeral Linux
 glibc, Alpine/musl, Windows x64, macOS Intel, and macOS Apple Silicon jobs.
 The workflow does not publish npm or create a release tag. Preserve its run ID,
-source SHA, package digest, and per-platform results as candidate evidence;
-This tests an npm package replacement in a fresh prefix; existing user
-configuration, live listener/child cleanup, and artifact attestations remain
+source SHA, package digest, and per-platform results as candidate evidence.
+This tests npm package replacement and installed launcher child/listener cleanup
+in a fresh prefix. Existing user configuration and artifact attestations remain
 separate gates.
 The experimental [0.1.5 package](https://www.npmjs.com/package/request-guard-mcp/v/0.1.5)
 remains available for existing installations.

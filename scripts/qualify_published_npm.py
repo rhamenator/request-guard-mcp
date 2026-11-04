@@ -163,6 +163,11 @@ def main():
             tarball = args.tarball.resolve()
             if sha256_file(tarball) != args.tarball_sha256:
                 raise AssertionError("candidate npm tarball does not match expected SHA-256")
+            with tarfile.open(tarball, "r:gz") as package:
+                candidate_files = {
+                    Path(member.name).relative_to("package").as_posix()
+                    for member in package.getmembers() if member.isfile()
+                }
             package_spec = str(tarball)
         else:
             metadata = json.loads(run(npm, "view", package_spec, "dist.integrity", "--json", env=env))
@@ -183,6 +188,7 @@ def main():
         shim = shim_dir / ("request-guard-mcp.cmd" if os.name == "nt"
                            else "request-guard-mcp")
         installed_successfully = False
+        old_native_digest = None
         try:
             if args.upgrade_from:
                 run(npm, "install", "-g", "--prefix", str(prefix), "--no-audit",
@@ -193,6 +199,10 @@ def main():
                     raise AssertionError("pre-upgrade install returned a different package")
                 if not shim.is_file():
                     raise AssertionError("pre-upgrade command shim is missing")
+                old_native = installed / "vendor" / folder / binary
+                if not old_native.is_file():
+                    raise AssertionError("pre-upgrade native binary is missing")
+                old_native_digest = sha256_file(old_native)
                 run(sys.executable, str(ROOT / "scripts/stdio_release_smoke.py"),
                     "--binary", str(shim), "--expected-version", args.upgrade_from,
                     env=env, show_output=True)
@@ -202,6 +212,13 @@ def main():
             manifest = json.loads((installed / "package.json").read_text())
             if manifest["name"] != PACKAGE or manifest["version"] != args.version:
                 raise AssertionError("candidate install returned a different package")
+            if args.tarball:
+                installed_files = {
+                    path.relative_to(installed).as_posix()
+                    for path in installed.rglob("*") if path.is_file()
+                }
+                if installed_files != candidate_files:
+                    raise AssertionError("candidate install contains missing or stale package files")
             if (manifest.get("scripts") or manifest.get("dependencies") or
                     manifest.get("optionalDependencies") or manifest.get("bundledDependencies") or
                     (installed / "binding.gyp").exists()):
@@ -215,6 +232,8 @@ def main():
             if native.read_bytes() != expected:
                 raise AssertionError("npm native binary differs from expected native archive")
             digest = hashlib.sha256(expected).hexdigest()
+            if old_native_digest == digest:
+                raise AssertionError("upgrade kept the previous native binary")
             run(sys.executable, str(ROOT / "scripts/stdio_release_smoke.py"),
                 "--binary", str(shim), "--expected-version", args.native_version or args.version,
                 env=env, show_output=True)
