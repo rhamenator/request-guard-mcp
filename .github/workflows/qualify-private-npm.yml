@@ -47,7 +47,7 @@ jobs:
           [[ "$RUN_ID" =~ ^[0-9]+$ ]]
           [[ "$NATIVE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
           [[ "$LABEL" =~ ^[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$ ]]
-          [[ "$UPGRADE_FROM" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+)?$ ]]
+          [[ "$UPGRADE_FROM" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
           [[ "$UPGRADE_FROM" != "$LABEL" ]]
           [[ "$LABEL" == "$NATIVE_VERSION"-rc.* ]]
           expected_workflow=$(gh api "repos/$REPO/actions/workflows/release.yml" --jq .id)

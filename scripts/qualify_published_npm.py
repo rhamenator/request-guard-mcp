@@ -135,8 +135,8 @@ def main():
         parser.error("--tarball-sha256 must be a lowercase SHA-256 digest")
     if args.native_version and not re.fullmatch(r"\d+\.\d+\.\d+(?:-rc\.\d+)?", args.native_version):
         parser.error("--native-version must be a numeric release or rc version")
-    if args.upgrade_from and not re.fullmatch(r"\d+\.\d+\.\d+(?:-rc\.\d+)?", args.upgrade_from):
-        parser.error("--upgrade-from must be a numeric release or rc version")
+    if args.upgrade_from and not re.fullmatch(r"\d+\.\d+\.\d+", args.upgrade_from):
+        parser.error("--upgrade-from must be a numeric public release version")
     if args.upgrade_from and not args.tarball:
         parser.error("--upgrade-from requires a local candidate tarball")
     if args.upgrade_from == args.version:

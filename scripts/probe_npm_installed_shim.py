@@ -48,7 +48,9 @@ def main():
     if bool(args.binary) == bool(args.installed_shim):
         parser.error("provide exactly one of binary or --installed-shim")
     if args.installed_shim:
-        shim = args.installed_shim.resolve(strict=True)
+        shim = args.installed_shim.absolute()
+        if not shim.is_file():
+            parser.error(f"installed command shim is missing: {shim}")
     else:
         binary = args.binary.resolve(strict=True)
     if sys.platform == "darwin":
