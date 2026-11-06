@@ -41,9 +41,18 @@ def process_running(pid, identity=None, handle=None):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("binary", type=Path)
+    parser.add_argument("binary", nargs="?", type=Path)
+    parser.add_argument("--installed-shim", type=Path,
+                        help="exercise an already installed npm command shim")
     args = parser.parse_args()
-    binary = args.binary.resolve(strict=True)
+    if bool(args.binary) == bool(args.installed_shim):
+        parser.error("provide exactly one of binary or --installed-shim")
+    if args.installed_shim:
+        shim = args.installed_shim.absolute()
+        if not shim.is_file():
+            parser.error(f"installed command shim is missing: {shim}")
+    else:
+        binary = args.binary.resolve(strict=True)
     if sys.platform == "darwin":
         platform = "macos-arm64" if os.uname().machine == "arm64" else "macos-x64"
         binary_name = "request-guard-mcp"
@@ -52,43 +61,44 @@ def main():
     else:
         platform, binary_name = "linux-x64", "request-guard-mcp"
 
-    launcher_source = Path(__file__).resolve().parents[1] / "npm/bin/request-guard-mcp.js"
-    npm = shutil.which("npm")
-    if npm is None:
-        raise RuntimeError("npm is required for installed-shim qualification")
     with tempfile.TemporaryDirectory(prefix="rg-npm-installed-shim-") as cwd:
         root = Path(cwd)
-        package = root / "package"
-        launcher = package / "bin/request-guard-mcp.js"
-        vendor = package / "vendor" / platform / binary_name
-        launcher.parent.mkdir(parents=True)
-        vendor.parent.mkdir(parents=True)
-        shutil.copyfile(launcher_source, launcher)
-        shutil.copyfile(binary, vendor)
-        launcher.chmod(0o755)
-        vendor.chmod(0o755)
-        (package / "package.json").write_text(json.dumps({
-            "name": "request-guard-mcp-shim-probe", "version": "0.0.0",
-            "private": True, "bin": {"request-guard-mcp": "bin/request-guard-mcp.js"},
-            "files": ["bin/", "vendor/"],
-        }))
-        packed = subprocess.run(
-            [npm, "pack", "--offline", "--ignore-scripts", "--silent", "--pack-destination", str(root)],
-            cwd=package, capture_output=True, text=True, check=True,
-        )
-        tarball = root / packed.stdout.strip().splitlines()[-1]
-        install = root / "install"
-        subprocess.run(
-            [npm, "install", "--offline", "--ignore-scripts", "--no-audit", "--no-fund",
-             "--prefix", str(install), str(tarball)],
-            cwd=root, capture_output=True, text=True, check=True,
-        )
-        installed = install / "node_modules" / "request-guard-mcp-shim-probe"
-        assert (installed / "vendor" / platform / binary_name).is_file()
-        shim = install / "node_modules" / ".bin" / (
-            "request-guard-mcp.cmd" if sys.platform == "win32" else "request-guard-mcp"
-        )
-        assert shim.is_file()
+        if not args.installed_shim:
+            launcher_source = Path(__file__).resolve().parents[1] / "npm/bin/request-guard-mcp.js"
+            npm = shutil.which("npm")
+            if npm is None:
+                raise RuntimeError("npm is required for installed-shim qualification")
+            package = root / "package"
+            launcher = package / "bin/request-guard-mcp.js"
+            vendor = package / "vendor" / platform / binary_name
+            launcher.parent.mkdir(parents=True)
+            vendor.parent.mkdir(parents=True)
+            shutil.copyfile(launcher_source, launcher)
+            shutil.copyfile(binary, vendor)
+            launcher.chmod(0o755)
+            vendor.chmod(0o755)
+            (package / "package.json").write_text(json.dumps({
+                "name": "request-guard-mcp-shim-probe", "version": "0.0.0",
+                "private": True, "bin": {"request-guard-mcp": "bin/request-guard-mcp.js"},
+                "files": ["bin/", "vendor/"],
+            }))
+            packed = subprocess.run(
+                [npm, "pack", "--offline", "--ignore-scripts", "--silent", "--pack-destination", str(root)],
+                cwd=package, capture_output=True, text=True, check=True,
+            )
+            tarball = root / packed.stdout.strip().splitlines()[-1]
+            install = root / "install"
+            subprocess.run(
+                [npm, "install", "--offline", "--ignore-scripts", "--no-audit", "--no-fund",
+                 "--prefix", str(install), str(tarball)],
+                cwd=root, capture_output=True, text=True, check=True,
+            )
+            installed = install / "node_modules" / "request-guard-mcp-shim-probe"
+            assert (installed / "vendor" / platform / binary_name).is_file()
+            shim = install / "node_modules" / ".bin" / (
+                "request-guard-mcp.cmd" if sys.platform == "win32" else "request-guard-mcp"
+            )
+            assert shim.is_file()
 
         preload = root / "record-process.cjs"
         preload.write_text(
