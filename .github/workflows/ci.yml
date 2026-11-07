@@ -32,6 +32,7 @@ jobs:
       - run: python3 scripts/test_write_private_candidate_evidence.py
       - run: python3 scripts/test_private_candidate_gate.py
       - run: python3 scripts/test_verify_private_candidate_qualification.py
+      - run: python3 scripts/test_verify_tagged_container_inputs.py
       - run: python3 scripts/test_release_approval_policy.py
       - run: python3 scripts/test_verify_installer_release_gate.py
       - run: python3 scripts/test_package_release_docs.py
