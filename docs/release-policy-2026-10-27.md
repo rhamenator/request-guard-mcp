@@ -6,6 +6,10 @@ withdraw v1.0.0. Version numbers continue forward. The next feature release
 candidate is planned on the `1.1.0-rc.N` line, subject to its own reviewed
 scope and version bump. Do not create that tag or move `latest` while the
 installer gate below is incomplete.
+The native binary reports the Cargo version `1.1.0`; an official candidate
+tag uses `v1.1.0-rc.N` and keeps the suffix in the package/archive label.
+Recognizing that tag shape does not authorize publication: the installer
+qualification guard remains fail-closed until the full gate is implemented.
 
 ## Official candidate gate
 

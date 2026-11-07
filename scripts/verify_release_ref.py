@@ -23,18 +23,23 @@ def main():
     kind = os.environ.get("GITHUB_REF_TYPE", "")
     event = os.environ.get("GITHUB_EVENT_NAME", "")
     candidate = os.environ.get("INPUT_CANDIDATE_VERSION", "")
-    if event == "workflow_dispatch":
+    if event == "workflow_dispatch" and kind != "tag":
         if not re.fullmatch(rf"v{re.escape(version)}-[A-Za-z0-9][A-Za-z0-9.-]*", candidate):
             fail(f"private candidate label must be v{version}-<suffix>")
         print(f"Private candidate {candidate} matches package {version}")
         return
+    if event == "workflow_dispatch" and kind == "tag" and candidate != name:
+        fail("manual tag dispatch candidate label must equal the tag name")
     # Keep public tag/version identity unambiguous. The workflow approval
     # predicate pauses every v1+ tag, including prereleases, but build
     # metadata is still unsupported by the artifact naming contract.
     if "+" in name or "+" in version:
         fail("release tags with SemVer build metadata are not supported")
-    if kind != "tag" or name != f"v{version}":
-        fail(f"release tag must be v{version}; got {name!r} ({kind})")
+    allowed = name == f"v{version}" or re.fullmatch(
+        rf"v{re.escape(version)}-rc\.[1-9][0-9]*", name
+    )
+    if kind != "tag" or not allowed:
+        fail(f"release tag must be v{version} or v{version}-rc.N; got {name!r} ({kind})")
     subprocess.run(["git", "fetch", "origin", "main", "--no-tags"], check=True)
     sha = os.environ.get("GITHUB_SHA", "")
     if not sha:
