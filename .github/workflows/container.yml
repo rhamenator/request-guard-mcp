@@ -25,6 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      actions: read
     outputs:
       publish: ${{ steps.tag.outputs.publish || steps.main.outputs.publish }}
     steps:
@@ -38,6 +39,7 @@ jobs:
         # tag, rather than as a private release-candidate dispatch.
         env:
           GITHUB_EVENT_NAME: push
+          GH_TOKEN: ${{ github.token }}
         run: |
           python3 scripts/verify_release_ref.py
           python3 scripts/verify_installer_release_gate.py

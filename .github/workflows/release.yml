@@ -22,6 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      actions: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -32,6 +33,7 @@ jobs:
       - name: Validate version, lockfile, and tag ancestry
         env:
           INPUT_CANDIDATE_VERSION: ${{ inputs.candidate_version }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           python scripts/verify_release_ref.py
           python scripts/verify_installer_release_gate.py

@@ -50,10 +50,16 @@ OS trust prompts and installation permissions in buyer instructions.
 The owner performs the final self-review against the exact tag, installer
 matrix, evidence, and release notes before public publication. The protected
 `stable-release` environment remains the owner pause for v1+ tags. The
-release workflows currently produce portable native archives and a container,
-not a qualified all-platform installer set. Their tagged publication paths
-fail closed in `scripts/verify_installer_release_gate.py` until an installer
-pipeline and exact-artifact qualification are implemented and reviewed.
+release workflows produce portable native archives and a container. The
+unpublished npm package is the installer path for the five supported platforms;
+its Node.js prerequisite must remain disclosed. Before a public tag can pass,
+`scripts/verify_installer_release_gate.py` verifies the annotated tag's exact
+source-bound private native, npm install/uninstall, and container run evidence.
+Tagged native publication promotes the verified private archives. Tagged
+container publication compares builder, runtime, and toolchain inventories
+with the private candidate before moving GHCR tags. The protected environment
+still requires owner approval, and public registry and tagged-byte checks
+remain postpublication gates.
 Unpublished `workflow_dispatch` candidates remain available for development.
 
 This policy does not turn Request Guard into outbound egress enforcement.
