@@ -5,7 +5,8 @@ from copy import deepcopy
 
 from private_candidate_gate import (
     NATIVE_SKIPPED_JOBS, PLATFORMS, REQUIRED_JOBS, WORKFLOWS,
-    load_annotated_tag, parse_tag_evidence, validate_evidence, validate_run,
+    fetch_qualification_run, load_annotated_tag, parse_tag_evidence,
+    validate_evidence, validate_run,
 )
 
 
@@ -99,6 +100,17 @@ def main() -> None:
     for kind in WORKFLOWS:
         run, jobs = fixture(kind)
         validate(kind, run, jobs)
+        run_path = f"repos/{REPO}/actions/runs/123"
+        jobs_path = f"{run_path}/attempts/2/jobs?per_page=100"
+        responses = {run_path: run, jobs_path: {"total_count": len(jobs), "jobs": jobs}}
+        fetched_run, fetched_jobs = fetch_qualification_run(
+            kind, repository=REPO, source_sha=SOURCE, run_id=123,
+            run_attempt=2, api=responses.__getitem__)
+        assert fetched_run == run and fetched_jobs == jobs
+        responses[jobs_path] = {"total_count": len(jobs) + 1, "jobs": jobs}
+        rejects(fetch_qualification_run, kind, repository=REPO, source_sha=SOURCE,
+                run_id=123, run_attempt=2, api=responses.__getitem__,
+                contains="job list missing or truncated")
         extra = jobs + [{"name": "Unreviewed publish", "conclusion": "success",
                          "head_sha": SOURCE, "run_attempt": 2}]
         rejects(validate, kind, run, extra, contains="unexpected jobs")

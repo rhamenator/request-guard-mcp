@@ -138,6 +138,23 @@ def validate_run(
     require(names.keys() == allowed, f"{kind} unexpected jobs: {sorted(names.keys() - allowed)}")
 
 
+def fetch_qualification_run(
+    kind: str, *, repository: str, source_sha: str, run_id: int,
+    run_attempt: int, api: Callable[[str], dict],
+) -> tuple[dict, list[dict]]:
+    """Fetch one exact Actions attempt and reject truncated job listings."""
+    run = api(f"repos/{repository}/actions/runs/{run_id}")
+    page = api(
+        f"repos/{repository}/actions/runs/{run_id}/attempts/{run_attempt}/jobs?per_page=100"
+    )
+    jobs = page.get("jobs")
+    require(isinstance(jobs, list) and page.get("total_count") == len(jobs)
+            and len(jobs) <= 100, f"{kind} job list missing or truncated")
+    validate_run(kind, run, jobs, repository=repository, source_sha=source_sha,
+                 run_id=run_id, run_attempt=run_attempt)
+    return run, jobs
+
+
 def validate_evidence(
     kind: str, evidence: dict, *, label: str, source_sha: str, run_id: int,
     run_attempt: int, platform: str | None = None, release_run_id: int | None = None,
