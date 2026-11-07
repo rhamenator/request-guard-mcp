@@ -25,11 +25,46 @@ REQUIRED_JOBS = {
 NATIVE_SKIPPED_JOBS = {
     "Approve v1+ release tag", "Attest and verify tagged native archives", "Create GitHub Release"
 }
+TAG_EVIDENCE_HEADER = "Request Guard MCP qualification v1"
+TAG_EVIDENCE_KEYS = {
+    "candidate_label", "source_sha", "release_run", "npm_run", "container_run",
+    "npm_tarball_sha256",
+}
 
 
 def require(condition: bool, message: str) -> None:
     if not condition:
         raise ValueError(message)
+
+
+def parse_tag_evidence(message: str, *, label: str, source_sha: str) -> dict[str, object]:
+    """Parse an annotated tag's owner-reviewed qualification run references."""
+    lines = [line.strip() for line in message.splitlines() if line.strip()]
+    require(bool(lines) and lines[0] == TAG_EVIDENCE_HEADER,
+            "annotated tag lacks Request Guard qualification header")
+    fields: dict[str, str] = {}
+    for line in lines[1:]:
+        require("=" in line, "invalid tag qualification field")
+        key, value = line.split("=", 1)
+        require(key in TAG_EVIDENCE_KEYS and key not in fields and value == value.strip(),
+                "unknown or duplicate tag qualification field")
+        fields[key] = value
+    require(fields.keys() == TAG_EVIDENCE_KEYS, "tag qualification fields incomplete")
+    require(fields["candidate_label"] == label, "tag candidate label mismatch")
+    require(fields["source_sha"] == source_sha, "tag source SHA mismatch")
+    require(re.fullmatch(r"[0-9a-f]{64}", fields["npm_tarball_sha256"]) is not None,
+            "tag npm tarball digest invalid")
+    result: dict[str, object] = {
+        "candidate_label": label,
+        "source_sha": source_sha,
+        "npm_tarball_sha256": fields["npm_tarball_sha256"],
+    }
+    for kind in ("release", "npm", "container"):
+        match = re.fullmatch(r"([1-9][0-9]*)/([1-9][0-9]*)", fields[f"{kind}_run"])
+        require(match is not None, f"tag {kind} run ID/attempt invalid")
+        result[f"{kind}_run_id"] = int(match.group(1))
+        result[f"{kind}_run_attempt"] = int(match.group(2))
+    return result
 
 
 def validate_run(

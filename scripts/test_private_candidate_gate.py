@@ -5,7 +5,7 @@ from copy import deepcopy
 
 from private_candidate_gate import (
     NATIVE_SKIPPED_JOBS, PLATFORMS, REQUIRED_JOBS, WORKFLOWS,
-    validate_evidence, validate_run,
+    parse_tag_evidence, validate_evidence, validate_run,
 )
 
 
@@ -48,6 +48,28 @@ def validate(kind: str, run: dict, jobs: list[dict]) -> None:
 
 
 def main() -> None:
+    tag_message = (
+        "Request Guard MCP qualification v1\n"
+        f"candidate_label={LABEL}\nsource_sha={SOURCE}\n"
+        "release_run=123/2\nnpm_run=456/1\ncontainer_run=789/3\n"
+        f"npm_tarball_sha256={'d' * 64}\n"
+    )
+    tag = parse_tag_evidence(tag_message, label=LABEL, source_sha=SOURCE)
+    assert (tag["release_run_id"], tag["release_run_attempt"]) == (123, 2)
+    assert (tag["npm_run_id"], tag["container_run_attempt"]) == (456, 3)
+    rejects(parse_tag_evidence, tag_message.replace(LABEL, "v1.1.0-rc.1"),
+            label=LABEL, source_sha=SOURCE, contains="candidate label mismatch")
+    rejects(parse_tag_evidence, tag_message.replace(SOURCE, "b" * 40),
+            label=LABEL, source_sha=SOURCE, contains="source SHA mismatch")
+    rejects(parse_tag_evidence, tag_message.replace("d" * 64, "invalid"),
+            label=LABEL, source_sha=SOURCE, contains="tarball digest invalid")
+    rejects(parse_tag_evidence, tag_message.replace("release_run=123/2", "release_run=0/2"),
+            label=LABEL, source_sha=SOURCE, contains="run ID/attempt invalid")
+    rejects(parse_tag_evidence, tag_message + "release_run=123/2\n",
+            label=LABEL, source_sha=SOURCE, contains="duplicate")
+    rejects(parse_tag_evidence, tag_message.replace("container_run=789/3\n", ""),
+            label=LABEL, source_sha=SOURCE, contains="fields incomplete")
+
     for kind in WORKFLOWS:
         run, jobs = fixture(kind)
         validate(kind, run, jobs)
