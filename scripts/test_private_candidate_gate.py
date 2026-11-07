@@ -2,12 +2,17 @@
 """Negative qualification checks must fail before any tag can publish."""
 
 from copy import deepcopy
+import json
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from private_candidate_gate import (
     NATIVE_SKIPPED_JOBS, PLATFORMS, REQUIRED_JOBS, WORKFLOWS,
     fetch_qualification_run, load_annotated_tag, parse_tag_evidence,
-    validate_evidence, validate_run,
+    validate_artifact_listing, validate_evidence, validate_run,
+    verify_container_files, verify_native_files, verify_npm_files,
 )
+from write_private_candidate_evidence import digest
 
 
 SOURCE = "a" * 40
@@ -169,6 +174,72 @@ def main() -> None:
     rejects(validate_evidence, "container", dict(container, platform="arm64"),
             label=LABEL, source_sha=SOURCE, run_id=789, run_attempt=3,
             platform="amd64", contains="platform mismatch")
+
+    artifact_names = [f"request-guard-mcp-{platform}" for platform in PLATFORMS]
+    artifact_page = {"total_count": 5, "artifacts": [
+        {"id": number, "name": name, "expired": False,
+         "workflow_run": {"id": 123, "head_sha": SOURCE}}
+        for number, name in enumerate(artifact_names, 1)
+    ]}
+    selected = validate_artifact_listing("native", artifact_page, source_sha=SOURCE, run_id=123)
+    assert set(selected) == set(artifact_names)
+    missing = deepcopy(artifact_page)
+    missing["artifacts"].pop()
+    missing["total_count"] = 4
+    rejects(validate_artifact_listing, "native", missing, source_sha=SOURCE,
+            run_id=123, contains="missing artifacts")
+    expired = deepcopy(artifact_page)
+    expired["artifacts"][0]["expired"] = True
+    rejects(validate_artifact_listing, "native", expired, source_sha=SOURCE,
+            run_id=123, contains="artifact expired")
+    wrong_source = deepcopy(artifact_page)
+    wrong_source["artifacts"][0]["workflow_run"]["head_sha"] = "b" * 40
+    rejects(validate_artifact_listing, "native", wrong_source, source_sha=SOURCE,
+            run_id=123, contains="artifact source/run mismatch")
+    duplicate = deepcopy(artifact_page)
+    duplicate["artifacts"].append(dict(duplicate["artifacts"][0], id=99))
+    duplicate["total_count"] = 6
+    rejects(validate_artifact_listing, "native", duplicate, source_sha=SOURCE,
+            run_id=123, contains="duplicate")
+
+    with TemporaryDirectory() as directory:
+        root = Path(directory)
+        archive = root / native["archive"]
+        archive.write_bytes(b"native bytes")
+        archive_hash = digest(archive)
+        (root / f"{archive.name}.sha256").write_text(f"{archive_hash} *{archive.name}\n")
+        native["archive_sha256"] = archive_hash
+        (root / "private-evidence-linux-x64.json").write_text(json.dumps(native))
+        verify_native_files(root, platform="linux-x64", label=LABEL,
+                            source_sha=SOURCE, run_id=123, run_attempt=2)
+        archive.write_bytes(b"tampered")
+        rejects(verify_native_files, root, platform="linux-x64", label=LABEL,
+                source_sha=SOURCE, run_id=123, run_attempt=2, contains="disagree")
+
+        npm_dir = root / "npm"
+        npm_dir.mkdir()
+        tarball = npm_dir / npm["tarball"]
+        tarball.write_bytes(b"candidate tarball")
+        npm["tarball_sha256"] = digest(tarball)
+        (npm_dir / "private-evidence.json").write_text(json.dumps(npm))
+        verify_npm_files(root, label=LABEL, source_sha=SOURCE, run_id=456,
+                         run_attempt=1, release_run_id=123, release_run_attempt=2)
+        tarball.write_bytes(b"tampered")
+        rejects(verify_npm_files, root, label=LABEL, source_sha=SOURCE, run_id=456,
+                run_attempt=1, release_run_id=123, release_run_attempt=2,
+                contains="tarball digest mismatch")
+
+        for stage in ("builder", "runtime", "toolchain"):
+            path = root / f"{stage}.txt"
+            path.write_text(stage)
+            container[f"{stage}_sha256"] = digest(path)
+        (root / "private-evidence.json").write_text(json.dumps(container))
+        verify_container_files(root, platform="amd64", label=LABEL,
+                               source_sha=SOURCE, run_id=789, run_attempt=3)
+        (root / "runtime.txt").write_text("tampered")
+        rejects(verify_container_files, root, platform="amd64", label=LABEL,
+                source_sha=SOURCE, run_id=789, run_attempt=3,
+                contains="runtime inventory digest mismatch")
     print("PASS private candidate gate: exact jobs, source, label and run attempts")
 
 

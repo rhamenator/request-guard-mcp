@@ -6,8 +6,12 @@ Keeping these checks pure makes missing-platform and wrong-source cases testable
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
 import re
 from typing import Callable
+
+from write_private_candidate_evidence import digest, native_fields
 
 
 PLATFORMS = (
@@ -153,6 +157,83 @@ def fetch_qualification_run(
     validate_run(kind, run, jobs, repository=repository, source_sha=source_sha,
                  run_id=run_id, run_attempt=run_attempt)
     return run, jobs
+
+
+def validate_artifact_listing(
+    kind: str, page: dict, *, source_sha: str, run_id: int,
+) -> dict[str, int]:
+    """Select unique, unexpired artifact IDs bound to the exact Actions run."""
+    require(kind in WORKFLOWS, "unknown qualification kind")
+    artifacts = page.get("artifacts")
+    require(isinstance(artifacts, list) and page.get("total_count") == len(artifacts)
+            and len(artifacts) <= 100, f"{kind} artifact list missing or truncated")
+    names: dict[str, int] = {}
+    for artifact in artifacts:
+        name = artifact.get("name")
+        require(isinstance(name, str) and name not in names,
+                f"{kind} duplicate or invalid artifact name")
+        require(artifact.get("expired") is False, f"{kind} artifact expired: {name}")
+        origin = artifact.get("workflow_run", {})
+        require(origin.get("id") == run_id and origin.get("head_sha") == source_sha,
+                f"{kind} artifact source/run mismatch: {name}")
+        artifact_id = artifact.get("id")
+        require(isinstance(artifact_id, int) and artifact_id > 0,
+                f"{kind} artifact ID invalid: {name}")
+        names[name] = artifact_id
+    expected = {
+        "native": {f"request-guard-mcp-{platform}" for platform in PLATFORMS},
+        "npm": {"private-npm-candidate-inputs"},
+        "container": {"private-container-inputs-amd64", "private-container-inputs-arm64"},
+    }[kind]
+    require(expected <= names.keys(), f"{kind} missing artifacts: {sorted(expected - names.keys())}")
+    return {name: names[name] for name in expected}
+
+
+def verify_native_files(
+    directory: Path, *, platform: str, label: str, source_sha: str,
+    run_id: int, run_attempt: int,
+) -> dict:
+    """Verify downloaded native archive, SHA sidecar, and bound evidence."""
+    require(platform in PLATFORMS, "unknown native platform")
+    extension = "zip" if platform == "windows-x64" else "tar.gz"
+    archive = directory / f"request-guard-mcp-{label}-{platform}.{extension}"
+    sidecar = directory / f"{archive.name}.sha256"
+    evidence_path = directory / f"private-evidence-{platform}.json"
+    evidence = json.loads(evidence_path.read_text())
+    validate_evidence("native", evidence, label=label, source_sha=source_sha,
+                      run_id=run_id, run_attempt=run_attempt, platform=platform)
+    require(native_fields(archive, sidecar)["archive_sha256"] == evidence["archive_sha256"],
+            "native archive digest differs from qualification evidence")
+    return evidence
+
+
+def verify_npm_files(
+    directory: Path, *, label: str, source_sha: str, run_id: int,
+    run_attempt: int, release_run_id: int, release_run_attempt: int,
+) -> dict:
+    """Verify the candidate tarball bound to the native Release run."""
+    evidence = json.loads((directory / "npm/private-evidence.json").read_text())
+    validate_evidence("npm", evidence, label=label, source_sha=source_sha,
+                      run_id=run_id, run_attempt=run_attempt,
+                      release_run_id=release_run_id,
+                      release_run_attempt=release_run_attempt)
+    tarball = directory / "npm" / evidence["tarball"]
+    require(digest(tarball) == evidence["tarball_sha256"], "npm tarball digest mismatch")
+    return evidence
+
+
+def verify_container_files(
+    directory: Path, *, platform: str, label: str, source_sha: str,
+    run_id: int, run_attempt: int,
+) -> dict:
+    """Verify recorded input inventories for an unpublished local image."""
+    evidence = json.loads((directory / "private-evidence.json").read_text())
+    validate_evidence("container", evidence, label=label, source_sha=source_sha,
+                      run_id=run_id, run_attempt=run_attempt, platform=platform)
+    for stage in ("builder", "runtime", "toolchain"):
+        require(digest(directory / f"{stage}.txt") == evidence[f"{stage}_sha256"],
+                f"container {stage} inventory digest mismatch")
+    return evidence
 
 
 def validate_evidence(
