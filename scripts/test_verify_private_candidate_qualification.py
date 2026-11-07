@@ -2,7 +2,10 @@
 """Exercise the full private gate with mocked GitHub API and artifact bytes."""
 
 import json
+import os
 from pathlib import Path
+import subprocess
+import sys
 from tempfile import TemporaryDirectory
 
 from private_candidate_gate import NATIVE_SKIPPED_JOBS, PLATFORMS, REQUIRED_JOBS, WORKFLOWS
@@ -116,6 +119,13 @@ def responses(npm_digest):
 
 
 def main():
+    empty_pin = subprocess.run(
+        [sys.executable, str(Path(__file__).with_name("verify_private_candidate_qualification.py"))],
+        env={**os.environ, "REQUEST_GUARD_EXPECTED_TAG_OBJECT_SHA": ""},
+        capture_output=True, text=True, check=False,
+    )
+    assert empty_pin.returncode != 0
+    assert "expected tag object SHA is empty" in empty_pin.stderr
     import hashlib
     sha = hashlib.sha256(TARBALL_BYTES).hexdigest()
     data = responses(sha)
