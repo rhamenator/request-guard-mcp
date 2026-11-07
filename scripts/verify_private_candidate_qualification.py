@@ -136,8 +136,12 @@ def main() -> None:
     label = os.environ.get("GITHUB_REF_NAME", "")
     source_sha = os.environ.get("GITHUB_SHA", "")
     native_output = os.environ.get("REQUEST_GUARD_VERIFIED_NATIVE_OUTPUT")
+    expected_tag_sha = os.environ.get("REQUEST_GUARD_EXPECTED_TAG_OBJECT_SHA")
+    if expected_tag_sha is not None:
+        require(bool(expected_tag_sha), "expected tag object SHA is empty")
     result = qualify(
         repository=repository, label=label, source_sha=source_sha,
+        expected_tag_object_sha=expected_tag_sha,
         native_output_dir=Path(native_output) if native_output else None,
     )
     print(json.dumps(result, indent=2, sort_keys=True))

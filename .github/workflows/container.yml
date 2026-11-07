@@ -28,6 +28,7 @@ jobs:
       actions: read
     outputs:
       publish: ${{ steps.tag.outputs.publish || steps.main.outputs.publish }}
+      tag_object_sha: ${{ steps.tag.outputs.tag_object_sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
@@ -220,7 +221,8 @@ jobs:
     # build-platform. Override implicit success() so that a successful native
     # matrix can still assemble the index; a skipped/failed matrix cannot.
     if: ${{ !cancelled() && github.event_name != 'pull_request' && needs.build-platform.result == 'success' }}
-    needs: build-platform
+    needs: [verify-container-ref, build-platform]
+    # Pin the owner-reviewed annotation through the approval and build jobs.
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -256,6 +258,7 @@ jobs:
         if: github.ref_type == 'tag'
         env:
           GH_TOKEN: ${{ github.token }}
+          REQUEST_GUARD_EXPECTED_TAG_OBJECT_SHA: ${{ needs.verify-container-ref.outputs.tag_object_sha }}
         run: |
           python3 scripts/verify_private_candidate_qualification.py > qualification.json
           for arch in amd64 arm64; do

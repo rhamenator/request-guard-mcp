@@ -60,6 +60,11 @@ container publication compares builder, runtime, and toolchain inventories
 with the private candidate before moving GHCR tags. The protected environment
 still requires owner approval, and public registry and tagged-byte checks
 remain postpublication gates.
+Private candidate artifacts are retained for 90 days so owner review and
+tagged publication can use the same bytes. Repository readers can download
+those unpublished artifacts during that period. Tagged native attestations
+identify the tag workflow that promoted and attested the verified archives;
+the private candidate run recorded in the tag annotation is the build run.
 Unpublished `workflow_dispatch` candidates remain available for development.
 
 This policy does not turn Request Guard into outbound egress enforcement.

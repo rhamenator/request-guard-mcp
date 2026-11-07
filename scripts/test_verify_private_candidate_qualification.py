@@ -136,6 +136,14 @@ def main():
     wrong = responses("0" * 64)
     try:
         qualify(repository=REPO, label=LABEL, source_sha=SOURCE,
+                expected_tag_object_sha="0" * 40,
+                api=data.__getitem__, download=fake_download)
+    except ValueError as error:
+        assert "tag object changed" in str(error)
+    else:
+        raise AssertionError("replaced tag object passed")
+    try:
+        qualify(repository=REPO, label=LABEL, source_sha=SOURCE,
                 api=wrong.__getitem__, download=fake_download)
     except ValueError as error:
         assert "tag npm tarball digest differs" in str(error)

@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from verify_installer_release_gate import main as gate_main
@@ -34,15 +35,17 @@ def main() -> None:
     public = run("push", "tag")
     assert public.returncode != 0, public.stdout
     assert "GH_TOKEN is required" in public.stderr
-    with patch.dict(os.environ, {
+    with TemporaryDirectory() as temporary, patch.dict(os.environ, {
         "GITHUB_EVENT_NAME": "push", "GITHUB_REF_TYPE": "tag",
         "GITHUB_REPOSITORY": "owner/request-guard-mcp",
         "GITHUB_REF_NAME": "v1.1.0-rc.2", "GITHUB_SHA": "a" * 40,
+        "GITHUB_OUTPUT": str(Path(temporary) / "output"),
     }):
         calls = []
         def qualified(**kwargs):
             calls.append(kwargs)
             return {
+                "tag_object_sha": "c" * 40,
                 "native_archives_sha256": {
                     name: "b" * 64 for name in (
                         "linux-x64", "linux-x64-musl", "windows-x64",
@@ -51,6 +54,7 @@ def main() -> None:
                 "container_input_sha256": {"amd64": {}, "arm64": {}},
             }
         gate_main(qualified)
+        assert (Path(temporary) / "output").read_text() == f"tag_object_sha={'c' * 40}\n"
         assert calls == [{
             "repository": "owner/request-guard-mcp", "label": "v1.1.0-rc.2",
             "source_sha": "a" * 40,

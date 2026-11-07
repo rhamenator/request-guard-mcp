@@ -20,6 +20,8 @@ jobs:
   verify-release-ref:
     name: Verify release version and source
     runs-on: ubuntu-latest
+    outputs:
+      tag_object_sha: ${{ steps.qualification.outputs.tag_object_sha }}
     permissions:
       contents: read
       actions: read
@@ -31,6 +33,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Validate version, lockfile, and tag ancestry
+        id: qualification
         env:
           INPUT_CANDIDATE_VERSION: ${{ inputs.candidate_version }}
           GH_TOKEN: ${{ github.token }}
@@ -408,7 +411,7 @@ jobs:
 
   attest-native-provenance:
     name: Attest and verify tagged native archives
-    needs: build-release
+    needs: [verify-release-ref, build-release]
     if: ${{ !cancelled() && github.event_name == 'push' && github.ref_type == 'tag' && needs.build-release.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
@@ -423,6 +426,7 @@ jobs:
       - name: Promote exact qualified native archives after owner approval
         env:
           GH_TOKEN: ${{ github.token }}
+          REQUEST_GUARD_EXPECTED_TAG_OBJECT_SHA: ${{ needs.verify-release-ref.outputs.tag_object_sha }}
           REQUEST_GUARD_VERIFIED_NATIVE_OUTPUT: artifacts
         run: python3 scripts/verify_private_candidate_qualification.py
       - name: Verify five archives and sidecars before attesting
@@ -482,6 +486,7 @@ jobs:
       - name: Reverify owner-approved candidate and exact native bytes
         env:
           GH_TOKEN: ${{ github.token }}
+          REQUEST_GUARD_EXPECTED_TAG_OBJECT_SHA: ${{ needs.verify-release-ref.outputs.tag_object_sha }}
           REQUEST_GUARD_VERIFIED_NATIVE_OUTPUT: artifacts
         run: python3 scripts/verify_private_candidate_qualification.py
       - name: Reverify exact downloaded assets and signed source provenance
