@@ -5,7 +5,7 @@ from copy import deepcopy
 
 from private_candidate_gate import (
     NATIVE_SKIPPED_JOBS, PLATFORMS, REQUIRED_JOBS, WORKFLOWS,
-    parse_tag_evidence, validate_evidence, validate_run,
+    load_annotated_tag, parse_tag_evidence, validate_evidence, validate_run,
 )
 
 
@@ -69,6 +69,32 @@ def main() -> None:
             label=LABEL, source_sha=SOURCE, contains="duplicate")
     rejects(parse_tag_evidence, tag_message.replace("container_run=789/3\n", ""),
             label=LABEL, source_sha=SOURCE, contains="fields incomplete")
+
+    tag_sha = "1" * 40
+    ref_path = f"repos/{REPO}/git/ref/tags/{LABEL}"
+    object_path = f"repos/{REPO}/git/tags/{tag_sha}"
+    responses = {
+        ref_path: {"ref": f"refs/tags/{LABEL}", "object": {"type": "tag", "sha": tag_sha}},
+        object_path: {"sha": tag_sha, "tag": LABEL,
+                      "object": {"type": "commit", "sha": SOURCE}, "message": tag_message},
+    }
+    api = responses.__getitem__
+    resolved_sha, resolved = load_annotated_tag(
+        repository=REPO, label=LABEL, source_sha=SOURCE, api=api)
+    assert resolved_sha == tag_sha and resolved == tag
+    rejects(load_annotated_tag, repository=REPO, label=LABEL, source_sha=SOURCE,
+            api=api, expected_tag_object_sha="2" * 40, contains="tag object changed")
+    original_ref = responses[ref_path]
+    responses[ref_path] = {"ref": f"refs/tags/{LABEL}",
+                           "object": {"type": "commit", "sha": SOURCE}}
+    rejects(load_annotated_tag, repository=REPO, label=LABEL, source_sha=SOURCE,
+            api=api, contains="must be annotated")
+    responses[ref_path] = original_ref
+    original_object = responses[object_path]
+    responses[object_path] = dict(original_object, object={"type": "commit", "sha": "b" * 40})
+    rejects(load_annotated_tag, repository=REPO, label=LABEL, source_sha=SOURCE,
+            api=api, contains="target commit mismatch")
+    responses[object_path] = original_object
 
     for kind in WORKFLOWS:
         run, jobs = fixture(kind)

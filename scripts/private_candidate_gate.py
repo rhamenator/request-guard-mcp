@@ -7,6 +7,7 @@ Keeping these checks pure makes missing-platform and wrong-source cases testable
 from __future__ import annotations
 
 import re
+from typing import Callable
 
 
 PLATFORMS = (
@@ -65,6 +66,39 @@ def parse_tag_evidence(message: str, *, label: str, source_sha: str) -> dict[str
         result[f"{kind}_run_id"] = int(match.group(1))
         result[f"{kind}_run_attempt"] = int(match.group(2))
     return result
+
+
+def load_annotated_tag(
+    *, repository: str, label: str, source_sha: str,
+    api: Callable[[str], dict], expected_tag_object_sha: str | None = None,
+) -> tuple[str, dict[str, object]]:
+    """Resolve the current GitHub tag ref and bind its annotation to the commit.
+
+    Calling this again with the returned object SHA detects tag replacement
+    between initial qualification and a publishing step.
+    """
+    require(re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repository) is not None,
+            "invalid repository")
+    require(re.fullmatch(r"v[0-9]+\.[0-9]+\.[0-9]+(?:-rc\.[1-9][0-9]*)?", label) is not None,
+            "invalid release tag name")
+    require(re.fullmatch(r"[0-9a-f]{40}", source_sha) is not None, "invalid source SHA")
+    ref = api(f"repos/{repository}/git/ref/tags/{label}")
+    require(ref.get("ref") == f"refs/tags/{label}", "tag reference mismatch")
+    obj = ref.get("object", {})
+    require(obj.get("type") == "tag", "release tag must be annotated")
+    tag_sha = obj.get("sha", "")
+    require(re.fullmatch(r"[0-9a-f]{40}", str(tag_sha)) is not None,
+            "invalid tag object SHA")
+    if expected_tag_object_sha is not None:
+        require(tag_sha == expected_tag_object_sha, "release tag object changed")
+    tag = api(f"repos/{repository}/git/tags/{tag_sha}")
+    require(tag.get("sha") == tag_sha and tag.get("tag") == label,
+            "annotated tag object mismatch")
+    target = tag.get("object", {})
+    require(target.get("type") == "commit" and target.get("sha") == source_sha,
+            "annotated tag target commit mismatch")
+    evidence = parse_tag_evidence(tag.get("message", ""), label=label, source_sha=source_sha)
+    return tag_sha, evidence
 
 
 def validate_run(
