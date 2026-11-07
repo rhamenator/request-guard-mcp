@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 from tempfile import TemporaryDirectory
 from typing import Callable
@@ -38,6 +39,7 @@ def qualify(
     api: Callable[[str], dict] = github_api,
     download: Callable[[str, int, str, Path], None] = download_artifact,
     expected_tag_object_sha: str | None = None,
+    native_output_dir: Path | None = None,
 ) -> dict:
     tag_sha, annotation = load_annotated_tag(
         repository=repository, label=label, source_sha=source_sha,
@@ -107,6 +109,15 @@ def qualify(
                 stage: evidence[f"{stage}_sha256"]
                 for stage in ("builder", "runtime", "toolchain")
             }
+        if native_output_dir is not None:
+            native_output_dir.mkdir(parents=True, exist_ok=True)
+            require(not any(native_output_dir.iterdir()), "native promotion directory is not empty")
+            for platform in PLATFORMS:
+                extension = "zip" if platform == "windows-x64" else "tar.gz"
+                archive = f"request-guard-mcp-{label}-{platform}.{extension}"
+                source = root / "native" / platform
+                for name in (archive, f"{archive}.sha256"):
+                    shutil.copy2(source / name, native_output_dir / name)
     return {
         "tag_object_sha": tag_sha,
         "source_sha": source_sha,
@@ -124,7 +135,11 @@ def main() -> None:
     repository = os.environ.get("GITHUB_REPOSITORY", "")
     label = os.environ.get("GITHUB_REF_NAME", "")
     source_sha = os.environ.get("GITHUB_SHA", "")
-    result = qualify(repository=repository, label=label, source_sha=source_sha)
+    native_output = os.environ.get("REQUEST_GUARD_VERIFIED_NATIVE_OUTPUT")
+    result = qualify(
+        repository=repository, label=label, source_sha=source_sha,
+        native_output_dir=Path(native_output) if native_output else None,
+    )
     print(json.dumps(result, indent=2, sort_keys=True))
 
 

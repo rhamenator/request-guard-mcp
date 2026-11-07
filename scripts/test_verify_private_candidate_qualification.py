@@ -3,6 +3,7 @@
 
 import json
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from private_candidate_gate import NATIVE_SKIPPED_JOBS, PLATFORMS, REQUIRED_JOBS, WORKFLOWS
 from verify_private_candidate_qualification import qualify
@@ -118,12 +119,20 @@ def main():
     import hashlib
     sha = hashlib.sha256(TARBALL_BYTES).hexdigest()
     data = responses(sha)
-    result = qualify(repository=REPO, label=LABEL, source_sha=SOURCE,
-                     api=data.__getitem__, download=fake_download)
-    assert result["tag_object_sha"] == TAG_OBJECT
-    assert result["npm_tarball_sha256"] == sha
-    assert set(result["native_archives_sha256"]) == set(PLATFORMS)
-    assert set(result["container_input_sha256"]) == {"amd64", "arm64"}
+    with TemporaryDirectory() as directory:
+        output = Path(directory) / "verified-native"
+        result = qualify(repository=REPO, label=LABEL, source_sha=SOURCE,
+                         api=data.__getitem__, download=fake_download,
+                         native_output_dir=output)
+        assert result["tag_object_sha"] == TAG_OBJECT
+        assert result["npm_tarball_sha256"] == sha
+        assert set(result["native_archives_sha256"]) == set(PLATFORMS)
+        assert set(result["container_input_sha256"]) == {"amd64", "arm64"}
+        assert len(list(output.iterdir())) == 10
+        for platform in PLATFORMS:
+            extension = "zip" if platform == "windows-x64" else "tar.gz"
+            archive = output / f"request-guard-mcp-{LABEL}-{platform}.{extension}"
+            assert digest(archive) == result["native_archives_sha256"][platform]
     wrong = responses("0" * 64)
     try:
         qualify(repository=REPO, label=LABEL, source_sha=SOURCE,
