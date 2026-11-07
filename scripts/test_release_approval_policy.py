@@ -59,6 +59,13 @@ assert job_line(attest, (
 ))
 assert job_line(publish, "needs: [verify-release-ref, build-release, attest-native-provenance]")
 assert job_line(publish, "if: github.event_name == 'push' && github.ref_type == 'tag'")
+for name, job in (("attest-native-provenance", attest), ("create-release", publish)):
+    lines = active_lines(job)
+    assert "      actions: read" in lines, f"{name} must read private candidate artifacts"
+    assert "        run: python3 scripts/verify_private_candidate_qualification.py" in lines, (
+        f"{name} must reverify and promote exact qualified native bytes"
+    )
+    assert "          REQUEST_GUARD_VERIFIED_NATIVE_OUTPUT: artifacts" in lines
 assert "          draft: ${{ !startsWith(github.ref_name, 'v0.') }}" in active_lines(publish), (
     "v1+ native assets must remain in a draft until exact tagged-byte review"
 )
