@@ -34,7 +34,7 @@ tungstenite = "0.29"
 hyper = { version = "1", features = ["server", "http1", "http2"] }
 hyper-util = { version = "0.1", features = ["server-auto", "tokio", "service"] }
 tower = { version = "0.5", features = ["util", "timeout", "limit"] }
-tower-http = { version = "0.5", features = ["trace", "cors", "limit"] }
+tower-http = { version = "0.7", features = ["trace", "cors", "limit"] }
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
