@@ -36,6 +36,7 @@ def job_line(job, value):
 
 assert job_line(approval, "environment: stable-release")
 assert job_line(approval, "needs: verify-release-ref")
+assert "      tag_object_sha: ${{ steps.qualification.outputs.tag_object_sha }}" in active_lines(jobs["verify-release-ref"])
 assert job_line(approval, (
     "if: github.event_name == 'push' && github.ref_type == 'tag' "
     "&& !startsWith(github.ref_name, 'v0.')"
@@ -52,13 +53,21 @@ assert job_line(build, (
     "(github.event_name == 'push' && github.ref_type == 'tag' "
     "&& startsWith(github.ref_name, 'v0.'))))) }}"
 )), "a skipped approval must build only a private dispatch or v0 tag"
-assert job_line(attest, "needs: build-release")
+assert job_line(attest, "needs: [verify-release-ref, build-release]")
 assert job_line(attest, (
     "if: ${{ !cancelled() && github.event_name == 'push' "
     "&& github.ref_type == 'tag' && needs.build-release.result == 'success' }}"
 ))
 assert job_line(publish, "needs: [verify-release-ref, build-release, attest-native-provenance]")
 assert job_line(publish, "if: github.event_name == 'push' && github.ref_type == 'tag'")
+for name, job in (("attest-native-provenance", attest), ("create-release", publish)):
+    lines = active_lines(job)
+    assert "      actions: read" in lines, f"{name} must read private candidate artifacts"
+    assert "          REQUEST_GUARD_EXPECTED_TAG_OBJECT_SHA: ${{ needs.verify-release-ref.outputs.tag_object_sha }}" in lines
+    assert "        run: python3 scripts/verify_private_candidate_qualification.py" in lines, (
+        f"{name} must reverify and promote exact qualified native bytes"
+    )
+    assert "          REQUEST_GUARD_VERIFIED_NATIVE_OUTPUT: artifacts" in lines
 assert "          draft: ${{ !startsWith(github.ref_name, 'v0.') }}" in active_lines(publish), (
     "v1+ native assets must remain in a draft until exact tagged-byte review"
 )
@@ -117,7 +126,9 @@ assert job_line(platform, (
     "(github.ref == 'refs/heads/main' || "
     "(github.ref_type == 'tag' && startsWith(github.ref_name, 'v0.'))))) }}"
 )), "a skipped approval may publish only main's experimental image or a v0 tag"
-assert job_line(multiarch, "needs: build-platform")
+assert job_line(multiarch, "needs: [verify-container-ref, build-platform]")
+assert "      tag_object_sha: ${{ steps.tag.outputs.tag_object_sha }}" in active_lines(container_jobs["verify-container-ref"])
+assert "          REQUEST_GUARD_EXPECTED_TAG_OBJECT_SHA: ${{ needs.verify-container-ref.outputs.tag_object_sha }}" in active_lines(multiarch)
 assert job_line(multiarch, (
     "if: ${{ !cancelled() && github.event_name != 'pull_request' "
     "&& needs.build-platform.result == 'success' }}"

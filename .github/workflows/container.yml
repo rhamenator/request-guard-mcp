@@ -25,8 +25,10 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      actions: read
     outputs:
       publish: ${{ steps.tag.outputs.publish || steps.main.outputs.publish }}
+      tag_object_sha: ${{ steps.tag.outputs.tag_object_sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
@@ -38,6 +40,7 @@ jobs:
         # tag, rather than as a private release-candidate dispatch.
         env:
           GITHUB_EVENT_NAME: push
+          GH_TOKEN: ${{ github.token }}
         run: |
           python3 scripts/verify_release_ref.py
           python3 scripts/verify_installer_release_gate.py
@@ -218,10 +221,12 @@ jobs:
     # build-platform. Override implicit success() so that a successful native
     # matrix can still assemble the index; a skipped/failed matrix cannot.
     if: ${{ !cancelled() && github.event_name != 'pull_request' && needs.build-platform.result == 'success' }}
-    needs: build-platform
+    needs: [verify-container-ref, build-platform]
+    # Pin the owner-reviewed annotation through the approval and build jobs.
     runs-on: ubuntu-24.04
     permissions:
       contents: read
+      actions: read
       packages: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
@@ -242,6 +247,25 @@ jobs:
           pattern: container-digest-*
           path: digests
           merge-multiple: true
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        if: github.ref_type == 'tag'
+        with:
+          pattern: container-inputs-*
+          path: tagged-inputs
+
+      - name: Reverify qualified private candidate and tagged build inputs
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REQUEST_GUARD_EXPECTED_TAG_OBJECT_SHA: ${{ needs.verify-container-ref.outputs.tag_object_sha }}
+        run: |
+          python3 scripts/verify_private_candidate_qualification.py > qualification.json
+          for arch in amd64 arm64; do
+            test -s "tagged-inputs/container-inputs-$arch/builder.txt"
+            mv "tagged-inputs/container-inputs-$arch" "tagged-inputs/$arch"
+          done
+          python3 scripts/verify_tagged_container_inputs.py qualification.json tagged-inputs
 
       - name: Extract metadata
         id: meta
