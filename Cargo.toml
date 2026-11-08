@@ -60,7 +60,7 @@ thiserror = "1.0"
 anyhow = "1.0"
 
 # Validation
-validator = { version = "0.20", features = ["derive"] }
+validator = { version = "0.21", features = ["derive"] }
 
 # UUID / IDs
 uuid = { version = "1.7", features = ["v4", "serde"] }
