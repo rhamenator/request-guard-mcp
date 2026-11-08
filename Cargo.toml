@@ -30,7 +30,7 @@ tokio-stream = "0.1"
 
 # WebSocket
 axum = { version = "0.8", features = ["ws", "macros"] }
-tungstenite = "0.29"
+tungstenite = "0.30"
 hyper = { version = "1", features = ["server", "http1", "http2"] }
 hyper-util = { version = "0.1", features = ["server-auto", "tokio", "service"] }
 tower = { version = "0.5", features = ["util", "timeout", "limit"] }
