@@ -20,6 +20,14 @@ The v0.1.5 release retains the Linux x64 musl archive for Alpine and the [Postgr
 
 The [companion skill](skills/request-guard-mcp/SKILL.md) tells a connected agent when and how to use this server’s classification tools. It does not deploy or replace the separate AI Scraping Defense products.
 
+### Agent skill and .NET implementation
+
+The optional [Request Guard MCP skill on Agensi](https://www.agensi.io/skills/request-guard-mcp) is a $6 agent-instruction ZIP for using the separately installed server. Buying it is not required to run this free GPL-3.0-or-later server; the companion instructions are also available in this repository. Check the listing's approved package version and compatibility notes before buying.
+
+For C# deployments, see the [.NET implementation](https://github.com/rhamenator/request-guard-mcp-dotnet). It is in development and has no official release yet; consult its parity matrix instead of assuming every Rust behavior matches.
+
+For example, ask a connected agent to assess an observed `POST /wp-login.php` with user agent `sqlmap` and documentation-only source IP `203.0.113.9`, then explain the contributing signals. The v1.0.0 Windows binary returns `block`, `medium` confidence and a `ua_scraper` signal for this input. A self-declared user agent does not prove identity, and the classifier does not block traffic itself: your application supplies metadata and enforces its own policy. Do not include cookies, authorization headers or bodies in this example.
+
 To package the skill for a directory listing, run `python3 scripts/package_skill.py`. The resulting local-only `dist/request-guard-mcp-skill.zip` contains only `request-guard-mcp/SKILL.md`; GitHub releases carry server binaries, not the skill ZIP. Install and configure the server separately. Verify the skill against a connected client before submitting a listing.
 
 ## Features
