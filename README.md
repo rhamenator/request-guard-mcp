@@ -22,6 +22,16 @@ The [companion skill](skills/request-guard-mcp/SKILL.md) tells a connected agent
 
 ### Agent skill and .NET implementation
 
+Request Guard was developed for the AI Scraping Defense family. Those systems provide the surrounding request inspection and response workflows; this server provides optional request classification and explanation through MCP.
+
+| Defense system | Implementation and setup |
+| --- | --- |
+| Python services with Nginx/Lua | [AI Scraping Defense](https://github.com/rhamenator/ai-scraping-defense) |
+| ASP.NET Core/.NET stack, including IIS deployment | [AI Scraping Defense .NET](https://github.com/rhamenator/ai-scraping-defense-iis) |
+| Rust service workspace | [AI Scraping Defense Rust](https://github.com/rhamenator/ai-scraping-defense-rust) |
+
+Install and configure the chosen defense system separately. MCP routing is optional and client-specific; follow its adapter configuration instead of assuming that installing Request Guard automatically routes or blocks website traffic.
+
 The optional [Request Guard MCP skill on Agensi](https://www.agensi.io/skills/request-guard-mcp) is a $6 agent-instruction ZIP for using the separately installed server. Buying it is not required to run this free GPL-3.0-or-later server; the companion instructions are also available in this repository. Check the listing's approved package version and compatibility notes before buying.
 
 For C# deployments, see the [.NET implementation](https://github.com/rhamenator/request-guard-mcp-dotnet). It is in development and has no official release yet; consult its parity matrix instead of assuming every Rust behavior matches.
