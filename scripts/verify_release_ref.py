@@ -24,8 +24,9 @@ def main():
     event = os.environ.get("GITHUB_EVENT_NAME", "")
     candidate = os.environ.get("INPUT_CANDIDATE_VERSION", "")
     if event == "workflow_dispatch" and kind != "tag":
-        if not re.fullmatch(rf"v{re.escape(version)}-[A-Za-z0-9][A-Za-z0-9.-]*", candidate):
-            fail(f"private candidate label must be v{version}-<suffix>")
+        # A stable candidate is labelled exactly v<version>; a release candidate adds a suffix.
+        if not re.fullmatch(rf"v{re.escape(version)}(?:-[A-Za-z0-9][A-Za-z0-9.-]*)?", candidate):
+            fail(f"private candidate label must be v{version} or v{version}-<suffix>")
         print(f"Private candidate {candidate} matches package {version}")
         return
     if event == "workflow_dispatch" and kind == "tag" and candidate != name:

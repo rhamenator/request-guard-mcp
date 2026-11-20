@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       candidate_version:
-        description: Private candidate label matching Cargo (for example v1.0.0-rc.6)
+        description: Private candidate label matching Cargo (for example v1.0.0-rc.6, or v1.1.0 for a stable candidate)
         required: true
         type: string
 

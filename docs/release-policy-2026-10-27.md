@@ -11,6 +11,16 @@ tag uses `v1.1.0-rc.N` and keeps the suffix in the package/archive label.
 Recognizing that tag shape does not authorize publication: the installer
 qualification guard remains fail-closed until the full gate is implemented.
 
+## Stable tag after a release candidate
+
+A stable tag (`v1.1.0`) uses the identical gate as a release candidate; nothing is relaxed.
+Its private native, npm and container candidates are dispatched with the exact label
+`v1.1.0` (npm label `1.1.0`) on the commit that will be tagged, the annotated tag records
+those runs, and `scripts/verify_installer_release_gate.py` verifies them before the
+`stable-release` owner pause. Qualification of an earlier `-rc.N` tag is not reused: the
+source SHA and label must match the stable tag exactly. The stable GitHub Release is not
+marked as a pre-release.
+
 ## Official candidate gate
 
 An official release candidate has the same technical, security, adversarial,

@@ -44,6 +44,13 @@ def main():
     error, calls = run_case("workflow_dispatch", "branch", "codex/candidate", "v1.1.0-rc.2")
     assert not error and not calls
 
+    # A stable candidate is labelled exactly v<version>; other versions and metadata stay rejected.
+    error, calls = run_case("workflow_dispatch", "branch", "codex/candidate", "v1.1.0")
+    assert not error and not calls
+    for bad in ("v1.2.0", "v1.1.0+meta", "v1.1", "1.1.0", "v1.1.01"):
+        error, calls = run_case("workflow_dispatch", "branch", "codex/candidate", bad)
+        assert "private candidate label must be" in error and not calls, bad
+
     for name in ("v1.1.0", "v1.1.0-rc.2"):
         error, calls = run_case("push", "tag", name)
         assert not error and [call[1] for call in calls] == ["fetch", "merge-base"]
@@ -61,6 +68,8 @@ def main():
     error, calls = run_case("workflow_dispatch", "tag", "v1.2.0", "v1.1.0-rc.2")
     assert "candidate label must equal" in error and not calls
     error, calls = run_case("workflow_dispatch", "tag", "v1.1.0-rc.2", "v1.1.0-rc.2")
+    assert not error and [call[1] for call in calls] == ["fetch", "merge-base"]
+    error, calls = run_case("workflow_dispatch", "tag", "v1.1.0", "v1.1.0")
     assert not error and [call[1] for call in calls] == ["fetch", "merge-base"]
     print("PASS release ref: private branch, final/rc tags, ancestry and tag dispatch")
 
