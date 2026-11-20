@@ -8,18 +8,32 @@ use std::collections::HashSet;
 
 static AI_BOT_UA: Lazy<Regex> = Lazy::new(|| {
     Regex::new(concat!(
-        r"(?i)(GPTBot|ChatGPT-User|Claude-Web|anthropic-ai|Bytespider|CCBot|",
-        r"cohere-ai|DuckAssistBot|FacebookBot|Google-Extended|ImagesiftBot|",
-        r"PerplexityBot|Scrapy|python-httpx|python-requests|aiohttp|curl/|wget/|",
-        r"libwww-perl|Go-http-client|Java/|okhttp)"
+        r"(?i)(GPTBot|ChatGPT-User|OAI-SearchBot|ClaudeBot|Claude-User|Claude-SearchBot|",
+        r"Claude-Web|anthropic-ai|Bytespider|CCBot|cohere-ai|cohere-training-data-crawler|",
+        r"DuckAssistBot|FacebookBot|meta-externalagent|meta-externalfetcher|Google-Extended|",
+        r"ImagesiftBot|PerplexityBot|Perplexity-User|Applebot-Extended|Amazonbot|Diffbot|",
+        r"omgili(?:bot)?|Timpibot|YouBot|AI2Bot|Scrapy)"
     ))
     .expect("compile regex")
 });
 
+/// Ordinary programmatic HTTP clients. Scripts, monitors and developers use
+/// them as much as scrapers do, so they are weak evidence, never an AI-bot claim.
+static GENERIC_CLIENT_UA: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(concat!(
+        r"(?i)(python-httpx|python-requests|aiohttp|\bcurl/|\bwget/|libwww-perl|",
+        r"Go-http-client|\bJava/|okhttp)"
+    ))
+    .expect("compile regex")
+});
+
+/// Named automation tools. The bare words "bot", "crawler" and "spider" are
+/// deliberately absent: they also name Googlebot, Bingbot, UptimeRobot and
+/// Slackbot. Real AI crawlers are matched by name in `AI_BOT_UA`.
 static SCRAPING_UA: Lazy<Regex> = Lazy::new(|| {
     Regex::new(concat!(
         r"(?i)(scrapy|beautifulsoup|mechanize|selenium|phantom|puppeteer|playwright|",
-        r"headless|crawler|spider|bot|scraper|",
+        r"headless|scraper|",
         r"\bmasscan\b|\bnikto\b|\bsqlmap\b|\bhttpclient\b)"
     ))
     .expect("compile regex")
@@ -31,6 +45,7 @@ static SCRAPING_UA: Lazy<Regex> = Lazy::new(|| {
 pub(crate) enum UserAgentPattern {
     AiBot,
     Scraper,
+    GenericClient,
 }
 
 pub(crate) fn user_agent_pattern(ua: &str) -> Option<UserAgentPattern> {
@@ -38,6 +53,8 @@ pub(crate) fn user_agent_pattern(ua: &str) -> Option<UserAgentPattern> {
         Some(UserAgentPattern::AiBot)
     } else if SCRAPING_UA.is_match(ua) {
         Some(UserAgentPattern::Scraper)
+    } else if GENERIC_CLIENT_UA.is_match(ua) {
+        Some(UserAgentPattern::GenericClient)
     } else {
         None
     }
@@ -114,6 +131,16 @@ impl RuleEngine {
 
         self.eval_tls_fingerprint(req, &mut signals);
 
+        if req.robots_violation {
+            signals.push(Signal::new(
+                "robots_violation",
+                1.0,
+                0.9,
+                SignalSource::RuleEngine,
+                "Caller reports the client requested a path disallowed by robots.txt",
+            ));
+        }
+
         signals
     }
 
@@ -134,6 +161,14 @@ impl RuleEngine {
                 0.7,
                 SignalSource::RuleEngine,
                 "User-agent matches scraping tool pattern",
+            ));
+        } else if pattern == Some(UserAgentPattern::GenericClient) {
+            signals.push(Signal::new(
+                "ua_generic_client",
+                0.5,
+                0.25,
+                SignalSource::RuleEngine,
+                "User-agent is a generic programmatic HTTP client (weak evidence)",
             ));
         }
 
@@ -349,6 +384,7 @@ mod tests {
             tls_fingerprint_source: None,
             tls_fingerprint_attestation: None,
             tls_fingerprint_verified: false,
+            robots_violation: false,
             extra: None,
         }
     }
@@ -366,6 +402,12 @@ mod tests {
         for sample in [
             "GPTBot",
             "ChatGPT-User",
+            "ClaudeBot",
+            "Claude-User",
+            "OAI-SearchBot",
+            "Amazonbot",
+            "Applebot-Extended",
+            "meta-externalagent",
             "Claude-Web",
             "anthropic-ai",
             "Bytespider",
@@ -377,18 +419,91 @@ mod tests {
             "ImagesiftBot",
             "PerplexityBot",
             "Scrapy",
-            "python-httpx",
-            "python-requests",
-            "aiohttp",
-            "curl/",
-            "wget/",
-            "libwww-perl",
-            "Go-http-client",
-            "Java/",
-            "okhttp",
         ] {
             assert!(AI_BOT_UA.is_match(sample), "AI bot pattern missed {sample}");
         }
+    }
+
+    #[test]
+    fn generic_http_clients_are_weak_evidence_not_ai_bots() {
+        for sample in [
+            "python-httpx/0.27",
+            "python-requests/2.31.0",
+            "aiohttp/3.9",
+            "curl/8.5.0",
+            "Wget/1.21.4",
+            "libwww-perl/6.72",
+            "Go-http-client/1.1",
+            "Java/17.0.2",
+            "okhttp/4.12.0",
+        ] {
+            assert!(
+                !AI_BOT_UA.is_match(sample),
+                "{sample} must not be an AI bot"
+            );
+            assert_eq!(
+                user_agent_pattern(sample),
+                Some(UserAgentPattern::GenericClient),
+                "{sample}"
+            );
+            let signals = RuleEngine::new().evaluate(&make_req(Some(sample), None));
+            assert!(signals
+                .as_slice()
+                .iter()
+                .any(|s| s.name == "ua_generic_client"));
+            assert!(!signals.as_slice().iter().any(|s| s.name == "ua_ai_bot"));
+            let verdict = crate::engines::scorer::Scorer::new()
+                .score(&signals)
+                .verdict;
+            assert_ne!(verdict, crate::models::enums::Verdict::Block, "{sample}");
+        }
+    }
+
+    #[test]
+    fn well_known_benign_crawlers_are_not_scrapers() {
+        for sample in [
+            "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+            "Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)",
+            "Mozilla/5.0+(compatible; UptimeRobot/2.0; http://www.uptimerobot.com/)",
+            "Slackbot-LinkExpanding 1.0 (+https://api.slack.com/robots)",
+        ] {
+            assert_eq!(user_agent_pattern(sample), None, "{sample}");
+            let signals = RuleEngine::new().evaluate(&make_req(Some(sample), Some("/")));
+            let verdict = crate::engines::scorer::Scorer::new()
+                .score(&signals)
+                .verdict;
+            assert_ne!(verdict, crate::models::enums::Verdict::Block, "{sample}");
+        }
+    }
+
+    #[test]
+    fn robots_violation_is_a_strong_standalone_signal() {
+        let mut req = make_req(
+            Some("Mozilla/5.0 (X11; Linux x86_64) Firefox/126.0"),
+            Some("/"),
+        );
+        let quiet = crate::engines::scorer::Scorer::new().score(&RuleEngine::new().evaluate(&req));
+        req.robots_violation = true;
+        let signals = RuleEngine::new().evaluate(&req);
+        assert!(signals
+            .as_slice()
+            .iter()
+            .any(|s| s.name == "robots_violation"));
+        let flagged = crate::engines::scorer::Scorer::new().score(&signals);
+        assert_eq!(flagged.verdict, crate::models::enums::Verdict::Block);
+        assert!(flagged.score > quiet.score);
+        assert_eq!(quiet.verdict, crate::models::enums::Verdict::Allow);
+    }
+
+    #[test]
+    fn absent_robots_violation_changes_nothing() {
+        let a = make_req(Some("curl/8.5.0"), Some("/admin"));
+        let mut b = a.clone();
+        b.robots_violation = false;
+        let sa = RuleEngine::new().evaluate(&a);
+        let sb = RuleEngine::new().evaluate(&b);
+        assert_eq!(sa.aggregate_score(), sb.aggregate_score());
+        assert!(!sa.as_slice().iter().any(|s| s.name == "robots_violation"));
     }
 
     #[test]
@@ -402,9 +517,6 @@ mod tests {
             "puppeteer",
             "playwright",
             "headless",
-            "crawler",
-            "spider",
-            "bot",
             "scraper",
             "masscan",
             "nikto",

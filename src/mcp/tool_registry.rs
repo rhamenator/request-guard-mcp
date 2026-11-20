@@ -104,7 +104,7 @@ impl ToolRegistry {
 fn tool_input_schema(name: &str) -> Value {
     let (properties, required) = match name {
         "classify" => (
-            serde_json::json!({"ip":{"type":"string"},"user_agent":{"type":"string"},"path":{"type":"string"},"method":{"type":"string"},"headers":{"type":"object","additionalProperties":{"type":"string"}},"body_snippet":{"type":"string"},"referer":{"type":"string"},"accept":{"type":"string"},"request_id":{"type":"string"},"timestamp":{"type":"string"},"tls_ja3":{"type":"string"},"tls_ja4":{"type":"string"},"tls_fingerprint_source":{"type":"string"},"tls_fingerprint_attestation":{"type":"string"},"extra":{}}),
+            serde_json::json!({"ip":{"type":"string"},"user_agent":{"type":"string"},"path":{"type":"string"},"method":{"type":"string"},"headers":{"type":"object","additionalProperties":{"type":"string"}},"body_snippet":{"type":"string"},"referer":{"type":"string"},"accept":{"type":"string"},"request_id":{"type":"string"},"timestamp":{"type":"string"},"tls_ja3":{"type":"string"},"tls_ja4":{"type":"string"},"tls_fingerprint_source":{"type":"string"},"tls_fingerprint_attestation":{"type":"string"},"robots_violation":{"type":"boolean"},"extra":{}}),
             vec![],
         ),
         "explain" => (
@@ -280,6 +280,7 @@ impl McpTool for ClassifyTool {
                 tls_fingerprint_source: None,
                 tls_fingerprint_attestation: None,
                 tls_fingerprint_verified: false,
+                robots_violation: false,
                 extra: None,
             });
         let result = crate::tools::classify::run_scoped(&state, req, caller_scope).await?;

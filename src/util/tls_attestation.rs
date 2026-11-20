@@ -192,6 +192,7 @@ mod tests {
             tls_fingerprint_source: Some("envoy".into()),
             tls_fingerprint_attestation: token,
             tls_fingerprint_verified: false,
+            robots_violation: false,
             extra: None,
         }
     }

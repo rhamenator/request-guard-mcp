@@ -62,6 +62,7 @@ pub(crate) fn parse_signals(
         "tls_ja4",
         "tls_fingerprint_source",
         "tls_fingerprint_attestation",
+        "robots_violation",
         "extra",
     ];
     let fields = signals_val.as_object().ok_or_else(|| {

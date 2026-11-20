@@ -17,6 +17,7 @@
     "tls_ja4": { "type": "string", "pattern": "^[A-Za-z0-9]{10}_[0-9A-Fa-f]{12}_[0-9A-Fa-f]{12}$", "description": "Caller-asserted canonical JA4 value; affects rules and cache identity only after server verification" },
     "tls_fingerprint_source": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,32}$", "description": "Caller-asserted collector or CDN provenance" },
     "tls_fingerprint_attestation": { "type": "string", "description": "Short-lived HMAC attestation from a trusted producer; never generate from untrusted request data" },
+    "robots_violation": { "type": "boolean", "description": "Caller-reported: the client requested a path the origin's robots.txt disallows. Request Guard does not fetch robots.txt. Omitted or false changes nothing" },
     "extra": { "type": "object", "description": "Arbitrary metadata; current classify rules do not score these values" }
   },
   "additionalProperties": false

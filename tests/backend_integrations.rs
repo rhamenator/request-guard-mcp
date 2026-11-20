@@ -94,6 +94,7 @@ fn classify_request(request_id: String, user_agent: &str) -> ClassifyRequest {
         tls_fingerprint_source: None,
         tls_fingerprint_attestation: None,
         tls_fingerprint_verified: false,
+        robots_violation: false,
         extra: None,
     }
 }

@@ -24,6 +24,7 @@ const CLASSIFY_REQUEST_FIELDS: &[&str] = &[
     "tls_ja4",
     "tls_fingerprint_source",
     "tls_fingerprint_attestation",
+    "robots_violation",
     "extra",
 ];
 

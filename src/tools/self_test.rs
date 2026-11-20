@@ -29,6 +29,7 @@ pub async fn run(state: &AppState, req: SelfTestRequest) -> SelfTestResponse {
             tls_fingerprint_source: None,
             tls_fingerprint_attestation: None,
             tls_fingerprint_verified: false,
+            robots_violation: false,
             extra: None,
         };
         let resp = crate::tools::classify::run_ephemeral(state, dummy).await;
@@ -70,6 +71,7 @@ pub async fn run(state: &AppState, req: SelfTestRequest) -> SelfTestResponse {
             tls_fingerprint_source: None,
             tls_fingerprint_attestation: None,
             tls_fingerprint_verified: false,
+            robots_violation: false,
             extra: None,
         };
         let resp = crate::tools::classify::run_ephemeral(state, dummy).await;

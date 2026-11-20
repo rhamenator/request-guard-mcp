@@ -56,6 +56,7 @@ pub fn request_fingerprint(
         "method": request.method.as_deref().map(str::to_ascii_uppercase),
         "header_presence": header_presence,
         "verified_tls": verified_tls,
+        "robots_violation": request.robots_violation,
     });
     sha256_hex(input.to_string().as_bytes())
 }
@@ -83,7 +84,7 @@ pub fn classification_cache_domain(
     ja4.sort_unstable();
     ja4.dedup();
     let input = serde_json::json!({
-        "schema": "classification-v3",
+        "schema": "classification-v4",
         "version": version,
         "git_commit": git_commit,
         "known_bad_ja3": ja3,
@@ -113,8 +114,20 @@ mod tests {
             tls_fingerprint_source: None,
             tls_fingerprint_attestation: None,
             tls_fingerprint_verified: false,
+            robots_violation: false,
             extra: None,
         }
+    }
+
+    #[test]
+    fn robots_violation_changes_the_cache_key() {
+        let base = request();
+        let mut flagged = request();
+        flagged.robots_violation = true;
+        assert_ne!(
+            request_fingerprint("caller", &base, "d"),
+            request_fingerprint("caller", &flagged, "d")
+        );
     }
 
     #[test]
