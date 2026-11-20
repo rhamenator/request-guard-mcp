@@ -22,6 +22,7 @@ fn bot_request() -> models::request::ClassifyRequest {
         tls_fingerprint_source: None,
         tls_fingerprint_attestation: None,
         tls_fingerprint_verified: false,
+        robots_violation: false,
         extra: None,
     }
 }
@@ -55,6 +56,7 @@ fn browser_request() -> models::request::ClassifyRequest {
         tls_fingerprint_source: None,
         tls_fingerprint_attestation: None,
         tls_fingerprint_verified: false,
+        robots_violation: false,
         extra: None,
     }
 }
@@ -133,6 +135,7 @@ async fn scrapy_ua_is_flagged_or_blocked() {
         tls_fingerprint_source: None,
         tls_fingerprint_attestation: None,
         tls_fingerprint_verified: false,
+        robots_violation: false,
         extra: None,
     };
     let resp = tools::classify::run(&state, req).await.unwrap();
@@ -162,6 +165,7 @@ async fn sensitive_path_raises_score() {
         tls_fingerprint_source: None,
         tls_fingerprint_attestation: None,
         tls_fingerprint_verified: false,
+        robots_violation: false,
         extra: None,
     };
     let resp = tools::classify::run(&state, req).await.unwrap();
@@ -290,4 +294,48 @@ fn serialized_request_omits_server_verified_tls_and_the_attestation() {
     assert!(payload.get("tls_fingerprint_attestation").is_none());
     let replayed: models::request::ClassifyRequest = serde_json::from_value(payload).unwrap();
     assert!(!replayed.tls_fingerprint_verified);
+}
+
+#[test]
+fn robots_violation_accepts_only_a_boolean_and_other_unknown_fields_still_fail() {
+    assert!(
+        serde_json::from_value::<models::request::ClassifyRequest>(
+            serde_json::json!({"robots_violation": true})
+        )
+        .unwrap()
+        .robots_violation
+    );
+    assert!(
+        !serde_json::from_value::<models::request::ClassifyRequest>(serde_json::json!({}))
+            .unwrap()
+            .robots_violation
+    );
+    for bad in [
+        serde_json::json!("yes"),
+        serde_json::json!(1),
+        serde_json::json!(null),
+    ] {
+        let parsed = serde_json::from_value::<models::request::ClassifyRequest>(
+            serde_json::json!({"robots_violation": bad}),
+        );
+        // null deserialises to the default for a bool field with serde(default) only if
+        // Option; a plain bool rejects it, which is the strict behaviour we want.
+        assert!(parsed.is_err(), "{bad} must be rejected");
+    }
+    assert!(serde_json::from_value::<models::request::ClassifyRequest>(
+        serde_json::json!({"robots_violaton": true})
+    )
+    .is_err());
+}
+
+#[test]
+fn robots_violation_is_omitted_from_serialized_requests_unless_true() {
+    let mut request = browser_request();
+    let plain = serde_json::to_value(&request).unwrap();
+    assert!(plain.get("robots_violation").is_none());
+    request.robots_violation = true;
+    assert_eq!(
+        serde_json::to_value(&request).unwrap()["robots_violation"],
+        true
+    );
 }

@@ -22,6 +22,7 @@ fn make_req(ua: &str) -> models::request::ClassifyRequest {
         tls_fingerprint_source: None,
         tls_fingerprint_attestation: None,
         tls_fingerprint_verified: false,
+        robots_violation: false,
         extra: None,
     }
 }

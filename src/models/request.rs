@@ -6,6 +6,10 @@ use std::collections::HashMap;
 #[serde(deny_unknown_fields)]
 pub struct EmptyToolRequest {}
 
+fn is_false(value: &bool) -> bool {
+    !*value
+}
+
 /// Primary classification request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -29,6 +33,12 @@ pub struct ClassifyRequest {
     /// Server-derived provenance. JSON callers cannot set this field.
     #[serde(default, skip_serializing, skip_deserializing)]
     pub tls_fingerprint_verified: bool,
+    /// Caller-reported: the client fetched a path that the origin's robots.txt
+    /// disallows. Request Guard never fetches robots.txt itself, so this is an
+    /// assertion from the caller (for example AI Scraping Defense). Absent or
+    /// false leaves every score unchanged.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub robots_violation: bool,
     pub extra: Option<serde_json::Value>,
 }
 

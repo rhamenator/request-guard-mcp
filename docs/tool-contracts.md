@@ -19,7 +19,8 @@ Classify a single HTTP request as bot/human.
   "tls_ja4": "t13d1516h2_8daaf6152771_e5627efa2ab1",
   "tls_fingerprint_source": "envoy",
   "tls_fingerprint_attestation": "v1:1700000000:<64 hex characters>",
-  "request_id": "uuid-optional"
+  "request_id": "uuid-optional",
+  "robots_violation": true
 }
 ```
 
@@ -28,6 +29,15 @@ valid `tls_fingerprint_attestation`. The server consumes the token and derives
 verification status itself; callers cannot assert `tls_fingerprint_verified`.
 Only verified values affect TLS rules and cache identity. See
 [TLS fingerprint attestation](tls-fingerprint-attestation.md).
+
+`robots_violation` is an optional boolean asserted by the caller: the client
+requested a path that the origin's robots.txt disallows. Request Guard never
+fetches or parses robots.txt; the caller (for example AI Scraping Defense) does
+that and reports the result. When `true` the rule engine adds a `robots_violation`
+signal (value 1.0, weight 0.9) that can reach `block` on its own. When omitted or
+`false`, every score is identical to a request without the field. The value is
+part of the cache key and the replayable decision snapshot. See
+[scoring changes in 1.1.0](scoring-changes-1.1.0.md).
 
 Development main rejects unknown metadata names such as `pah` instead of
 classifying a partial request as clean; put custom metadata in `extra`.

@@ -57,6 +57,8 @@ fn replay_feature_snapshot(request: &ClassifyRequest) -> ClassifyRequest {
         tls_fingerprint_source: None,
         tls_fingerprint_attestation: None,
         tls_fingerprint_verified: false,
+        // A caller-reported robots violation is a replayable rule input.
+        robots_violation: request.robots_violation,
         extra: None,
     }
 }

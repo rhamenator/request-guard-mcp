@@ -64,7 +64,7 @@ impl Scorer {
         let names: Vec<&str> = signals.as_slice().iter().map(|s| s.name.as_str()).collect();
         if names.contains(&"ua_ai_bot") {
             ThreatCategory::AiScraping
-        } else if names.contains(&"ua_scraper") {
+        } else if names.contains(&"ua_scraper") || names.contains(&"robots_violation") {
             ThreatCategory::Scraping
         } else if names.iter().any(|n| n.starts_with("ua_")) {
             ThreatCategory::BotTraffic

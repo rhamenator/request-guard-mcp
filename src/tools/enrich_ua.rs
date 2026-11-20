@@ -34,6 +34,7 @@ fn enrich(req: EnrichUaRequest) -> EnrichUaResponse {
     let pattern_score = match user_agent_pattern(ua) {
         Some(UserAgentPattern::AiBot) => 0.8_f64,
         Some(UserAgentPattern::Scraper) => 0.7_f64,
+        Some(UserAgentPattern::GenericClient) => 0.4_f64,
         None => 0.1_f64,
     };
     let risk_score = if is_bot {
