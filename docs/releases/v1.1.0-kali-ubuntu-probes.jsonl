@@ -1,0 +1,135 @@
+{"probe": "backend_absent", "case": "redis_unavailable_error", "pass": true, "detail": {"http": 200, "rpc": -502, "message": "INTEGRATION_UNAVAILABLE"}}
+{"probe": "backend_absent", "case": "core_tool_after_backend_error", "pass": true, "detail": {"http": 200, "isError": false}}
+{"probe": "backend_absent", "passed": 2, "total": 2}
+{"probe": "classifier", "case": "benign_browser", "pass": true, "http": 200, "signals": []}
+{"probe": "classifier", "case": "gptbot_casefold", "pass": true, "http": 200, "signals": ["ua_ai_bot", "ua_non_browser"]}
+{"probe": "classifier", "case": "gptbot_embedded", "pass": true, "http": 200, "signals": ["ua_ai_bot"]}
+{"probe": "classifier", "case": "raw_dotenv", "pass": true, "http": 200, "signals": ["path_sensitive"]}
+{"probe": "classifier", "case": "encoded_dotenv", "pass": true, "http": 200, "signals": ["path_sensitive"]}
+{"probe": "classifier", "case": "double_encoded_dotenv", "pass": true, "http": 200, "signals": ["path_sensitive"]}
+{"probe": "classifier", "case": "triple_encoded_dotenv", "pass": true, "http": 200, "signals": ["path_sensitive"]}
+{"probe": "classifier", "case": "quadruple_encoded_dotenv", "pass": true, "http": 200, "signals": ["path_sensitive"]}
+{"probe": "classifier", "case": "encoded_separator", "pass": true, "http": 200, "signals": ["path_sensitive"]}
+{"probe": "classifier", "case": "double_encoded_backslash", "pass": true, "http": 200, "signals": ["path_sensitive"]}
+{"probe": "classifier", "case": "masscan_scanner", "pass": true, "http": 200, "signals": ["ua_non_browser", "ua_scraper"]}
+{"probe": "classifier", "case": "nikto_scanner", "pass": true, "http": 200, "signals": ["ua_non_browser", "ua_scraper"]}
+{"probe": "classifier", "case": "sqlmap_scanner", "pass": true, "http": 200, "signals": ["ua_non_browser", "ua_scraper"]}
+{"probe": "classifier", "case": "httpclient_library", "pass": true, "http": 200, "signals": ["ua_non_browser", "ua_scraper"]}
+{"probe": "classifier", "case": "internal_path", "pass": true, "http": 200, "signals": ["path_sensitive"]}
+{"probe": "classifier", "case": "internal_child", "pass": true, "http": 200, "signals": ["path_sensitive"]}
+{"probe": "classifier", "case": "xmlrpc_path", "pass": true, "http": 200, "signals": ["path_sensitive"]}
+{"probe": "classifier", "case": "internalized_control", "pass": true, "http": 200, "signals": []}
+{"probe": "classifier", "case": "xmlrpc_suffix_control", "pass": true, "http": 200, "signals": []}
+{"probe": "classifier", "passed": 19, "total": 19}
+{"probe": "connection_burst", "case": "bounded_connection_burst", "pass": true, "shed": 128, "attempted": 128, "exceptions": 0, "max_latency_ms": 1.36, "recovered": true}
+{"probe": "connection_cap", "case": "connection_cap_holds_two", "pass": true, "detail": "pending"}
+{"probe": "connection_cap", "case": "connection_cap_sheds_third", "pass": true, "detail": "closed"}
+{"probe": "connection_cap", "case": "connection_cap_recovers", "pass": true, "detail": "ping"}
+{"probe": "connection_cap", "passed": 3, "total": 3}
+{"probe": "envelope_fuzz", "case": "bounded_malformed_envelopes", "passed": 128, "total": 128, "seconds": 1.006, "recovery": true, "failures": []}
+{"probe": "envelope_pinned", "case": "parse_error", "pass": true}
+{"probe": "envelope_pinned", "case": "array_input", "pass": true}
+{"probe": "envelope_pinned", "case": "wrong_jsonrpc", "pass": true}
+{"probe": "envelope_pinned", "case": "null_request_id", "pass": true}
+{"probe": "envelope_pinned", "case": "fractional_request_id", "pass": true}
+{"probe": "envelope_pinned", "case": "nonobject_params", "pass": true}
+{"probe": "envelope_pinned", "case": "integer_id", "pass": true}
+{"probe": "envelope_pinned", "case": "string_id", "pass": true}
+{"probe": "envelope_pinned", "case": "notification", "pass": true}
+{"probe": "envelope_pinned", "case": "bad_notification", "pass": true}
+{"probe": "envelope_pinned", "case": "client_response", "pass": true}
+{"probe": "envelope_pinned", "case": "bad_client_result", "pass": true}
+{"probe": "envelope_pinned", "case": "recovery", "pass": true}
+{"probe": "envelope_pinned", "passed": 13, "total": 13}
+{"probe": "http_mcp_auth", "case": "missing_auth", "pass": true, "detail": 401}
+{"probe": "http_mcp_auth", "case": "wrong_auth", "pass": true, "detail": 403}
+{"probe": "http_mcp_auth", "case": "authorized_rpc", "pass": true, "detail": 200}
+{"probe": "http_mcp_auth", "case": "malformed_json", "pass": true, "detail": {"http": 200, "rpc": -32700}}
+{"probe": "http_mcp_auth", "case": "wrong_jsonrpc_version", "pass": true, "detail": 200}
+{"probe": "http_mcp_auth", "case": "invalid_request_id", "pass": true, "detail": 200}
+{"probe": "http_mcp_auth", "case": "scalar_params", "pass": true, "detail": 200}
+{"probe": "http_mcp_auth", "case": "invalid_parameter_type", "pass": true, "detail": 200}
+{"probe": "http_mcp_auth", "case": "instruction_as_data", "pass": true, "detail": 200}
+{"probe": "http_mcp_auth", "case": "oversized_body", "pass": true, "detail": 413}
+{"probe": "http_mcp_auth", "passed": 10, "total": 10}
+{"probe": "postgres_healthy", "stage": "healthy", "tool": "classify", "pass": true, "http": 200, "error_code": null}
+{"probe": "postgres_healthy", "stage": "healthy", "tool": "replay_decision", "pass": true, "http": 200, "error_code": null}
+{"probe": "postgres_healthy", "stage": "healthy", "tool": "ping", "pass": true, "http": 200, "error_code": null}
+{"probe": "postgres_healthy", "passed": 3, "total": 3}
+{"probe": "postgres_outage", "stage": "outage", "tool": "classify", "pass": true, "http": 200, "error_code": -502}
+{"probe": "postgres_outage", "stage": "outage", "tool": "replay_decision", "pass": true, "http": 200, "error_code": -502}
+{"probe": "postgres_outage", "stage": "outage", "tool": "ping", "pass": true, "http": 200, "error_code": null}
+{"probe": "postgres_outage", "passed": 3, "total": 3}
+{"probe": "postgres_restarted", "stage": "healthy", "tool": "classify", "pass": true, "http": 200, "error_code": null}
+{"probe": "postgres_restarted", "stage": "healthy", "tool": "replay_decision", "pass": true, "http": 200, "error_code": null}
+{"probe": "postgres_restarted", "stage": "healthy", "tool": "ping", "pass": true, "http": 200, "error_code": null}
+{"probe": "postgres_restarted", "passed": 3, "total": 3}
+{"probe": "redis_healthy", "stage": "healthy", "tool": "threat_lookup", "pass": true, "http": 200, "error_code": null}
+{"probe": "redis_healthy", "stage": "healthy", "tool": "classify", "pass": true, "http": 200, "error_code": null}
+{"probe": "redis_healthy", "passed": 2, "total": 2}
+{"probe": "redis_outage", "stage": "outage", "tool": "threat_lookup", "pass": true, "http": 200, "error_code": -502}
+{"probe": "redis_outage", "stage": "outage", "tool": "classify", "pass": true, "http": 200, "error_code": null}
+{"probe": "redis_outage", "passed": 2, "total": 2}
+{"probe": "redis_restarted", "stage": "healthy", "tool": "threat_lookup", "pass": true, "http": 200, "error_code": null}
+{"probe": "redis_restarted", "stage": "healthy", "tool": "classify", "pass": true, "http": 200, "error_code": null}
+{"probe": "redis_restarted", "passed": 2, "total": 2}
+{"probe": "robots_violation_input", "case": "true_blocks", "got": ["block", 1.0, ["robots_violation"]], "pass": true, "note": ""}
+{"probe": "robots_violation_input", "case": "false_is_identical_to_absent", "got": ["allow", 0.0, []], "pass": true, "note": ""}
+{"probe": "robots_violation_input", "case": "rejects_string_true", "got": ["error", -400], "pass": true, "note": "non-boolean must not be coerced"}
+{"probe": "robots_violation_input", "case": "rejects_int_one", "got": ["error", -400], "pass": true, "note": "non-boolean must not be coerced"}
+{"probe": "robots_violation_input", "case": "rejects_null", "got": ["error", -400], "pass": true, "note": "non-boolean must not be coerced"}
+{"probe": "robots_violation_input", "case": "rejects_array", "got": ["error", -400], "pass": true, "note": "non-boolean must not be coerced"}
+{"probe": "robots_violation_input", "case": "rejects_object", "got": ["error", -400], "pass": true, "note": "non-boolean must not be coerced"}
+{"probe": "robots_violation_input", "case": "rejects_huge_int", "got": ["error", -400], "pass": true, "note": "non-boolean must not be coerced"}
+{"probe": "robots_violation_input", "case": "rejects_empty_string", "got": ["error", -400], "pass": true, "note": "non-boolean must not be coerced"}
+{"probe": "robots_violation_input", "case": "not_via_extra", "got": ["allow", 0.0, []], "pass": true, "note": ""}
+{"probe": "robots_violation_input", "case": "not_via_headers", "got": ["allow", 0.0, []], "pass": true, "note": ""}
+{"probe": "robots_violation_input", "case": "unknown_neighbour_rejected", "got": ["error", -400], "pass": true, "note": ""}
+{"probe": "robots_violation_input", "case": "duplicate_key_no_crash", "got": [200], "pass": true, "note": ""}
+{"probe": "robots_violation_input", "case": "explain_applies_field", "got": true, "pass": true, "note": "factor robots_violation present, no RPC error"}
+{"probe": "robots_violation_input", "case": "score_breakdown_applies_field", "got": true, "pass": true, "note": "total >= block threshold, signal in breakdown"}
+{"probe": "robots_violation_input", "case": "batch_items_independent", "got": true, "pass": true, "note": "item 0 block, item 1 allow, errors == 0"}
+{"probe": "robots_violation_input", "case": "validators_reject_errors", "got": [false, false, false, false], "pass": true, "note": ""}
+{"probe": "robots_violation_input", "case": "alternating_40_no_residue", "got": ["block", "allow", "block", "allow"], "pass": true, "note": ""}
+{"probe": "robots_violation_input", "case": "healthy_afterwards", "got": [200], "pass": true, "note": ""}
+{"probe": "robots_violation_input", "summary": {"passed": 19, "total": 19, "requests": 58}}
+{"probe": "slow_client", "case": "incomplete_headers_close", "pass": true, "detail": null}
+{"probe": "slow_client", "case": "incomplete_body_408", "pass": true, "detail": 408}
+{"probe": "slow_client", "case": "chunked_body_413", "pass": true, "detail": 413}
+{"probe": "slow_client", "case": "post_limit_recovery", "pass": true, "detail": 200}
+{"probe": "slow_client", "passed": 4, "total": 4}
+{"probe": "transport_pinned", "case": "missing_bearer", "pass": true, "http": 401}
+{"probe": "transport_pinned", "case": "wrong_bearer", "pass": true, "http": 403}
+{"probe": "transport_pinned", "case": "authorized_ping", "pass": true, "http": 200}
+{"probe": "transport_pinned", "case": "unlisted_origin", "pass": true, "http": 403}
+{"probe": "transport_pinned", "case": "unsupported_protocol_header", "pass": true, "http": 400}
+{"probe": "transport_pinned", "case": "non_json_content_type", "pass": true, "http": 415}
+{"probe": "transport_pinned", "case": "json_excluded_by_accept", "pass": true, "http": 406}
+{"probe": "transport_pinned", "case": "non_upgrade_get", "pass": true, "http": 405}
+{"probe": "transport_pinned", "case": "accepted_notification", "pass": true, "http": 202}
+{"probe": "transport_pinned", "case": "invalid_notification", "pass": true, "http": 400}
+{"probe": "transport_pinned", "case": "post_rejection_recovery", "pass": true, "http": 200}
+{"probe": "transport_pinned", "passed": 11, "total": 11}
+{"probe": "websocket", "case": "ws_missing_auth", "pass": true, "detail": 401}
+{"probe": "websocket", "case": "ws_wrong_auth", "pass": true, "detail": 403}
+{"probe": "websocket", "case": "ws_authorized_upgrade", "pass": true, "detail": 101}
+{"probe": "websocket", "case": "ws_initialize", "pass": true, "detail": {"opcode": 1, "id": 1}}
+{"probe": "websocket", "case": "ws_malformed_json", "pass": true, "detail": {"opcode": 1, "code": -32700}}
+{"probe": "websocket", "case": "ws_wrong_jsonrpc_version", "pass": true, "detail": {"opcode": 1, "code": -32600}}
+{"probe": "websocket", "case": "ws_scalar_params", "pass": true, "detail": {"opcode": 1, "code": -32600}}
+{"probe": "websocket", "case": "ws_array_input", "pass": true, "detail": {"opcode": 1, "code": -32600}}
+{"probe": "websocket", "case": "ws_empty_object", "pass": true, "detail": {"opcode": 1, "code": -32600}}
+{"probe": "websocket", "case": "ws_null_request_id", "pass": true, "detail": {"opcode": 1, "code": -32600}}
+{"probe": "websocket", "case": "ws_fractional_request_id", "pass": true, "detail": {"opcode": 1, "code": -32600}}
+{"probe": "websocket", "case": "ws_nonobject_params", "pass": true, "detail": {"opcode": 1, "code": -32600}}
+{"probe": "websocket", "case": "ws_bad_notification", "pass": true, "detail": {"opcode": 1, "code": -32600}}
+{"probe": "websocket", "case": "ws_bad_client_result", "pass": true, "detail": {"opcode": 1, "code": -32600}}
+{"probe": "websocket", "case": "ws_integer_id", "pass": true, "detail": {"opcode": 1, "id": 7}}
+{"probe": "websocket", "case": "ws_string_id", "pass": true, "detail": {"opcode": 1, "id": "string"}}
+{"probe": "websocket", "case": "ws_tools_list", "pass": true, "detail": {"opcode": 1, "tools": 23}}
+{"probe": "websocket", "case": "ws_notification_no_reply", "pass": true, "detail": {"upgrade": 101, "no_reply": true, "recovered": true}}
+{"probe": "websocket", "case": "ws_client_response_no_reply", "pass": true, "detail": {"upgrade": 101, "no_reply": true, "recovered": true}}
+{"probe": "websocket", "case": "ws_oversized_frame", "pass": true, "detail": {"upgrade": 101, "opcode": 8, "close_code": 1009, "hard_close": false}}
+{"probe": "websocket", "case": "ws_oversized_fragmented_message", "pass": true, "detail": {"upgrade": 101, "opcode": 8, "close_code": 1009, "hard_close": false}}
+{"probe": "websocket", "case": "ws_after_oversize_recovers", "pass": true, "detail": {"upgrade": 101, "opcode": 1}}
+{"probe": "websocket", "passed": 22, "total": 22}
