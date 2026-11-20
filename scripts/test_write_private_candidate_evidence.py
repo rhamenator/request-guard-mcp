@@ -73,6 +73,12 @@ def main() -> None:
                         "--release-run-id", 456, "--release-run-attempt", 1,
                         "--output", output)
         assert result.returncode != 0 and "invalid candidate label" in result.stderr
+    # Stable and release-candidate labels are accepted; build metadata and bad numbering are not.
+    import write_private_candidate_evidence as writer
+    for good in ("v1.1.0", "v1.1.0-rc.1", "v10.20.30-rc.12"):
+        assert writer.LABEL.fullmatch(good), good
+    for bad in ("v1.1.0+bad", "v1.1.0-rc.0", "v1.1.0-rc.01", "v1.1.0-beta.1", "1.1.0", "v1.1"):
+        assert not writer.LABEL.fullmatch(bad), bad
     print("PASS private candidate evidence: source, label, digests and checksum rejection")
 
 

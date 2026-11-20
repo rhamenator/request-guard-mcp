@@ -13,7 +13,7 @@ import re
 
 SHA256 = re.compile(r"[0-9a-f]{64}\Z")
 SHA1 = re.compile(r"[0-9a-f]{40}\Z")
-LABEL = re.compile(r"v[0-9]+\.[0-9]+\.[0-9]+-rc\.[1-9][0-9]*\Z")
+LABEL = re.compile(r"v[0-9]+\.[0-9]+\.[0-9]+(?:-rc\.[1-9][0-9]*)?\Z")
 
 
 def digest(path: Path) -> str:
