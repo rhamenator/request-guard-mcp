@@ -86,12 +86,13 @@
 {"probe": "robots_violation_input", "case": "not_via_headers", "got": ["allow", 0.0, []], "pass": true, "note": ""}
 {"probe": "robots_violation_input", "case": "unknown_neighbour_rejected", "got": ["error", -400], "pass": true, "note": ""}
 {"probe": "robots_violation_input", "case": "duplicate_key_no_crash", "got": [200], "pass": true, "note": ""}
-{"probe": "robots_violation_input", "case": "explain_accepts_field", "got": [200, "other"], "pass": true, "note": ""}
-{"probe": "robots_violation_input", "case": "score_breakdown_accepts_field", "got": [200, "other"], "pass": true, "note": ""}
-{"probe": "robots_violation_input", "case": "batch_independent_items", "got": [200, [null, null]], "pass": true, "note": ""}
+{"probe": "robots_violation_input", "case": "explain_applies_field", "got": true, "pass": true, "note": "factor robots_violation present, no RPC error"}
+{"probe": "robots_violation_input", "case": "score_breakdown_applies_field", "got": true, "pass": true, "note": "total >= block threshold, signal in breakdown"}
+{"probe": "robots_violation_input", "case": "batch_items_independent", "got": true, "pass": true, "note": "item 0 block, item 1 allow, errors == 0"}
+{"probe": "robots_violation_input", "case": "validators_reject_errors", "got": [false, false, false, false], "pass": true, "note": ""}
 {"probe": "robots_violation_input", "case": "alternating_40_no_residue", "got": ["block", "allow", "block", "allow"], "pass": true, "note": ""}
 {"probe": "robots_violation_input", "case": "healthy_afterwards", "got": [200], "pass": true, "note": ""}
-{"probe": "robots_violation_input", "summary": {"passed": 18, "total": 18, "requests": 58}}
+{"probe": "robots_violation_input", "summary": {"passed": 19, "total": 19, "requests": 58}}
 {"probe": "slow_client", "case": "incomplete_headers_close", "pass": true, "detail": null}
 {"probe": "slow_client", "case": "incomplete_body_408", "pass": true, "detail": 408}
 {"probe": "slow_client", "case": "chunked_body_413", "pass": true, "detail": 413}

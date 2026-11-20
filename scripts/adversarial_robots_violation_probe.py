@@ -38,12 +38,24 @@ case("unknown_neighbour_rejected", classify({**BASE, "robots_violaton": True})[1
 # duplicate keys and raw framing around the field
 s, b = post(b'{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"classify","arguments":{"method":"GET","path":"/","user_agent":"x","robots_violation":false,"robots_violation":true}}}')
 case("duplicate_key_no_crash", (s,), lambda g: g[0] in (200, 400))
-# the other tools that accept a classify-shaped request
-s, g = classify({"classification": {**BASE, "robots_violation": True}}, tool="explain"); case("explain_accepts_field", (s, g[0]), lambda g: g[0] == 200)
-s, g = classify({"signals": {**BASE, "robots_violation": True}}, tool="score_breakdown"); case("score_breakdown_accepts_field", (s, g[0]), lambda g: g[0] == 200)
-s, b = post({"jsonrpc": "2.0", "id": 77, "method": "tools/call", "params": {"name": "batch_classify", "arguments": {"items": [{**BASE, "robots_violation": True}, BASE]}}})
-r = ((b or {}).get("result") or {}); r = r.get("structuredContent") or r
-case("batch_independent_items", (s, [x.get("verdict") for x in (r.get("results") or r.get("items") or [])][:2]), lambda g: g[0] == 200)
+# the other tools that accept a classify-shaped request: validate the payload, not just HTTP 200
+def tool_result(tool, args):
+    s, b = post({"jsonrpc": "2.0", "id": n[0] + 1, "method": "tools/call", "params": {"name": tool, "arguments": args}})
+    if s != 200 or not isinstance(b, dict) or "error" in b: return None
+    r = b.get("result") or {}
+    if r.get("isError"): return None
+    return r.get("structuredContent") or r
+def explain_ok(r): return bool(r) and "robots_violation" in [f.get("name") for f in r.get("factors", [])]
+def breakdown_ok(r): return bool(r) and r.get("total_score", 0) >= 0.75 and any("robots_violation" in e.get("signals", []) for e in r.get("breakdown", []))
+def batch_ok(r):
+    items = (r or {}).get("results") or []
+    verdicts = [((i.get("result") or {}).get("verdict"), i.get("error")) for i in items]
+    return bool(r) and r.get("errors") == 0 and verdicts == [("block", None), ("allow", None)]
+case("explain_applies_field", bool(explain_ok(tool_result("explain", {"classification": {**BASE, "robots_violation": True}}))), lambda g: g is True, "factor robots_violation present, no RPC error")
+case("score_breakdown_applies_field", bool(breakdown_ok(tool_result("score_breakdown", {"signals": {**BASE, "robots_violation": True}}))), lambda g: g is True, "total >= block threshold, signal in breakdown")
+case("batch_items_independent", bool(batch_ok(tool_result("batch_classify", {"items": [{**BASE, "robots_violation": True}, BASE]}))), lambda g: g is True, "item 0 block, item 1 allow, errors == 0")
+# the validators themselves must reject error-shaped results (guards against a pass-on-error probe)
+case("validators_reject_errors", [explain_ok(None), breakdown_ok(None), batch_ok(None), batch_ok({"errors": 2, "results": []})], lambda g: not any(g))
 # repeated flips never leave residue between requests
 seq = [classify({**BASE, "robots_violation": i % 2 == 0})[1][0] for i in range(40)]
 case("alternating_40_no_residue", seq[:4], lambda g: seq == ["block", "allow"] * 20)
