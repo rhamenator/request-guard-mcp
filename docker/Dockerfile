@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 # ─── Build stage ──────────────────────────────────────────────────────────────
 # Review both multi-architecture index digests when updating the toolchain or OS.
-FROM rust:1.99.1-slim-bookworm@sha256:54e39a2f4480fd827ebfa47736212703a1e46be0fddf7e1590aa0e94b8d0cae1 AS builder
+FROM rust:1.99.1-slim-bookworm@sha256:f2c004e3d2d8b547e8cf7ffbc29205385f4e71d23e53e4e383065db5e9f822cd AS builder
 
 WORKDIR /build
 
