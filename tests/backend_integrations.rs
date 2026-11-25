@@ -618,7 +618,7 @@ async fn concurrent_postgres_schema_initialization_completes() {
     // Isolate the first-run DDL race from the other parallel backend tests.
     let schema = format!("request_guard_{}", Uuid::new_v4().simple());
     let admin = sqlx::PgPool::connect(&postgres_url).await.unwrap();
-    sqlx::query(&format!("CREATE SCHEMA {schema}"))
+    sqlx::query(sqlx::AssertSqlSafe(format!("CREATE SCHEMA {schema}")))
         .execute(&admin)
         .await
         .unwrap();
@@ -650,7 +650,7 @@ async fn concurrent_postgres_schema_initialization_completes() {
     .unwrap();
     assert_eq!(created.0, 1, "schema URL did not isolate the first-run DDL");
     drop((a, b, c, d));
-    sqlx::query(&format!("DROP SCHEMA {schema} CASCADE"))
+    sqlx::query(sqlx::AssertSqlSafe(format!("DROP SCHEMA {schema} CASCADE")))
         .execute(&admin)
         .await
         .unwrap();
@@ -668,7 +668,7 @@ async fn initialized_postgres_schema_does_not_wait_for_ddl_lock() {
 
     let schema = format!("request_guard_{}", Uuid::new_v4().simple());
     let admin = sqlx::PgPool::connect(&postgres_url).await.unwrap();
-    sqlx::query(&format!("CREATE SCHEMA {schema}"))
+    sqlx::query(sqlx::AssertSqlSafe(format!("CREATE SCHEMA {schema}")))
         .execute(&admin)
         .await
         .unwrap();
@@ -682,9 +682,9 @@ async fn initialized_postgres_schema_does_not_wait_for_ddl_lock() {
     // ACCESS EXCLUSIVE table lock of CREATE TABLE IF NOT EXISTS. The second
     // initializer must finish while this transaction still holds the lock.
     let mut writer = admin.begin().await.unwrap();
-    sqlx::query(&format!(
+    sqlx::query(sqlx::AssertSqlSafe(format!(
         "LOCK TABLE {schema}.mcp_decisions IN ACCESS SHARE MODE"
-    ))
+    )))
     .execute(&mut *writer)
     .await
     .unwrap();
@@ -698,9 +698,9 @@ async fn initialized_postgres_schema_does_not_wait_for_ddl_lock() {
     assert!(second.postgres.ping().await);
     writer.rollback().await.unwrap();
     // A legacy or incomplete schema must still take the migration path.
-    sqlx::query(&format!(
+    sqlx::query(sqlx::AssertSqlSafe(format!(
         "DROP INDEX {schema}.idx_mcp_feedback_caller_created"
-    ))
+    )))
     .execute(&admin)
     .await
     .unwrap();
@@ -715,7 +715,7 @@ async fn initialized_postgres_schema_does_not_wait_for_ddl_lock() {
         "schema initialization did not restore missing index"
     );
     drop((first, second, repaired));
-    sqlx::query(&format!("DROP SCHEMA {schema} CASCADE"))
+    sqlx::query(sqlx::AssertSqlSafe(format!("DROP SCHEMA {schema} CASCADE")))
         .execute(&admin)
         .await
         .unwrap();
