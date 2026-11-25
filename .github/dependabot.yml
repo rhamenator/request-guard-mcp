@@ -5,6 +5,9 @@ updates:
     schedule:
       interval: weekly
     groups:
+      # These crates are versioned together; one moving alone leaves two incompatible copies of the API (PR 374 failed to build).
+      opentelemetry:
+        patterns: ["opentelemetry*", "tracing-opentelemetry"]
       cargo-minor-patch:
         update-types: [minor, patch]
     ignore:
