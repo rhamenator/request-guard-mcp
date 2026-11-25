@@ -84,7 +84,7 @@ moka = { version = "0.12", features = ["future"] }
 
 # IP parsing
 ipnetwork = "0.21"
-maxminddb = "0.28"
+maxminddb = "0.33"
 
 # Regex
 regex = "1.10"
