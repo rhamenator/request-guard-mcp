@@ -7,6 +7,11 @@ updates:
     groups:
       cargo-minor-patch:
         update-types: [minor, patch]
+    ignore:
+      # Keep the direct tungstenite dependency on the same version axum's WebSocket stack uses. With two versions in the
+      # build, the downcast in src/mcp/transport_ws.rs that detects "message too big" never matches, so oversized frames
+      # get a hard disconnect instead of a 1009 close frame (PR 171). Remove this once axum moves to tungstenite 0.30.
+      - dependency-name: tungstenite
   - package-ecosystem: github-actions
     directory: /
     schedule:
